@@ -1,6 +1,6 @@
 # Team_21_Grocery_Robot
 
-Our group’s vision is to make everyday shopping more efficient and inclusive, and we aim to address these issues that would benefit both owners and customers through an intelligent, multi-functional robotic system to improve shelf management and customer experience.
+Our group’s vision is to make everyday shopping more efficient and inclusive. We aim to address issues that would benefit both owners and customers through an intelligent, multi-functional robotic system to improve shelf management and customer experience. Our final delivery would be a multi-wheel robot with functional robotic arm(s), sensors, cameras, and artificial intelligence to assist in employee stocking and customer shopping.
 
 <p align="center">
 <img src="./images/thisismyteam.png" width="50%">
