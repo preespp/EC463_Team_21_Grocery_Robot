@@ -6,11 +6,11 @@ Our group’s vision is to make everyday shopping more efficient and inclusive. 
 <img src="./images/thisismyteam.png" width="50%">
 </p>
 <p align="center">
-This is my team
+This is our team
 </p>
 
 ## Team links
-- [Team Google Drive]()
+- [Team Google Drive](https://drive.google.com/drive/folders/1yiAgVb-4LaUo8HKmD3yormvIIuaboWg9)
 
 ## Course links
 - [ECE Senior Design Piazza Site](https://piazza.com/bu/fall2025/ec463/home)
