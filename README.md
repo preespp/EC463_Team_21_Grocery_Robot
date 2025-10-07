@@ -21,7 +21,7 @@ Darren Figo Sajino, Pree Simphliphan, Bach Thien Nguyen, Bernie Xu, Xingjian Jia
 
 
 ## Optional features links
-- Team Jira
+- Team Jira (https://seniordesign-team-21.atlassian.net/jira/software/projects/SCRUM/summary)
 - Team Confluence
 - Something else
 
