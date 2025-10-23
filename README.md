@@ -56,13 +56,20 @@ Post-COVID staffing shortages in the grocery industry have created major operati
 
 ## System Architecture
 <p align="center">
-<img src="./images/ros2.jpg" width="50%">
+<img src="./images/ROS2.png" width="50%">
+</p>
+
+<p align="center">
 ROS2 System Architecture
 </p>
+
 <p align="center">
-<img src="./images/workflow.jpg" width="50%">
+<img src="./images/workflow.png" width="50%">
+</p>
+<p align="center">
 Logic Workflow
 </p>
+
 ### Software Stack
 - Python
 - ROS2
