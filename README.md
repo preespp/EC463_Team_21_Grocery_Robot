@@ -28,20 +28,66 @@ The robotic system will navigate through a grocery store to restock products and
 
 ## Problems and Market Analysis
 ### Market Research
+Post-COVID staffing shortages in the grocery industry have created major operational challenges for store owners and employees, as well as accessibility obstacles for customers. With 68% of grocery managers rating labor availability as "difficult" or "very difficult" and turnover rates approaching 80% during the COVID peak, owners are struggling to maintain productivity and service levels. Among American adults, 61 million (one in four) are living with disabilities, and 27% of surveyed individuals with disabilities encounter accessibility barriers during shopping at least monthly. The urgent need for assistive technologies and labor-saving automation in grocery retail thus benefits both store owners and customers, improving operational efficiency and enhancing inclusivity.
 
 ### User Stories and User Requirement
+- As a store owner, I want the robot to automatically restock the product to reduce the cost of human labor. 
+- As a store owner, I want to have a real-time digital inventory report so I can save time waiting for the report.
+- As a store employee, I want the robot to reduce my workload and focus more on more important things or serve the customers.
+- As a shop customer, I want the robot to look for the product and navigate to the aisle for me, so that I will not get lost in the store.
+- As a customer with special needs, I want to shop independently so that I do not have to ask my friends/relatives for help.
+- As a delivery driver, I want to have my customer’s order be ready and packed when I arrive to save time. 
 
 ## Goals
 ### Minimum Viable Product
+- Single-Aisle Navigation: fixed route in a mock aisle using line tracing mechanism for navigation with integration of LiDAR and IR Sensors. with 90% success rate under 5 minutes per operation
+- Place, Verify & Recovery: Predefined motion of control of robotics arm with range of operation 2-meter height and 2-pound of payload per picking
+- Approach & Alignment: Computer Vision to change the orientation of the gripper to pick up product accurately with KPI of 90% success rate
+- Safety feature: distance sensor to prevent collision
 
 ### Stretch Goals
+- Real-time Inventory Report with Database
+- Multiple-Aisle Navigation using SLAM algorithms
+- Robotics Arm Motions: Integrate Computer Vision or VLA for motion control
+- Two modes for customers and store employees
+- Online Order Prep from delivery drivers
+- Additional Assitance feature on screen for customers
+- Safety feature: avoid collision and re-route new navigation
 
 ## System Architecture
+<p align="center">
+<img src="./images/ros2.jpg" width="50%">
+ROS2 System Architecture
+</p>
+<p align="center">
+<img src="./images/workflow.jpg" width="50%">
+Logic Workflow
+</p>
 ### Software Stack
+- Python
+- ROS2
+- OpenCV
+- IntelRealSense SDK
+- Node.js
+- Gazebo
+- Database (TBD)
 
 ### Hardware (Mechanical)
+- 12V DC motors
+- High-torque servo motors
+- 3D printing components
+- Mecanum wheels
+- Aluminum framing (80/20 profiles and tubing)
 
 ### Hardware (Electrical & Sensing)
+- 2D LiDAR Sensor (SICK TiM series)
+- Odometry Sensor (MCU Gyroscope)
+- IntelRealSense Camera
+- Ultrasonic Sensor
+- 12V lead-acid batteries (+ Fuse and Power Distribution)
+- E-Stop
+- Switch
+- NVIDIA Jetson Nano
 
 ## Team Members
 - Bach Thien Nguyen, Mechanical Engineering
