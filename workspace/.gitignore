@@ -22,3 +22,4 @@ dist/
 
 # Colcon metadata
 .colcon/
+.colcon_release_metadata/
