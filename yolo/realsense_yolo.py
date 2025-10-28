@@ -17,7 +17,7 @@ Windows + RealSense D435 + YOLO 实时检测并回报每个目标的距离 & 3D 
   - 3D 点为相机坐标系 (X,Y,Z) 米；X向右、Y向下、Z向前（离相机的距离≈Z）。
 """
 
-def median_depth(depth_frame, x, y, k=5):
+def median_depth(depth_frame, x, y, k=3):
     """在 (x,y) 周围取 kxk 区域的中值深度（米），忽略0值。"""
     h, w = depth_frame.get_height(), depth_frame.get_width()
     x0, y0 = max(0, x - k//2), max(0, y - k//2)
@@ -36,7 +36,7 @@ def main(args):
     # 1) 初始化 RealSense
     pipe = rs.pipeline()
     cfg  = rs.config()
-    cfg.enable_stream(rs.stream.depth, 640, 400, rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
     cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
     profile = pipe.start(cfg)
 
@@ -60,7 +60,8 @@ def main(args):
             color_img = np.asanyarray(color.get_data())
 
             # 3) YOLO 推理（BGR 图像直接喂）
-            results = model(color_img, conf=args.conf, iou=0.45, verbose=False)
+            results = model(color_img, conf=args.conf, iou=0.45, verbose=False,
+                imgsz=480, half=True, device="cuda:0")
 
             # 4) 遍历检测框，计算距离 & 3D 坐标
             for r in results:
