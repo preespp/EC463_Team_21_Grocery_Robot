@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from mvp_interfaces.srv import ProdcutRequest.srv
+from mvp_robot.srv import ProdcutRequest
 
 class UiInput(Node):
 	def __init__(self):
@@ -19,11 +19,11 @@ class UiInput(Node):
 		rclpy.spin_until_future_complete(self, future)
 		response = future.result()
 		
-		if response and response.success:
+		if response and response.found:
 			resp_msg = f"Product {product_id}: {response.product_name} is "
 			resp_msg += "found" if response.found else "not found"
 			if response.found:
-				resp_msg += f"{ located at {response.product_location}"
+				resp_msg += f" located at {response.product_location}"
 				self.get_logger().info(resp_msg)
 			else:
 				self.get_logger().warn(resp_msg)

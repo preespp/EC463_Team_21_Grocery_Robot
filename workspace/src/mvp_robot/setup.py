@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            # 'product_db_query = mvp_robot.product_db_query:main',
+            'product_db_query = mvp_robot.product_db_query:main',
             # 'lidar.py = mvp_robot.lidar:main',
             # 'ir_sensor = mvp_robot.ir_sensor:main',
             # 'navigation = mvp_robot.navigation:main',
@@ -32,7 +32,7 @@ setup(
             # 'distance_sensor = mvp_robot.distance_sensor:main',
             # 'camera_vision = mvp_robot.camera_vision:main',
             # 'arm_motor = mvp_robot.arm_motor:main',
-            # 'ui_input = mvp_robot.ui_input:main',
+            'ui_input = mvp_robot.ui_input:main',
             'central = mvp_robot.central:main',
         ],
     },
