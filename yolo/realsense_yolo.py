@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 from ultralytics import YOLO
+import torch
 
 """
 Windows + RealSense D435 + YOLO 实时检测并回报每个目标的距离 & 3D 坐标。
@@ -45,6 +46,10 @@ def main(args):
 
     # 2) 加载 YOLO（可换成你训练好的 .pt）
     model = YOLO(args.model)
+    if torch.cuda.is_available():
+        model.to("cuda:0")
+    else:
+        print("[WARN] CUDA 不可用，当前仍在 CPU 上跑。")
 
     fps_hist = deque(maxlen=20)
     try:
@@ -60,8 +65,13 @@ def main(args):
             color_img = np.asanyarray(color.get_data())
 
             # 3) YOLO 推理（BGR 图像直接喂）
-            results = model(color_img, conf=args.conf, iou=0.45, verbose=False)
-
+            results = model.predict(
+                source=color_img,
+                conf=args.conf,
+                iou=0.45,
+                device=0 if torch.cuda.is_available() else "cpu",
+                verbose=False
+            )
             # 4) 遍历检测框，计算距离 & 3D 坐标
             for r in results:
                 names = r.names  # 类别名字典
