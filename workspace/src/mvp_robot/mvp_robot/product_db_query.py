@@ -6,7 +6,7 @@ class ProductDbQuery(Node):
 	def __init__(self):
 		super().__init__('product_db_query')
 		self.get_logger().info('Product Database Query Node Start!')
-		self.srv = self.create_service(ProductQuery, 'product_query', self.query_callback)
+		self.srv = self.create_service(ProductInfo, 'product_query', self.query_callback)
 		# mock database to be replaced with API for real database
 		self.database = { # name, aisle, shelf level
 			'A123' : ('Bottle', 'A1' , 1),
@@ -28,7 +28,7 @@ class ProductDbQuery(Node):
 		return response
 		
 def main(args=None):
-	rcl.py.init(args=args)
+	rclpy.init(args=args)
 	node = ProductDbQuery()
 	rclpy.spin(node)
 	node.destroy_node()
