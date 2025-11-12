@@ -14,7 +14,7 @@ class DistanceSensor(Node):
         self.get_logger().info('Distance Sensor Node started!')
 
         # Configure UART Serial Port
-        self.serial_port = serial.Serial('/dev/ttyTHS1', 115200, timeout=0.1)
+        self.serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)
 
         # Timer for 20 Hz polling
         self.timer = self.create_timer(0.05, self.read_serial)
@@ -24,7 +24,11 @@ class DistanceSensor(Node):
     def read_serial(self):
         try:
             line = self.serial_port.readline().decode('utf-8').strip()
+            print(line)
             if not line:
+                self.get_logger().info(
+                    "Reading Error"
+                    )
                 return
             data = json.loads(line)
             # Publish distance
@@ -42,6 +46,9 @@ class DistanceSensor(Node):
 
         except (json.JSONDecodeError, KeyError, ValueError):
             # Skip malformed data
+            self.get_logger().info(
+                "Skip Malformed Data"
+            )
             pass
         except serial.SerialException as e:
             self.get_logger().error(f"Serial Error: {e}")
