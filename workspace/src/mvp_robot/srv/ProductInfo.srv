@@ -1,6 +1,0 @@
-string product_id
----
-string product_name
-bool found
-string aisle
-int shelf_level
