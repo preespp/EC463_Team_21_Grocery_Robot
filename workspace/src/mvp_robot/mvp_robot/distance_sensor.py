@@ -3,6 +3,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float32, Bool
 import serial
 import json
+import glob
 
 class DistanceSensor(Node):
     def __init__(self):
@@ -13,8 +14,21 @@ class DistanceSensor(Node):
 
         self.get_logger().info('Distance Sensor Node started!')
 
-        # Configure UART Serial Port
-        self.serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)
+        # # Configure UART Serial Port
+        # self.serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)
+        
+        # UART Pins (Try all possible ports)
+        possible_ports = []
+        # Jetson hardware UART ports
+        possible_ports += glob.glob("/dev/ttyTHS*")
+        possible_ports += glob.glob("/dev/ttyS*")
+        for port in possible_ports:
+            try:
+                ser = serial.Serial(port, 115200, timeout=0.1)
+                self.get_logger().info(f"Connected to UART: {port}")
+                break
+            except (serial.SerialException, PermissionError):
+                continue
 
         # Timer for 20 Hz polling
         self.timer = self.create_timer(0.05, self.read_serial)
