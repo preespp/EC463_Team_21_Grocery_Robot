@@ -6,19 +6,23 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 from ultralytics import YOLO
+import torch
 
 """
-Windows + RealSense D435 + YOLO 实时检测并回报每个目标的距离 & 3D 坐标。
-用法:
+Windows + RealSense D435 + YOLO real-time detection with distance & 3D coordinates.
+Usage:
   python realsense_yolo_infer.py --model yolov8n.pt --conf 0.5
-说明:
-  - 默认彩色 1280x720@30，深度 848x480@30，并把深度对齐到彩色坐标系。
-  - 距离采用 bbox 中心 5x5 小窗口的“中值深度”，更稳健。
-  - 3D 点为相机坐标系 (X,Y,Z) 米；X向右、Y向下、Z向前（离相机的距离≈Z）。
+
+Notes:
+  - Uses color 1280x720@30 and depth 848x480@30, with depth aligned to the color frame.
+  - Distance is computed using the median depth in a 5x5 window around the bbox center
+    for robustness.
+  - 3D point is reported in the camera coordinate system (X, Y, Z) in meters;
+    X to the right, Y down, Z forward (distance from camera ≈ Z).
 """
 
 def median_depth(depth_frame, x, y, k=5):
-    """在 (x,y) 周围取 kxk 区域的中值深度（米），忽略0值。"""
+    """Compute the median depth (in meters) in a k*k window around (x, y), ignoring zeros."""
     h, w = depth_frame.get_height(), depth_frame.get_width()
     x0, y0 = max(0, x - k//2), max(0, y - k//2)
     x1, y1 = min(w, x + k//2), min(h, y + k//2)
@@ -33,18 +37,20 @@ def median_depth(depth_frame, x, y, k=5):
     return float(np.median(vals))
 
 def main(args):
-    # 1) 初始化 RealSense
+    # 1) Initialize RealSense
     pipe = rs.pipeline()
     cfg  = rs.config()
     cfg.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, 30)
     cfg.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
     profile = pipe.start(cfg)
-
-    # 将深度帧对齐到彩色帧坐标系
     align_to_color = rs.align(rs.stream.color)
 
-    # 2) 加载 YOLO（可换成你训练好的 .pt）
+    # 2) Load YOLO model
     model = YOLO(args.model)
+    if torch.cuda.is_available():
+        model.to("cuda:0")
+    else:
+        print("[WARN] CUDA not available, running on CPU.")
 
     fps_hist = deque(maxlen=20)
     try:
@@ -59,32 +65,37 @@ def main(args):
 
             color_img = np.asanyarray(color.get_data())
 
-            # 3) YOLO 推理（BGR 图像直接喂）
-            results = model(color_img, conf=args.conf, iou=0.45, verbose=False)
-
-            # 4) 遍历检测框，计算距离 & 3D 坐标
+            # 3) YOLO inference (directly on BGR image)
+            results = model.predict(
+                source=color_img,
+                conf=args.conf,
+                iou=0.45,
+                device=0 if torch.cuda.is_available() else "cpu",
+                verbose=False
+            )
+            # 4) Iterate detections, compute distance & 3D coordinates
             for r in results:
-                names = r.names  # 类别名字典
+                names = r.names
                 for box in r.boxes:
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
                     cls_id = int(box.cls[0].cpu().numpy())
                     conf   = float(box.conf[0].cpu().numpy())
                     name   = names.get(cls_id, str(cls_id))
 
-                    # 取框中心像素
+                    # Bounding box center pixel
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
 
-                    # 中值深度（米）
+                    # Median depth (meters)
                     dist_m = median_depth(depth, cx, cy, k=5)
 
-                    # 反投影到3D：使用对齐后的“深度帧内参”
+                    # Deproject to 3D using aligned depth intrinsics
                     depth_intrin = depth.profile.as_video_stream_profile().get_intrinsics()
                     X, Y, Z = rs.rs2_deproject_pixel_to_point(depth_intrin,
                                                               [float(cx), float(cy)],
                                                               dist_m)
 
-                    # 画框与文字
+                    # Draw bounding box and label
                     cv2.rectangle(color_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     label = f"{name} {conf:.2f}"
                     if dist_m > 0:
@@ -111,7 +122,7 @@ def main(args):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", type=str, default="yolov8n.pt",
-                    help="YOLO 权重（.pt），默认 COCO 预训练 yolov8n.pt")
-    ap.add_argument("--conf", type=float, default=0.5, help="置信度阈值")
+                    help="YOLO weights (.pt), default is COCO-pretrained yolov8n.pt")
+    ap.add_argument("--conf", type=float, default=0.5, help="Confidence threshold")
     args = ap.parse_args()
     main(args)
