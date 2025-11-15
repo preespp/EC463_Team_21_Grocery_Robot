@@ -75,29 +75,31 @@
 # if __name__ == "__main__":
 #     main()
 
-# Test SPI with ROS2
+# Test SPI with UART
 import rclpy
 from rclpy.node import Node
-import spidev
+import serial
+import time
 
-class ServoTest(Node):
+class ServoTestUART(Node):
     def __init__(self):
-        super().__init__('servo_test')
-        self.spi = spidev.SpiDev()
-        self.spi.open(0, 0)  # bus=0, cs=0
-        self.spi.max_speed_hz = 1000000
-
+        super().__init__('servo_uart')
+        self.ser = serial.Serial('/dev/ttyTHS1', 115200, timeout=1)  # Jetson TX/RX
         self.angle = 0
         self.timer = self.create_timer(1.0, self.send_angle)
 
     def send_angle(self):
-        self.spi.xfer([self.angle])
-        self.get_logger().info(f"Sent angle: {self.angle}")
-        self.angle = (self.angle + 20) % 180
+        msg = f"{self.angle}\n"
+        self.ser.write(msg.encode())
+        self.get_logger().info(f"Sent: {self.angle}")
+        self.angle = (self.angle + 30) % 270
 
 def main():
     rclpy.init()
-    node = ServoTest()
+    node = ServoTestUART()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()
