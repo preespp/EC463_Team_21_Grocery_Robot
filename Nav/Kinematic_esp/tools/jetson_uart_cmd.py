@@ -9,6 +9,7 @@ firmware (e.g. "F0.2", "L0.1", "W-0.3", "S").
 import argparse
 import sys
 import time
+from typing import Tuple
 
 import serial
 
@@ -40,6 +41,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def decode_cmd(line: str) -> Tuple[float, float, float]:
+    line = line.strip()
+    if not line:
+        return 0.0, 0.0, 0.0
+    cmd = line[0].upper()
+    value = 0.0
+    if len(line) > 1:
+        try:
+            value = float(line[1:])
+        except ValueError:
+            value = 0.0
+
+    vx = vy = w = 0.0
+    if cmd == "F":
+        vx = abs(value)
+    elif cmd == "B":
+        vx = -abs(value)
+    elif cmd == "L":
+        vy = abs(value)
+    elif cmd == "R":
+        vy = -abs(value)
+    elif cmd == "W":
+        w = value
+    return vx, vy, w
+
+
 def main() -> int:
     args = parse_args()
     try:
@@ -51,6 +78,7 @@ def main() -> int:
     print("Jetson UART command sender ready.")
     print("Format: F0.2 / B0.2 / L0.2 / R0.2 / W0.4 / S (stop). Press Ctrl+C to exit.")
     last_payload: bytes | None = None
+    last_line: str | None = None
     next_send_time = 0.0
 
     try:
@@ -60,6 +88,9 @@ def main() -> int:
             if (not args.no_loop) and last_payload and now >= next_send_time:
                 ser.write(last_payload)
                 ser.flush()
+                if last_line is not None:
+                    vx, vy, w = decode_cmd(last_line)
+                    print(f"[TX-loop] {last_line}  ->  vx={vx:.3f} m/s, vy={vy:.3f} m/s, w={w:.3f} rad/s")
                 next_send_time = now + (1.0 / args.rate)
 
             if sys.stdin in select.select([sys.stdin], [], [], 0.05)[0]:
@@ -72,8 +103,10 @@ def main() -> int:
                 payload = (line + "\n").encode("utf-8")
                 ser.write(payload)
                 ser.flush()
-                print(f"[TX] {line}")
+                vx, vy, w = decode_cmd(line)
+                print(f"[TX] {line}  ->  vx={vx:.3f} m/s, vy={vy:.3f} m/s, w={w:.3f} rad/s")
                 last_payload = payload
+                last_line = line
                 next_send_time = time.monotonic() + (0.0 if args.no_loop else (1.0 / args.rate))
     except KeyboardInterrupt:
         print("\nStopping...")
