@@ -52,12 +52,12 @@
 #define RR_IN2_GPIO    GPIO_NUM_5
 
 /* ------------------------------ UART config -------------------------------- */
-// #define UART_PORT              UART_NUM_1  // uart pins
-#define UART_PORT              UART_NUM_0     // uart usb
+ #define UART_PORT              UART_NUM_1  // uart pins
+// #define UART_PORT              UART_NUM_0     // uart usb
 #define UART_BAUD_RATE         115200
-// #define UART_TX_GPIO           GPIO_NUM_4 // on pin uart
-#define UART_TX_GPIO           UART_PIN_NO_CHANGE // usb uart
-//#define UART_RX_GPIO           GPIO_NUM_5 // on pin uart
+#define UART_TX_GPIO           GPIO_NUM_4 // on pin uart
+//#define UART_TX_GPIO           UART_PIN_NO_CHANGE // usb uart
+#define UART_RX_GPIO           GPIO_NUM_5 // on pin uart
 #define UART_RX_GPIO           UART_PIN_NO_CHANGE // usb uart
 #define UART_RX_BUF_SIZE       256
 #define UART_LINE_MAX_LEN      64
