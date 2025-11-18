@@ -75,31 +75,92 @@
 # if __name__ == "__main__":
 #     main()
 
-# Test SPI with UART
+# Test I2C with 5 servo motors
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-import serial
+from sensor_msgs.msg import JointState
+from smbus2 import SMBus
+import struct
 import time
 
-class ServoTestUART(Node):
+
+class ServoI2C(Node):
     def __init__(self):
-        super().__init__('servo_uart')
-        self.ser = serial.Serial('/dev/ttyTHS1', 115200, timeout=1)  # Jetson TX/RX
-        self.angle = 0
-        self.timer = self.create_timer(1.0, self.send_angle)
+        super().__init__("arm_motor")
 
-    def send_angle(self):
-        msg = f"{self.angle}\n"
-        self.ser.write(msg.encode())
-        self.get_logger().info(f"Sent: {self.angle}")
-        self.angle = (self.angle + 30) % 270
+        # Parameters can override via ROS2 launch
+        self.declare_parameter("bus", 7)
+        self.declare_parameter("addr", 0x08)
+        self.declare_parameter("rate", 20.0)
+        self.declare_parameter("joint_count", 5)
 
-def main():
-    rclpy.init()
-    node = ServoTestUART()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+        # Load parameters
+        self.bus_id = self.get_parameter("bus").value
+        self.addr = self.get_parameter("addr").value
+        self.rate = self.get_parameter("rate").value
+        self.joint_count = self.get_parameter("joint_count").value
+
+        # Open I2C bus
+        try:
+            self.bus = SMBus(self.bus_id)
+        except FileNotFoundError:
+            self.get_logger().error(f"Could not open /dev/i2c-{self.bus_id}")
+            raise
+
+        self.get_logger().info(
+            f"Started I2C Servo Sender on /dev/i2c-{self.bus_id}, addr=0x{self.addr:02X}"
+        )
+
+        # Latest joint angles (default zeros)
+        self.joint_angles = [0.0] * self.joint_count
+
+        # Subscribe to JointState topic
+        self.subscription = self.create_subscription(
+            JointState,
+            "/arm/joint_states",
+            self.joint_callback,
+            10
+        )
+
+        # Timer to send I2C packets periodically
+        self.timer = self.create_timer(1.0 / self.rate, self.send_i2c_packet)
+
+    def joint_callback(self, msg: JointState):
+        # Use the first N joint positions
+        for i in range(min(self.joint_count, len(msg.position))):
+            self.joint_angles[i] = float(msg.position[i])
+
+    def send_i2c_packet(self):
+        # Pack the joint angles as <ffffff....
+        packet = struct.pack("<" + "f" * self.joint_count, *self.joint_angles)
+
+        try:
+            self.bus.write_i2c_block_data(self.addr, 0x00, list(packet))
+        except Exception as e:
+            self.get_logger().warn(f"I2C send failed: {e}")
+            return
+
+        self.get_logger().info(
+            "Sent angles: " + ", ".join(f"{a:.2f}" for a in self.joint_angles)
+        )
+
+    def destroy_node(self):
+        self.bus.close()
+        super().destroy_node()
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ServoI2C()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
