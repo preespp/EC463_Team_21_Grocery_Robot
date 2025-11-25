@@ -1,32 +1,42 @@
+// #include <Arduino.h>
+
 #define TRIG_PIN 18
 #define ECHO_PIN 5
 
+// UART pins for Serial1
+#define UART_RX 16
+#define UART_TX 17
+
 long duration;
 float distance;
-unsigned long start_time, end_time;
 
 void setup() {
-  Serial.begin(115200);
+  Serial1.begin(115200, SERIAL_8N1, UART_RX, UART_TX); // UART to Jetson
+
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 }
 
 void loop() {
-  // trigger ultrasonic pulse
+  // Trigger ultrasonic pulse
   digitalWrite(TRIG_PIN, LOW);
   delayMicroseconds(2);
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
 
-  // measure echo
   duration = pulseIn(ECHO_PIN, HIGH);
-  distance = (duration / 2.0) / 29.1;  // cm
 
-  // JSON-style serial output
-  Serial.print("{\"distance_cm\":");
-  Serial.print(distance);
-  Serial.println("}");
+  // Calculate distance
+  distance = (duration / 2.0) / 29.1;
 
-  delay(50); // ~20Hz
+  // Create JSON
+  String json = "{\"distance_cm\": ";
+  json += String(distance, 2);
+  json += "}";
+
+  // Send over UART (Serial1)
+  Serial1.println(json);
+
+  delay(50); // ~20 Hz
 }
