@@ -29,8 +29,8 @@ setup(
         'console_scripts': [
             # 'lidar.py = mvp_robot.lidar:main',
             # 'ir_sensor = mvp_robot.ir_sensor:main',
-            # 'navigation = mvp_robot.navigation:main',
-            # 'wheel_motor = mvp_robot.wheel_motor:main',
+            'navigation = mvp_robot.navigation:main',
+            'wheel_motor = mvp_robot.wheel_motor:main',
             'distance_sensor = mvp_robot.distance_sensor:main',
             'camera_vision = mvp_robot.camera_vision:main',
             # 'arm_motor = mvp_robot.arm_motor:main',

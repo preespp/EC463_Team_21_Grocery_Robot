@@ -15,10 +15,10 @@ class DistanceSensor(Node):
         self.get_logger().info('Distance Sensor Node started!')
 
         # # Configure UART Serial Port (via USB)
-        # self.serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)
+        self.serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)
         
         # UART Port
-        self.serial_port = serial.Serial('/dev/ttyTHS1', 115200, timeout=0.1)
+        # self.serial_port = serial.Serial('/dev/ttyTHS1', 115200, timeout=0.1)
         	
         # Timer for 20 Hz polling
         self.timer = self.create_timer(0.05, self.read_serial)
