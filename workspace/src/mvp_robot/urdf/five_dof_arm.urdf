@@ -203,6 +203,7 @@
     <child link="link1_tower"/>
     <origin xyz="0 0 0.05" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
+    <dynamics damping="0.1" friction="0.1"/>
     <!-- ±135 degrees -->
     <limit lower="-2.3562" upper="2.3562" effort="50.0" velocity="2.0"/>
   </joint>
@@ -213,6 +214,7 @@
     <child link="link2_upper_arm"/>
     <origin xyz="0 0 0.2" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
+    <dynamics damping="0.1" friction="0.1"/>
     <limit lower="-1.5708" upper="1.5708" effort="50.0" velocity="2.0"/>
   </joint>
 
@@ -222,6 +224,7 @@
     <child link="link3_forearm"/>
     <origin xyz="0.3 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
+    <dynamics damping="0.1" friction="0.1"/>
     <limit lower="0.0" upper="2.3562" effort="40.0" velocity="2.0"/>
   </joint>
 
@@ -231,6 +234,7 @@
     <child link="link4_wrist"/>
     <origin xyz="0.3 0 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
+    <dynamics damping="0.1" friction="0.1"/>
     <!-- ±135 degrees -->
     <limit lower="-2.3562" upper="2.3562" effort="30.0" velocity="3.0"/>
   </joint>
@@ -248,6 +252,7 @@
     <child link="gripper_finger1"/>
     <origin xyz="0.02 0.015 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
+    <dynamics damping="0.1" friction="0.1"/>
     <!-- 0 rad = open, positive = close -->
     <limit lower="0.0" upper="0.8" effort="10.0" velocity="3.0"/>
   </joint>
@@ -258,65 +263,58 @@
     <child link="gripper_finger2"/>
     <origin xyz="0.02 -0.015 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
+    <dynamics damping="0.1" friction="0.1"/>
     <limit lower="-0.8" upper="0.0" effort="10.0" velocity="3.0"/>
     <mimic joint="joint5_gripper" multiplier="-1.0" offset="0.0"/>
   </joint>
   
-  <!-- Joint 1: base yaw -->
+  <!-- === GAZEBO JOINT CONTROLLERS === -->
   <gazebo>
+    <!-- Joint 1 -->
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint1_base_yaw</joint_name>
-      <topic>/arm/joint1_cmd</topic>
       <p_gain>10.0</p_gain>
+      <topic>/model/five_dof_arm/joint/joint1_base_yaw/0/cmd_pos</topic>
     </plugin>
-  </gazebo>
 
-  <!-- Joint 2: shoulder -->
-  <gazebo>
+    <!-- Joint 2 -->
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint2_shoulder</joint_name>
-      <topic>/arm/joint2_cmd</topic>
       <p_gain>10.0</p_gain>
+      <topic>/model/five_dof_arm/joint/joint2_shoulder/0/cmd_pos</topic>
     </plugin>
-  </gazebo>
 
-  <!-- Joint 3: elbow -->
-  <gazebo>
+    <!-- Joint 3 -->
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint3_elbow</joint_name>
-      <topic>/arm/joint3_cmd</topic>
       <p_gain>10.0</p_gain>
+      <topic>/model/five_dof_arm/joint/joint3_elbow/0/cmd_pos</topic>
     </plugin>
-  </gazebo>
 
-  <!-- Joint 4: wrist roll -->
-  <gazebo>
+    <!-- Joint 4 -->
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
-      <joint_name>joint4_wrist_roll</joint_name>
-      <topic>/arm/joint4_cmd</topic>
+      <joint_name>/model/five_dof_arm/joint/joint4_wrist_roll/0/cmd_pos</joint_name>
       <p_gain>5.0</p_gain>
+      <topic>/arm/joint4_cmd</topic>
     </plugin>
-  </gazebo>
 
-  <!-- Joint 5: gripper -->
-  <gazebo>
+    <!-- Joint 5 -->
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
-      <joint_name>joint5_gripper</joint_name>
-      <topic>/arm/joint5_cmd</topic>
+      <joint_name>/model/five_dof_arm/joint/joint5_gripper/0/cmd_pos</joint_name>
       <p_gain>3.0</p_gain>
+      <topic>/arm/joint5_cmd</topic>
     </plugin>
   </gazebo>
-
 
 </robot>
 

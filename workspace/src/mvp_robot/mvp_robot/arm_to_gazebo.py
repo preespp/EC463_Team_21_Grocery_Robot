@@ -44,7 +44,7 @@ class ArmJointStateToCmd(Node):
             "joint5_gripper": self.create_publisher(Float64, "/arm/joint5_cmd", 10),
         }
 
-        self.get_logger().info("arm_js_to_cmd node started (listening on /arm/joint_state)")
+        self.get_logger().info("arm_to_gazebo node started (listening on /arm/joint_state)")
 
     def js_callback(self, msg: JointState):
         # Build dict from name -> position for safety
