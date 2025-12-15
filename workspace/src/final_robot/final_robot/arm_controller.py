@@ -1,3 +1,6 @@
+'''
+This version is using keyboard to control each joint manually (Forward Kinematics)
+'''
 #!/usr/bin/env python3
 import sys
 import select
@@ -134,234 +137,180 @@ def main(args=None):
 if __name__ == "__main__":
     main()
 
-# ik version
-"""
-#!/usr/bin/env python3
-import math
-import sys
-import select
-import termios
-import tty
+'''
+Basic Closed Loop Autonomous Motion (Looping motion)
+'''
+# #!/usr/bin/env python3
+# import math
+# from enum import Enum
 
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import JointState
+# import rclpy
+# from rclpy.node import Node
+# from sensor_msgs.msg import JointState
 
-JOINT_NAMES = [
-    "joint1_base_yaw",
-    "joint2_shoulder",
-    "joint3_elbow",
-    "joint4_wrist_roll",
-    "joint5_gripper",
-]
+# # Robot configuration
+# JOINT_NAMES = [
+#     "joint1_base_yaw",
+#     "joint2_shoulder",
+#     "joint3_elbow",
+#     "joint4_wrist_roll",
+#     "joint5_gripper",
+# ]
 
-JOINT_LIMITS = {
-    "joint1_base_yaw":   (-2.3562,  2.3562),
-    "joint2_shoulder":   (-1.5708,  1.5708),
-    "joint3_elbow":      (0.0,      2.3562),
-    "joint4_wrist_roll": (-2.3562,  2.3562),
-    "joint5_gripper":    (0.0,      0.8),
-}
+# JOINT_LIMITS = {
+#     "joint1_base_yaw": (-2.3562, 2.3562),
+#     "joint2_shoulder": (-1.5708, 1.5708),
+#     "joint3_elbow": (0.0, 2.3562),
+#     "joint4_wrist_roll": (-2.3562, 2.3562),
+#     "joint5_gripper": (0.0, 0.8),
+# }
 
-# Link lengths for simple IK model (meters) – approximate your URDF
-H_SHOULDER = 0.25  # height of shoulder joint above base origin
-L1 = 0.30          # upper arm length
-L2 = 0.30          # forearm length
+# # Arm geometry (meters)
+# H_SHOULDER = 0.25
+# L1 = 0.30
+# L2 = 0.30
 
-POS_STEP = 0.02    # meters per key press
+# # Control
+# PUBLISH_RATE = 20.0  # Hz
 
+# # Utilities
+# def clamp(val, lo, hi):
+#     return max(lo, min(hi, val))
 
-def clamp(value, lo, hi):
-    return max(lo, min(hi, value))
+# class ArmState(Enum):
+#     MOVE_HOME = 0
+#     MOVE_PICK = 1
+#     CLOSE_GRIPPER = 2
+#     MOVE_PLACE = 3
+#     OPEN_GRIPPER = 4
 
+# class ArmAutonomousIK(Node):
 
-def get_key(settings, timeout=0.05):
-    """"""Non-blocking read of a single key.""""""
-    tty.setraw(sys.stdin.fileno())
-    rlist, _, _ = select.select([sys.stdin], [], [], timeout)
-    key = sys.stdin.read(1) if rlist else ""
-    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
-    return key
+#     def __init__(self):
+#         super().__init__("arm_autonomous_ik")
 
+#         self.publisher = self.create_publisher(
+#             JointState, "/arm/joint_state", 10
+#         )
 
-class ArmKeyboardIK(Node):
-    """"""
-    End-effector position keyboard teleop with simple IK.
+#         # Waypoints (edit these!)
+#         self.home_pos  = [0.35,  0.00, 0.45]
+#         self.pick_pos  = [0.45,  0.15, 0.20]
+#         self.place_pos = [0.30, -0.25, 0.30]
 
-    Keys move the desired end-effector position (x, y, z) and we solve IK
-    for the 5-DOF arm, then publish sensor_msgs/JointState on /arm/joint_state.
-    """"""
+#         self.target_pos = list(self.home_pos)
+#         self.positions = [0.0] * len(JOINT_NAMES)
 
-    def __init__(self):
-        super().__init__("arm_keyboard_ik")
-        self.publisher = self.create_publisher(JointState, "/arm/joint_state", 10)
+#         self.state = ArmState.MOVE_HOME
+#         self.state_start_time = self.get_clock().now()
 
-        # Start with some reachable default target (x, y, z)
-        self.target_pos = [0.4, 0.0, 0.4]
+#         self.update_ik()
 
-        # Initial guess for joints (will be overwritten by IK)
-        self.positions = [0.0] * len(JOINT_NAMES)
-        self.update_ik()  # initialize joints
+#         self.timer = self.create_timer(
+#             1.0 / PUBLISH_RATE,
+#             self.control_loop
+#         )
 
-        # Publish at 20 Hz
-        self.timer = self.create_timer(0.05, self.publish_joint_state)
+#         self.get_logger().info("Autonomous Arm IK Node Started")
 
-        self.get_logger().info(
-            "ArmKeyboardIK started. Controls (move end-effector):\n"
-            "  w / s : +x / -x\n"
-            "  a / d : +y / -y\n"
-            "  r / f : +z / -z\n"
-            "  q     : quit\n"
-        )
+#     # Main control loop
+#     def control_loop(self):
+#         self.update_autonomy()
 
-    def publish_joint_state(self):
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = list(JOINT_NAMES)
-        msg.position = list(self.positions)
-        self.publisher.publish(msg)
+#         msg = JointState()
+#         msg.header.stamp = self.get_clock().now().to_msg()
+#         msg.name = list(JOINT_NAMES)
+#         msg.position = list(self.positions)
+#         self.publisher.publish(msg)
 
-    def process_key(self, key: str) -> bool:
-        """"""
-        Process one keystroke.
-        Returns False if we should exit.
-        """"""
-        if key in ("q", "Q"):
-            self.get_logger().info("Quitting ArmKeyboardIK.")
-            return False
+#     # Autonomous state machine
+#     def update_autonomy(self):
+#         now = self.get_clock().now()
+#         elapsed = (now - self.state_start_time).nanoseconds * 1e-9
 
-        moved = False
+#         if self.state == ArmState.MOVE_HOME:
+#             self.target_pos = self.home_pos
+#             self.update_ik()
+#             if elapsed > 2.0:
+#                 self.transition(ArmState.MOVE_PICK)
 
-        if key == "w":
-            self.target_pos[0] += POS_STEP
-            moved = True
-        elif key == "s":
-            self.target_pos[0] -= POS_STEP
-            moved = True
-        elif key == "a":
-            self.target_pos[1] += POS_STEP
-            moved = True
-        elif key == "d":
-            self.target_pos[1] -= POS_STEP
-            moved = True
-        elif key == "r":
-            self.target_pos[2] += POS_STEP
-            moved = True
-        elif key == "f":
-            self.target_pos[2] -= POS_STEP
-            moved = True
+#         elif self.state == ArmState.MOVE_PICK:
+#             self.target_pos = self.pick_pos
+#             self.update_ik()
+#             if elapsed > 2.0:
+#                 self.transition(ArmState.CLOSE_GRIPPER)
 
-        if moved:
-            if self.update_ik():
-                x, y, z = self.target_pos
-                self.get_logger().info(
-                    f"Target pos -> x={x:.3f}, y={y:.3f}, z={z:.3f}"
-                )
-            else:
-                self.get_logger().warn("IK failed for requested position.")
+#         elif self.state == ArmState.CLOSE_GRIPPER:
+#             self.positions[4] = JOINT_LIMITS["joint5_gripper"][1]
+#             if elapsed > 1.0:
+#                 self.transition(ArmState.MOVE_PLACE)
 
-        return True
+#         elif self.state == ArmState.MOVE_PLACE:
+#             self.target_pos = self.place_pos
+#             self.update_ik()
+#             if elapsed > 2.0:
+#                 self.transition(ArmState.OPEN_GRIPPER)
 
-    def update_ik(self) -> bool:
-        """"""
-        Compute IK for current target_pos and update self.positions.
+#         elif self.state == ArmState.OPEN_GRIPPER:
+#             self.positions[4] = JOINT_LIMITS["joint5_gripper"][0]
+#             if elapsed > 1.0:
+#                 self.transition(ArmState.MOVE_HOME)
 
-        Simple analytic IK for a 3-DOF arm:
-          - joint1: yaw (base) aligns XY
-          - joint2: shoulder
-          - joint3: elbow
-          - joint4: wrist roll (kept at 0)
-          - joint5: gripper (kept at 0)
+#     def transition(self, new_state):
+#         self.state = new_state
+#         self.state_start_time = self.get_clock().now()
+#         self.get_logger().info(f"State -> {new_state.name}")
 
-        Returns True if successful, False otherwise.
-        """"""
-        x, y, z = self.target_pos
+#     def update_ik(self) -> bool:
+#         x, y, z = self.target_pos
 
-        # Base yaw
-        theta1 = math.atan2(y, x)
+#         # Base yaw
+#         theta1 = math.atan2(y, x)
 
-        # Position relative to shoulder joint
-        dx = x
-        dy = y
-        dz = z - H_SHOULDER
+#         # Relative to shoulder
+#         dx = x
+#         dy = y
+#         dz = z - H_SHOULDER
 
-        # Distance from shoulder to target
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+#         d = math.sqrt(dx*dx + dy*dy + dz*dz)
 
-        # Workspace clamp to keep solvable
-        max_reach = L1 + L2 - 1e-4
-        min_reach = abs(L1 - L2) + 1e-4
+#         max_reach = L1 + L2 - 1e-4
+#         min_reach = abs(L1 - L2) + 1e-4
 
-        if d > max_reach or d < min_reach:
-            # Clamp position back into reachable shell
-            if d == 0.0:
-                return False
-            scale = max_reach / d if d > max_reach else min_reach / d
-            dx *= scale
-            dy *= scale
-            dz *= scale
-            d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            # Update target_pos to clamped value (for transparency)
-            self.target_pos = [dx, dy, dz + H_SHOULDER]
+#         if d < min_reach or d > max_reach:
+#             d = clamp(d, min_reach, max_reach)
 
-        # Planar radius and height (in plane of the arm)
-        r = math.sqrt(dx * dx + dy * dy)
-        z_eff = dz
+#         r = math.sqrt(dx*dx + dy*dy)
+#         z_eff = dz
 
-        # Law of cosines for elbow
-        cos_elbow = (r * r + z_eff * z_eff - L1 * L1 - L2 * L2) / (2.0 * L1 * L2)
-        cos_elbow = clamp(cos_elbow, -1.0, 1.0)
-        theta3 = math.acos(cos_elbow)  # elbow-down configuration
+#         cos_elbow = (r*r + z_eff*z_eff - L1*L1 - L2*L2) / (2*L1*L2)
+#         cos_elbow = clamp(cos_elbow, -1.0, 1.0)
 
-        # Shoulder angle
-        k1 = L1 + L2 * math.cos(theta3)
-        k2 = L2 * math.sin(theta3)
-        theta2 = math.atan2(z_eff, r) - math.atan2(k2, k1)
+#         theta3 = math.acos(cos_elbow)
 
-        # Keep wrist roll and gripper neutral for now
-        theta4 = 0.0
-        theta5 = 0.0
+#         k1 = L1 + L2 * math.cos(theta3)
+#         k2 = L2 * math.sin(theta3)
 
-        candidate = [theta1, theta2, theta3, theta4, theta5]
+#         theta2 = math.atan2(z_eff, r) - math.atan2(k2, k1)
 
-        # Enforce joint limits to avoid "breaking" the arm
-        for i, name in enumerate(JOINT_NAMES):
-            lo, hi = JOINT_LIMITS[name]
-            val = candidate[i]
-            clamped_val = clamp(val, lo, hi)
-            if clamped_val != val:
-                self.get_logger().warn(
-                    f"{name} IK value {val:.2f} out of range, "
-                    f"clamped to [{lo:.2f}, {hi:.2f}] -> {clamped_val:.2f}"
-                )
-            candidate[i] = clamped_val
+#         theta4 = 0.0
+#         theta5 = self.positions[4]
 
-        self.positions = candidate
-        return True
+#         candidate = [theta1, theta2, theta3, theta4, theta5]
 
+#         for i, name in enumerate(JOINT_NAMES):
+#             lo, hi = JOINT_LIMITS[name]
+#             candidate[i] = clamp(candidate[i], lo, hi)
 
-def main(args=None):
-    rclpy.init(args=args)
-    node = ArmKeyboardIK()
-    settings = termios.tcgetattr(sys.stdin)
+#         self.positions = candidate
+#         return True
 
-    try:
-        while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.01)
-            key = get_key(settings, timeout=0.05)
-            if key:
-                if not node.process_key(key):
-                    break
-    except KeyboardInterrupt:
-        pass
-    finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
-        node.destroy_node()
-        rclpy.shutdown()
+# def main(args=None):
+#     rclpy.init(args=args)
+#     node = ArmAutonomousIK()
+#     rclpy.spin(node)
+#     node.destroy_node()
+#     rclpy.shutdown()
 
-
-if __name__ == "__main__":
-    main()
-
-"""
-
+# if __name__ == "__main__":
+#     main()
