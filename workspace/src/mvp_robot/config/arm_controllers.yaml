@@ -1,0 +1,21 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz, can go higher later (e.g. 250/500)
+
+    # Publish joint states on /joint_states
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # Simple group position controller: commands joint angles directly
+    arm_position_controller:
+      type: position_controllers/JointGroupPositionController
+
+arm_position_controller:
+  ros__parameters:
+    joints:
+      - joint1_base_yaw
+      - joint2_shoulder
+      - joint3_elbow
+      - joint4_wrist_roll
+      - joint5_gripper
+
