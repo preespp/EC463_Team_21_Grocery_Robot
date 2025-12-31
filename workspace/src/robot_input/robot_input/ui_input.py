@@ -2,7 +2,8 @@
 
 import rclpy
 from rclpy.node import Node
-from robot_msgs.srv import ProductRequest
+from robot_interfaces.srv import ProductRequest
+
 
 class UiInput(Node):
     def __init__(self):
@@ -35,7 +36,6 @@ class UiInput(Node):
         else:
             self.get_logger().warn(f"Product {product_id} not found.")
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = UiInput()
@@ -53,7 +53,5 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
-
 if __name__ == '__main__':
     main()
-

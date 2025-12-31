@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>mvp_robot</name>
-  <version>0.0.0</version>
-  <description>Package to test Minimum Viable Product for Fall Semester: Line Tracing mechanism with Motor Control, Camera, LiDAR, IR Sensor, Distance Sensor, etc.</description>
+  <name>robot_vision</name>
+  <version>1.0.0</version>
+  <description>Computer Vision and IntelRealsense Package</description>
   <maintainer email="prees26@bu.edu">GroceryBot</maintainer>
   <license>Apache-2.0</license>
 

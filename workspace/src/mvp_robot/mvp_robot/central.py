@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from mvp_robot_msgs.srv import ProductRequest
+from robot_interfaces.srv import ProductRequest
 
 
 class Central(Node):
