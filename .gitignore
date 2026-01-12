@@ -55,3 +55,6 @@ dkms.conf
 sdkconfig
 build/
 .vscode
+
+# For Database credential
+credential.json
