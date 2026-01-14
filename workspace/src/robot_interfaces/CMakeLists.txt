@@ -29,7 +29,8 @@ find_package(cv_bridge REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ProductRequest.srv"
-  #"msg/"
+  "msg/Order.msg"
+  "msg/OrderIterm.msg"
   #"action/"
   DEPENDENCIES 
   builtin_interfaces 
