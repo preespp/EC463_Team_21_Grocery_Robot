@@ -55,3 +55,9 @@ dkms.conf
 sdkconfig
 build/
 .vscode
+
+# For Database credential + Nodejs
+credential.json
+node_modules/
+package.json
+package-lock.json
