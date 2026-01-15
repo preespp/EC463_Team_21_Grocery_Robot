@@ -12,8 +12,12 @@ def setup_blackboard():
     bb.item_index = 0
     bb.current_item = None
 
-    bb.shelf_pose = None
-    bb.basket_pose = None
-    bb.home_pose = None
+    bb.nav_goal = (0.0, 0.0)
+    bb.rack_goal = 1
+
+    # Fill out once we conclude the value of each pose for robotics arm
+    bb.shelf_pose = None # Depends on data from database
+    bb.basket_pose = None # Assign Constant in here
+    bb.home_pose = None # Assign Constant in here
 
     return bb
