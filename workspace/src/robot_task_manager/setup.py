@@ -28,7 +28,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'central = robot_task_manager.central:main',
+            'bt_executor = robot_task_manager.bt_executor:main',
         ],
     },
 )
