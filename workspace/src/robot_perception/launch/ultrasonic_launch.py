@@ -13,7 +13,7 @@ def generate_launch_description():
 
         Node(
             package="robot_perception",
-            executable="ultrasonic_i2c_node",
+            executable="distance_sensor",
             name="ultrasonic_front",
             parameters=[
                 common,
@@ -24,7 +24,7 @@ def generate_launch_description():
 
         Node(
             package="robot_perception",
-            executable="ultrasonic_i2c_node",
+            executable="distance_sensor",
             name="ultrasonic_right",
             parameters=[
                 common,
@@ -35,7 +35,7 @@ def generate_launch_description():
 
         Node(
             package="robot_perception",
-            executable="ultrasonic_i2c_node",
+            executable="distance_sensor",
             name="ultrasonic_left",
             parameters=[
                 common,
@@ -46,7 +46,7 @@ def generate_launch_description():
 
         Node(
             package="robot_perception",
-            executable="ultrasonic_i2c_node",
+            executable="distance_sensor",
             name="ultrasonic_back",
             parameters=[
                 common,
