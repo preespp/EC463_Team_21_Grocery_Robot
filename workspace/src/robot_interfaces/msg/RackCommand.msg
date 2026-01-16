@@ -1,0 +1,4 @@
+string rack_id
+float32 target_angle_deg
+float32 speed_deg_s
+builtin_interfaces/Time stamp

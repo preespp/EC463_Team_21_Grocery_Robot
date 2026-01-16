@@ -28,7 +28,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'arm_motor = robot_manipulation.arm_motor_I2C:main',
+            'rack_controller = robot_manipulation.rack_controller:main',
+            'arm_motor = robot_manipulation.arm_motor:main',
             'arm_controller = robot_manipulation.arm_controller:main',
             'arm_to_gazebo = robot_manipulation.arm_to_gazebo:main',
         ],
