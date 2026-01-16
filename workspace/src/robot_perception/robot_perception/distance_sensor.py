@@ -1,74 +1,104 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32, Bool
-import serial
-import json
-import glob
+from std_msgs.msg import Bool
+import struct
+from smbus2 import SMBus
+
 
 class DistanceSensor(Node):
     def __init__(self):
-        super().__init__('distance_sensor')
+        super().__init__('ultrasonic_i2c')
 
-        self.distance_pub = self.create_publisher(Float32, 'distance_cm', 10)
-        self.alert_pub = self.create_publisher(Bool, 'obstacle_alert', 10)
+        # ---------------- Parameters ----------------
+        self.declare_parameter("bus", 7)
+        self.declare_parameter("addr", 9)
+        self.declare_parameter("rate", 20.0)
+        self.declare_parameter("threshold_m", 0.30)
+        self.declare_parameter("name", "front")
 
-        self.get_logger().info('Distance Sensor Node started!')
+        self.bus_id = int(self.get_parameter("bus").value)
+        self.addr = int(self.get_parameter("addr").value)
+        self.rate = float(self.get_parameter("rate").value)
+        self.threshold_m = float(self.get_parameter("threshold_m").value)
+        self.name = self.get_parameter("name").value
 
-        # # Configure UART Serial Port (via USB)
-        self.serial_port = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)
-        
-        # UART Port
-        # self.serial_port = serial.Serial('/dev/ttyTHS1', 115200, timeout=0.1)
-        	
-        # Timer for 20 Hz polling
-        self.timer = self.create_timer(0.05, self.read_serial)
-        
-        self.threshold = 30.0
-    
-    def read_serial(self):
-    	try:
-    		raw = self.serial_port.readline()
-    		
-    		if not raw:
-    			self.get_logger().warn("Empty line from serial")
-    			return
-    			
-    		line = raw.decode('utf-8', errors='ignore').strip()
-    		print(f"Serial line: {line}")
-    		
-    		# If there is any extra text on the line, keep only the JSON part
-    		if '{' in line and '}' in line:
-    			line = line[line.index('{'): line.rindex('}') + 1]
-    		
-    		data = json.loads(line)
-    		
-    		# ESP32 sends centimeters: {"distance_cm": 812.85}
-    		distance_cm = float(data["distance_cm"])
-    		
-    		# Publish distance
-    		distance_msg = Float32()
-    		distance_msg.data = distance_cm
-    		self.distance_pub.publish(distance_msg)
-    		
-    		alert_msg = Bool()
-    		alert_msg.data = distance_msg.data < self.threshold
-    		self.alert_pub.publish(alert_msg)
-    		
-    		self.get_logger().info(
-    			f"Distance: {distance_msg.data:.1f} (same units as threshold) | "
-    			f"Obstacle Alert: {alert_msg.data}"
-    		)
-    	except (json.JSONDecodeError, KeyError, ValueError) as e:
-    		self.get_logger().warn(f"Skip malformed data: {e}")
-    	except serial.SerialException as e:
-    		self.get_logger().error(f"Serial Error: {e}")
+        if self.rate <= 0.0:
+            self.get_logger().warn("rate <= 0, clamping to 10 Hz")
+            self.rate = 10.0
+
+        # ---------------- I2C ----------------
+        try:
+            self.bus = SMBus(self.bus_id)
+        except FileNotFoundError as exc:
+            self.get_logger().fatal(
+                f"[{self.name}] Cannot open /dev/i2c-{self.bus_id}: {exc}"
+            )
+            raise
+
+        # ---------------- Publisher ----------------
+        self.alert_pub = self.create_publisher(
+            Bool,
+            f"{self.name}_alert",
+            10
+        )
+
+        # ---------------- Timer ----------------
+        self.timer = self.create_timer(
+            1.0 / self.rate,
+            self.timer_callback
+        )
+
+        self.get_logger().info(
+            f"[{self.name}] Ultrasonic I2C started on "
+            f"/dev/i2c-{self.bus_id}, addr 0x{self.addr:02X}, "
+            f"rate {self.rate:.1f} Hz"
+        )
+
+    def timer_callback(self):
+        try:
+            # Read 8 bytes: left + right ultrasonic
+            data = self.bus.read_i2c_block_data(self.addr, 0x00, 8)
+            dist_left_m, dist_right_m = struct.unpack('ff', bytes(data))
+
+            alert = (
+                0 < dist_left_m < self.threshold_m or
+                0 < dist_right_m < self.threshold_m
+            )
+
+            msg = Bool()
+            msg.data = alert
+            self.alert_pub.publish(msg)
+
+        except OSError as e:
+            self.get_logger().warn(
+                f"[{self.name}] I2C read failed: {e}"
+            )
+
+        except struct.error as e:
+            self.get_logger().warn(
+                f"[{self.name}] Malformed packet: {e}"
+            )
+
+    def destroy_node(self):
+        try:
+            self.bus.close()
+        except Exception:
+            pass
+        return super().destroy_node()
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = DistanceSensor()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
