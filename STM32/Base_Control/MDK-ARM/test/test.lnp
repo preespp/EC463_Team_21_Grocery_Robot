@@ -43,6 +43,7 @@
 "test\dvc_motor_dji.o"
 "test\dvc_serialplot.o"
 "test\dvc_ahrs_wheeltec.o"
+"test\dvc_imu_mpu6500.o"
 "test\dvc_host_uart.o"
 "test\crt_chassis.o"
 --strict --scatter "test\test.sct"

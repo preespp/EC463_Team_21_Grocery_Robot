@@ -70,7 +70,7 @@ extern "C" {
 /* USER CODE BEGIN PV */
 
 bool init_finished = false;
-static bool can2_inited = false;
+static bool can1_inited = false;
 
 Class_Serialplot serialplot;
 Class_Host_UART host_uart;
@@ -180,11 +180,11 @@ static void BoardA_Debug_Blink_LedG_10ms(void)
 }
 
 /**
- * @brief CAN2 Rx callback for chassis motors
+ * @brief CAN1 Rx callback for chassis motors
  *
  * @param Rx_Buffer CAN接收的信息结构体
  */
-void Device_CAN2_Callback(Struct_CAN_Rx_Buffer *Rx_Buffer)
+void Device_CAN1_Callback(Struct_CAN_Rx_Buffer *Rx_Buffer)
 {
   switch (Rx_Buffer->Header.StdId)
   {
@@ -212,23 +212,23 @@ void Device_CAN2_Callback(Struct_CAN_Rx_Buffer *Rx_Buffer)
 }
 
 /**
- * @brief UART2 serialplot callback
+ * @brief UART3 serialplot callback
  *
- * @param Buffer UART2收到的消息
- * @param Length 长度
+ * @param Buffer UART3?????
+ * @param Length ??
  */
-void Serialplot_UART2_Callback(uint8_t *Buffer, uint16_t Length)
+void Serialplot_UART3_Callback(uint8_t *Buffer, uint16_t Length)
 {
   serialplot.UART_RxCpltCallback(Buffer, Length);
 }
 
 /**
- * @brief UART3 host callback
+ * @brief UART2 host callback
  *
- * @param Buffer UART3收到的消息
+ * @param Buffer UART2收到的消息
  * @param Length 长度
  */
-void Host_UART3_Callback(uint8_t *Buffer, uint16_t Length)
+void Host_UART2_Callback(uint8_t *Buffer, uint16_t Length)
 {
   host_uart.UART_RxCpltCallback(Buffer, Length);
 }
@@ -312,7 +312,7 @@ void Task1ms_TIM5_Callback()
 
     if (kLedGreenDiagBlink)
     {
-      if (can2_inited)
+      if (can1_inited)
       {
         BoardA_Debug_Blink_LedG_10ms();
       }
@@ -393,17 +393,17 @@ int main(void)
   BSP_Init(BSP_DC24_LU_ON | BSP_DC24_LD_ON | BSP_DC24_RU_ON | BSP_DC24_RD_ON);
   BoardA_Set_All_LEDs(true);
   IMU_MPU6500_Init();
-  CAN_Init(&hcan2, Device_CAN2_Callback);
-  can2_inited = true;
-  UART_Init(&huart2, Serialplot_UART2_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
-  UART_Init(&huart3, Host_UART3_Callback, sizeof(Struct_Host_UART_Rx_Data));
+  CAN_Init(&hcan1, Device_CAN1_Callback);
+  can1_inited = true;
+  UART_Init(&huart3, Serialplot_UART3_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
+  UART_Init(&huart2, Host_UART2_Callback, sizeof(Struct_Host_UART_Rx_Data));
 
-  serialplot.Init(&huart2, Serialplot_Checksum_8_ENABLE, 0, NULL);
+  serialplot.Init(&huart3, Serialplot_Checksum_8_ENABLE, 0, NULL);
   serialplot.Set_Data(6, &serialplot_target_angle, &serialplot_now_angle, &serialplot_target_omega,
                       &serialplot_now_omega, &serialplot_target_current, &serialplot_now_current);
 
-  host_uart.Init(&huart3);
-  chassis.Init(&hcan2);
+  host_uart.Init(&huart2);
+  chassis.Init(&hcan1);
   chassis.Set_Chassis_Control_Type(Chassis_Control_Type_NORMAL);
 
   TIM_Init(&htim4, Task100us_TIM4_Callback);

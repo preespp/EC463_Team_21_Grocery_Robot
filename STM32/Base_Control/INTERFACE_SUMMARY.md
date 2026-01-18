@@ -6,22 +6,22 @@ This summary reflects the current Base_Control code configuration.
 
 | Purpose | Peripheral | MCU pins | Board macros | Baud | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Serialplot telemetry | USART2 | PD5 (TX), PD6 (RX) | `BoardA_Bluetooth_Tx_Pin`, `BoardA_Bluetooth_Rx_Pin` | 1000000 | `Class_Serialplot` output |
-| Host UART (vx/vy/w + IMU) | USART3 | PD8 (TX), PD9 (RX) | `BoardA_USART3_Tx_Pin`, `BoardA_USART3_Rx_Pin` | 115200 | `Class_Host_UART` protocol |
+| Serialplot telemetry | USART3 | PD8 (TX), PD9 (RX) | `BoardA_USART3_Tx_Pin`, `BoardA_USART3_Rx_Pin` | 1000000 | `Class_Serialplot` output |
+| Host UART (vx/vy/w + IMU) | USART2 | PD5 (TX), PD6 (RX) | `BoardA_Bluetooth_Tx_Pin`, `BoardA_Bluetooth_Rx_Pin` | 115200 | `Class_Host_UART` protocol |
 | External IMU input (Wheeltec AHRS) | UART7 | PE8 (TX), PE7 (RX) | `BoardA_UART7_Tx_Pin`, `BoardA_UART7_Rx_Pin` | 921600 | Not used (external AHRS disabled) |
 
 ## CAN Buses
 
 | Bus | Peripheral | MCU pins | Board macros | Bitrate | Usage |
 | --- | --- | --- | --- | --- | --- |
-| Chassis CAN bus | CAN2 | PB13 (TX), PB12 (RX) | `BoardA_CAN2_Tx_Pin`, `BoardA_CAN2_Rx_Pin` | 1 Mbps | DJI C620/M3508, Tx ID 0x200, Rx IDs 0x201-0x204 |
-| Unused (available) | CAN1 | PD1 (TX), PD0 (RX) | `BoardA_CAN1_Tx_Pin`, `BoardA_CAN1_Rx_Pin` | 1 Mbps | MX_CAN1_Init runs, but CAN_Init is not called |
+| Chassis CAN bus | CAN1 | PD1 (TX), PD0 (RX) | `BoardA_CAN1_Tx_Pin`, `BoardA_CAN1_Rx_Pin` | 1 Mbps | DJI C620/M3508, Tx ID 0x200, Rx IDs 0x201-0x204 |
+| Unused (available) | CAN2 | PB13 (TX), PB12 (RX) | `BoardA_CAN2_Tx_Pin`, `BoardA_CAN2_Rx_Pin` | 1 Mbps | MX_CAN2_Init runs, but CAN_Init is not called |
 
 ## IMU Data Output (to host)
 
-- IMU data is forwarded to the host on USART3 using the `Class_Host_UART` TX frame (header 0x5AA5) every 10 ms.
+- IMU data is forwarded to the host on USART2 using the `Class_Host_UART` TX frame (header 0x5AA5) every 10 ms.
 - Fields: yaw, pitch, roll, omega_z plus chassis vx/vy/omega.
-- USART3 Host protocol (little-endian, packed, CRC8 = sum of all previous bytes mod 256):
+- USART2 Host protocol (little-endian, packed, CRC8 = sum of all previous bytes mod 256):
   - RX (PC -> board, vx/vy/w): `0xA55A` + `float vx` + `float vy` + `float w` + `uint8_t crc8` (15 bytes)
   - TX (board -> PC, IMU + chassis): `0x5AA5` + `float yaw` + `float pitch` + `float roll` + `float omega_z` + `float vx` + `float vy` + `float w` + `uint8_t crc8` (31 bytes)
 

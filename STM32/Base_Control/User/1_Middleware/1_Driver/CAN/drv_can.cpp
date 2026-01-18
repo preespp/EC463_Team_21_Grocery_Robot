@@ -190,8 +190,8 @@ uint8_t CAN_Send_Data(CAN_HandleTypeDef *hcan, uint16_t ID, uint8_t *Data, uint1
 void TIM_1ms_CAN_PeriodElapsedCallback()
 {
     // 云台电机
-    // Chassis motors on CAN2
-    CAN_Send_Data(&hcan2, 0x200, CAN2_0x200_Tx_Data, 8);
+    // Chassis motors on CAN1
+    CAN_Send_Data(&hcan1, 0x200, CAN1_0x200_Tx_Data, 8);
 }
 
 /**
