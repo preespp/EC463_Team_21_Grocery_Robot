@@ -18,7 +18,8 @@ void Class_Chassis::Init(CAN_HandleTypeDef *hcan)
 
     for (int i = 0; i < 4; i++)
     {
-        Motor_Wheel[i].PID_Omega.Init(5.0f, 0.2f, 0.0f, 0.0f, 10.0f, 20.0f, 0.002f);
+        //Motor_Wheel[i].PID_Omega.Init(5.0f, 0.2f, 0.0f, 0.0f, 10.0f, 20.0f, 0.002f);
+        Motor_Wheel[i].PID_Omega.Init(3.0f, 0.05f, 0.1f, 0.0f, 5.0f, 10.0f, 0.002f);
     }
 
     Motor_Wheel[Chassis_Wheel_Front_Left].Init(hcan, Motor_DJI_ID_0x201, Motor_DJI_Control_Method_OMEGA);
