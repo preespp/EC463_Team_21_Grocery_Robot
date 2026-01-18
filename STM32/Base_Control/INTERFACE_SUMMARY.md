@@ -33,6 +33,16 @@ This summary reflects the current Base_Control code configuration.
   - IMU heater PWM on PB5 (`BoardA_PWM_MPU6500_Heater_Pin`)
 - Driver: `Base_Control/User/2_Device/IMU/MPU6500/dvc_imu_mpu6500.*`
 
+## Chassis Geometry (Mecanum)
+
+- Geometry parameters are defined in `Base_Control/User/3_Chariot/1_Module/Chassis/crt_chassis.h`:
+  - `Wheel_Radius` (wheel radius, meters)
+  - `Wheelbase` (front-to-rear wheel center distance, meters)
+  - `Wheeltrack` (left-to-right wheel center distance, meters)
+  - `Wheel_Direction[4]` (per-wheel sign, wiring-dependent)
+- Kinematics for mecanum uses `chassis_radius = (Wheelbase + Wheeltrack) * 0.5f` in `Base_Control/User/3_Chariot/1_Module/Chassis/crt_chassis.cpp`.
+- For a rectangular mecanum chassis (wheels at the four corners), set `Wheelbase` and `Wheeltrack` to your measured dimensions.
+
 ## File References
 
 - UART pin map: `Base_Control/Core/Inc/main.h`
