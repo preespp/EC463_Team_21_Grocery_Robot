@@ -108,10 +108,6 @@ inline float Class_Chassis::Get_Now_Omega()
 
 inline float Class_Chassis::Get_Now_AHRS_Omega()
 {
-    if (IMU_MPU6500_Get_Status() == IMU_MPU6500_Status_ENABLE)
-    {
-        return (-IMU_MPU6500_Get_Omega_Z());
-    }
     return (Now_Omega);
 }
 
