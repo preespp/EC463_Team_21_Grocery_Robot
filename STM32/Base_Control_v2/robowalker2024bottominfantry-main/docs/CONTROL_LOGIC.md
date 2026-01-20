@@ -3,9 +3,9 @@
 This document summarizes the control logic, chassis kinematics, and PID usage for the STM32 project in this repo. It also lists executable vs separable code, required hardware, and the key callable APIs.
 
 ## Current implementation snapshot (chassis-only, PC UART2)
-- Input: PC UART2 frame (0xAC header, 5 floats + key mask + switches, checksum).
+- Input: PC UART2 frame (0xAC header, 5 floats + key mask + switches, checksum) at 115200 baud (8-N-1).
 - Scheduling: 1 ms PC parse + chassis target update, 2 ms chassis resolution/control, 1 ms CAN send + Serialplot.
-- Chassis: 4 mecanum, C620 current mode, outer PID on vx/vy/omega, wheel odom only (no IMU).
+- Chassis: 4 mecanum, C620 current mode, outer PID on vx/vy/omega, wheel odom only (no IMU). Wheel direction mismatches (FR/RR wiring) are handled via a compile-time `Wheel_Direction` sign map when sampling encoder data and when issuing motor currents.
 
 ## Project layout and entry points
 - Core entry point: `test/Core/Src/main.c` calls `Task_Init()` and `Task_Loop()`.
@@ -132,10 +132,10 @@ Current chassis is a 4 wheel mecanum drive (C620 + M3508):
 - ~~Omega = sum(omega_wheel * sin(steer_angle - wheel_azimuth) * R / distance) / 4~~
 - ~~Pitch/roll from AHRS are used to compute slope direction vector.~~
 
-Current (mecanum, using wheel omegas):
-- Vx = R * (w_fl + w_fr + w_rl + w_rr) / 4
-- Vy = R * (-w_fl + w_fr + w_rl - w_rr) / 4
-- Omega = R * (-w_fl + w_fr - w_rl + w_rr) / (4 * (L + W))
+Current (mecanum, using wheel omegas with direction signs `s_i`):
+- Vx = R * (s_fl*w_fl + s_fr*w_fr + s_rl*w_rl + s_rr*w_rr) / 4
+- Vy = R * (-s_fl*w_fl + s_fr*w_fr + s_rl*w_rl - s_rr*w_rr) / 4
+- Omega = R * (-s_fl*w_fl + s_fr*w_fr - s_rl*w_rl + s_rr*w_rr) / (4 * (L + W))
 - Pitch/roll are fixed to 0; slope direction is (0, 0, 1).
 
 ### Inverse kinematics
@@ -152,6 +152,7 @@ Current (mecanum, no steering):
 - w_fr = (Vx + Vy + Omega * (L + W)) / R
 - w_rl = (Vx + Vy - Omega * (L + W)) / R
 - w_rr = (Vx - Vy + Omega * (L + W)) / R
+  (direction signs are applied later when converting to motor commands)
 
 ### Dynamics inversion
 ~~Computed in `Class_Chassis::Dynamics_Inverse_Resolution()`:~~
@@ -163,6 +164,7 @@ Current (mecanum):
 - PID outputs for Vx/Vy/Omega are treated as force_x/force_y/torque.
 - Per wheel current uses force contribution and speed error: `Target_Wheel_Current[i] = (force term) * R + Wheel_Speed_Limit_Factor * (Target_Wheel_Omega - Now_Omega)`.
 - Dynamic resistance compensation is applied around `Wheel_Resistance_Omega_Threshold` using `Dynamic_Resistance_Wheel_Current[]`.
+- Wheel direction signs are applied only when sampling `Now_Omega` and when commanding `Set_Target_Current()` so physical wiring differences do not skew control gains.
 
 ### Output and power limiting
 - `Output_To_Motor()` sets wheel motors to current mode and runs motor PID loops (no steer motors).
@@ -225,7 +227,7 @@ Current (mecanum):
 - ~~Scheduler path from `Task1ms_TIM5_Callback()` so the above timers run.~~
 
 ## Controller communication (PC UART2) - required code path
-Minimum required pieces for PC control to work:
+Minimum required pieces for PC control to work (UART2 @ 115200 baud, 8-N-1):
 - `UART_Init(&huart2, PC_UART2_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH)` in `Task_Init()`.
 - `drv_uart.cpp` receive-to-idle DMA handler (`HAL_UARTEx_RxEventCallback`) dispatches UART2 to `PC_UART2_Callback()` and re-arms DMA.
 - `PC_UART2_Callback()` calls `Class_PC::UART_RxCpltCallback()`; if parsing fails, it forwards to Serialplot.
