@@ -7,6 +7,8 @@
 
 #include "crt_chassis.h"
 
+constexpr int8_t Class_Chassis::Wheel_Direction[4];
+
 /* Function prototypes -------------------------------------------------------*/
 
 void Class_Chassis::Init()
@@ -82,11 +84,6 @@ void Class_Chassis::Kinematics_Inverse_Resolution()
     Target_Wheel_Omega[1] = (Target_Velocity_X + Target_Velocity_Y + Target_Omega * base_sum) / Wheel_Radius;
     Target_Wheel_Omega[2] = (Target_Velocity_X + Target_Velocity_Y - Target_Omega * base_sum) / Wheel_Radius;
     Target_Wheel_Omega[3] = (Target_Velocity_X - Target_Velocity_Y + Target_Omega * base_sum) / Wheel_Radius;
-
-    for (int i = 0; i < 4; i++)
-    {
-        Target_Wheel_Omega[i] *= Wheel_Direction[i];
-    }
 }
 
 void Class_Chassis::Output_To_Dynamics()
@@ -148,8 +145,6 @@ void Class_Chassis::Dynamics_Inverse_Resolution()
         {
             Target_Wheel_Current[i] += motor_now_omega / Wheel_Resistance_Omega_Threshold * Dynamic_Resistance_Wheel_Current[i];
         }
-
-        Target_Wheel_Current[i] *= Wheel_Direction[i];
     }
 }
 
@@ -171,7 +166,7 @@ void Class_Chassis::Output_To_Motor()
         for (int i = 0; i < 4; i++)
         {
             Motor_Wheel[i].Set_Control_Method(Motor_DJI_Control_Method_CURRENT);
-            Motor_Wheel[i].Set_Target_Current(Target_Wheel_Current[i]);
+            Motor_Wheel[i].Set_Target_Current(Wheel_Direction[i] * Target_Wheel_Current[i]);
         }
         break;
     }
