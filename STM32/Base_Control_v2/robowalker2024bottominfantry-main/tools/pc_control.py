@@ -16,6 +16,8 @@ except ImportError as exc:
 HEADER = 0xAC
 PAYLOAD_SIZE = 24
 FRAME_SIZE = 26
+DEFAULT_PORT = "COM14"
+DEFAULT_BAUD = 115_200
 
 DR16_SWITCH_UP = 1
 
@@ -123,8 +125,8 @@ def build_frame():
 
 def main():
     parser = argparse.ArgumentParser(description="PC control sender for chassis")
-    parser.add_argument("--port", required=True, help="Serial port, e.g. COM5")
-    parser.add_argument("--baud", type=int, default=1000000, help="Baud rate")
+    parser.add_argument("--port", default=DEFAULT_PORT, help="Serial port (default: %(default)s)")
+    parser.add_argument("--baud", type=int, default=DEFAULT_BAUD, help="Baud rate (default: %(default)s)")
     parser.add_argument("--rate", type=float, default=50.0, help="Send rate (Hz)")
     args = parser.parse_args()
 

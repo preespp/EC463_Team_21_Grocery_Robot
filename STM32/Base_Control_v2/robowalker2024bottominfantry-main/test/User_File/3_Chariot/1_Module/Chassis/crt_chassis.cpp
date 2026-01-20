@@ -46,10 +46,10 @@ void Class_Chassis::TIM_2ms_Control_PeriodElapsedCallback()
 
 void Class_Chassis::Self_Resolution()
 {
-    float w_fl = Motor_Wheel[0].Get_Now_Omega();
-    float w_fr = Motor_Wheel[1].Get_Now_Omega();
-    float w_rl = Motor_Wheel[2].Get_Now_Omega();
-    float w_rr = Motor_Wheel[3].Get_Now_Omega();
+    float w_fl = Wheel_Direction[0] * Motor_Wheel[0].Get_Now_Omega();
+    float w_fr = Wheel_Direction[1] * Motor_Wheel[1].Get_Now_Omega();
+    float w_rl = Wheel_Direction[2] * Motor_Wheel[2].Get_Now_Omega();
+    float w_rr = Wheel_Direction[3] * Motor_Wheel[3].Get_Now_Omega();
 
     float base_sum = Wheel_Base_Half_Length + Wheel_Base_Half_Width;
 
@@ -82,6 +82,11 @@ void Class_Chassis::Kinematics_Inverse_Resolution()
     Target_Wheel_Omega[1] = (Target_Velocity_X + Target_Velocity_Y + Target_Omega * base_sum) / Wheel_Radius;
     Target_Wheel_Omega[2] = (Target_Velocity_X + Target_Velocity_Y - Target_Omega * base_sum) / Wheel_Radius;
     Target_Wheel_Omega[3] = (Target_Velocity_X - Target_Velocity_Y + Target_Omega * base_sum) / Wheel_Radius;
+
+    for (int i = 0; i < 4; i++)
+    {
+        Target_Wheel_Omega[i] *= Wheel_Direction[i];
+    }
 }
 
 void Class_Chassis::Output_To_Dynamics()
@@ -128,7 +133,8 @@ void Class_Chassis::Dynamics_Inverse_Resolution()
 
     for (int i = 0; i < 4; i++)
     {
-        Target_Wheel_Current[i] = tmp_force[i] * Wheel_Radius + Wheel_Speed_Limit_Factor * (Target_Wheel_Omega[i] - Motor_Wheel[i].Get_Now_Omega());
+        float motor_now_omega = Wheel_Direction[i] * Motor_Wheel[i].Get_Now_Omega();
+        Target_Wheel_Current[i] = tmp_force[i] * Wheel_Radius + Wheel_Speed_Limit_Factor * (Target_Wheel_Omega[i] - motor_now_omega);
 
         if (Target_Wheel_Omega[i] > Wheel_Resistance_Omega_Threshold)
         {
@@ -140,8 +146,10 @@ void Class_Chassis::Dynamics_Inverse_Resolution()
         }
         else
         {
-            Target_Wheel_Current[i] += Motor_Wheel[i].Get_Now_Omega() / Wheel_Resistance_Omega_Threshold * Dynamic_Resistance_Wheel_Current[i];
+            Target_Wheel_Current[i] += motor_now_omega / Wheel_Resistance_Omega_Threshold * Dynamic_Resistance_Wheel_Current[i];
         }
+
+        Target_Wheel_Current[i] *= Wheel_Direction[i];
     }
 }
 

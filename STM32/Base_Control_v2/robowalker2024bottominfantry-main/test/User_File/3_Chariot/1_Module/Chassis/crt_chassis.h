@@ -67,6 +67,8 @@ protected:
     // kinematics outputs
     float Target_Wheel_Omega[4];
     float Target_Wheel_Current[4];
+    // wheel direction (1=matches chassis math, -1=reversed motor mounting)
+    const float Wheel_Direction[4] = {1.0f, -1.0f, 1.0f, -1.0f};
 
     // friction compensation
     float Static_Resistance_Wheel_Current[4] = {0.0f, 0.0f, 0.0f, 0.0f};

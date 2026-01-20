@@ -58,7 +58,7 @@ I (C:\Keil_v5\ARM\ARMCC\include\float.h)(0x599F920C)
 I (C:\Keil_v5\ARM\ARMCC\include\limits.h)(0x599F920A)
 I (../User/2_Device/Serialplot/dvc_serialplot.h)(0x696D2DB0)
 I (C:\Keil_v5\ARM\ARMCC\include\stdarg.h)(0x599F920A)
-I (../User/3_Chariot/1_Module/Chassis/crt_chassis.h)(0x696D2DB0)
+I (../User/3_Chariot/1_Module/Chassis/crt_chassis.h)(0x696E96F6)
 I (../User/2_Device/Motor/Motor_DJI/dvc_motor_dji.h)(0x696D2DB0)
 I (../User/1_Middleware/2_Algorithm/PID/alg_pid.h)(0x696D2DAE)
 F (../Core/Src/gpio.c)(0x696D2D88)(--c99 -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ../User --cpp11-I.\RTE\_test-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-D__UVISION_VERSION="526" -D_RTE_ -DSTM32F427xx -DUSE_HAL_DRIVER -DSTM32F427xx-o test\gpio.o --omf_browse test\gpio.crf --depend test\gpio.d)
@@ -1400,7 +1400,7 @@ I (C:\Keil_v5\ARM\ARMCC\include\string.h)(0x599F920C)
 I (C:\Keil_v5\ARM\ARMCC\include\math.h)(0x599F920E)
 I (C:\Keil_v5\ARM\ARMCC\include\float.h)(0x599F920C)
 I (C:\Keil_v5\ARM\ARMCC\include\limits.h)(0x599F920A)
-F (..\User\2_Device\Motor\Motor_DJI\dvc_motor_dji.cpp)(0x696D2DB0)(--cpp -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ../User --cpp11-I.\RTE\_test-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-D__UVISION_VERSION="526" -D_RTE_ -DSTM32F427xx -DUSE_HAL_DRIVER -DSTM32F427xx-o test\dvc_motor_dji.o --omf_browse test\dvc_motor_dji.crf --depend test\dvc_motor_dji.d)
+F (..\User\2_Device\Motor\Motor_DJI\dvc_motor_dji.cpp)(0x696E9FA4)(--cpp -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ../User --cpp11-I.\RTE\_test-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-D__UVISION_VERSION="526" -D_RTE_ -DSTM32F427xx -DUSE_HAL_DRIVER -DSTM32F427xx-o test\dvc_motor_dji.o --omf_browse test\dvc_motor_dji.crf --depend test\dvc_motor_dji.d)
 I (..\User\2_Device\Motor\Motor_DJI\dvc_motor_dji.h)(0x696D2DB0)
 I (../User/1_Middleware/2_Algorithm/PID/alg_pid.h)(0x696D2DAE)
 I (../User/1_Middleware/1_Driver/Math/drv_math.h)(0x696D2DAE)
@@ -1629,8 +1629,8 @@ I (../Middlewares/ST/ARM/DSP/Inc/arm_math.h)(0x696D2DAC)
 I (C:\Keil_v5\ARM\ARMCC\include\math.h)(0x599F920E)
 I (C:\Keil_v5\ARM\ARMCC\include\float.h)(0x599F920C)
 I (C:\Keil_v5\ARM\ARMCC\include\limits.h)(0x599F920A)
-F (..\User\3_Chariot\1_Module\Chassis\crt_chassis.cpp)(0x696D2DB0)(--cpp -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ../User --cpp11-I.\RTE\_test-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-D__UVISION_VERSION="526" -D_RTE_ -DSTM32F427xx -DUSE_HAL_DRIVER -DSTM32F427xx-o test\crt_chassis.o --omf_browse test\crt_chassis.crf --depend test\crt_chassis.d)
-I (..\User\3_Chariot\1_Module\Chassis\crt_chassis.h)(0x696D2DB0)
+F (..\User\3_Chariot\1_Module\Chassis\crt_chassis.cpp)(0x696E96F2)(--cpp -c --cpu Cortex-M4.fp -g -O0 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc -I ../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I ../Drivers/CMSIS/Include -I ../Middlewares/ST/ARM/DSP/Inc -I ../User --cpp11-I.\RTE\_test-IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Core\Include-IC:\Keil_v5\ARM\PACK\Keil\STM32F4xx_DFP\2.8.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include-D__UVISION_VERSION="526" -D_RTE_ -DSTM32F427xx -DUSE_HAL_DRIVER -DSTM32F427xx-o test\crt_chassis.o --omf_browse test\crt_chassis.crf --depend test\crt_chassis.d)
+I (..\User\3_Chariot\1_Module\Chassis\crt_chassis.h)(0x696E96F6)
 I (../User/2_Device/IMU/MPU6500/dvc_imu_mpu6500.h)(0x696D2DAE)
 I (C:\Keil_v5\ARM\ARMCC\include\stdint.h)(0x599F920E)
 I (../User/2_Device/Motor/Motor_DJI/dvc_motor_dji.h)(0x696D2DB0)

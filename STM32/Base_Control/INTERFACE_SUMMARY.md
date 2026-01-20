@@ -6,8 +6,8 @@ This summary reflects the current Base_Control code configuration.
 
 | Purpose | Peripheral | MCU pins | Board macros | Baud | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Serialplot telemetry | USART3 | PD8 (TX), PD9 (RX) | `BoardA_USART3_Tx_Pin`, `BoardA_USART3_Rx_Pin` | 1000000 | `Class_Serialplot` output |
-| Host UART (vx/vy/w + IMU) | USART2 | PD5 (TX), PD6 (RX) | `BoardA_Bluetooth_Tx_Pin`, `BoardA_Bluetooth_Rx_Pin` | 115200 | `Class_Host_UART` protocol |
+| Serialplot telemetry (shared on command port) | USART2 | PD5 (TX), PD6 (RX) | `BoardA_Bluetooth_Tx_Pin`, `BoardA_Bluetooth_Rx_Pin` | 115200 | `Class_Serialplot` output now rides on the same link as host commands |
+| Host UART (vx/vy/w + IMU) | USART2 | PD5 (TX), PD6 (RX) | `BoardA_Bluetooth_Tx_Pin`, `BoardA_Bluetooth_Rx_Pin` | 115200 | `Class_Host_UART` protocol (RX commands, TX telemetry); shares line with Serialplot frames |
 | External IMU input (Wheeltec AHRS) | UART7 | PE8 (TX), PE7 (RX) | `BoardA_UART7_Tx_Pin`, `BoardA_UART7_Rx_Pin` | 921600 | Not used (external AHRS disabled) |
 
 ## CAN Buses
@@ -24,6 +24,7 @@ This summary reflects the current Base_Control code configuration.
 - USART2 Host protocol (little-endian, packed, CRC8 = sum of all previous bytes mod 256):
   - RX (PC -> board, vx/vy/w): `0xA55A` + `float vx` + `float vy` + `float w` + `uint8_t crc8` (15 bytes)
   - TX (board -> PC, IMU + chassis): `0x5AA5` + `float yaw` + `float pitch` + `float roll` + `float omega_z` + `float vx` + `float vy` + `float w` + `uint8_t crc8` (31 bytes)
+- Serialplot telemetry frames (0xAB header, 6 floats + checksum) are also emitted on USART2 at 100 Hz; configure SerialPlot to read the same COM port used for commands.
 
 ## Internal IMU Hardware Interface (on-board)
 

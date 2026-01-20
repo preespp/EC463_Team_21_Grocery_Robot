@@ -17,11 +17,17 @@
 
 /* Private macros ------------------------------------------------------------*/
 
+// Deadband tuning values that suppress dithering around near-zero wheel speeds (rad/s).
+static constexpr float kC620OmegaCommandDeadband = 2.5f;
+static constexpr float kC620OmegaErrorDeadband = 0.8f;
+
 /* Private types -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 
 /* Private function declarations ---------------------------------------------*/
+
+static bool is_within_c620_deadband(float desired_omega, float now_omega);
 
 /* Function prototypes -------------------------------------------------------*/
 
@@ -657,6 +663,16 @@ void Class_Motor_DJI_GM6020::Power_Limit_Control()
 }
 
 /**
+ * @brief Whether the requested and measured wheel speeds are inside the deadband.
+ */
+static bool is_within_c620_deadband(float desired_omega, float now_omega)
+{
+    const float omega_error = desired_omega - now_omega;
+    return (Math_Abs(desired_omega) < kC620OmegaCommandDeadband) &&
+           (Math_Abs(omega_error) < kC620OmegaErrorDeadband);
+}
+
+/**
  * @brief 电机数据输出到CAN总线发送缓冲区
  *
  */
@@ -800,11 +816,20 @@ void Class_Motor_DJI_C610::PID_Calculate()
     }
     case (Motor_DJI_Control_Method_OMEGA):
     {
-        PID_Omega.Set_Target(Target_Omega + Feedforward_Omega);
+        const float desired_omega = Target_Omega + Feedforward_Omega;
+        PID_Omega.Set_Target(desired_omega);
         PID_Omega.Set_Now(Rx_Data.Now_Omega);
-        PID_Omega.TIM_Calculate_PeriodElapsedCallback();
 
-        Target_Current = PID_Omega.Get_Out();
+        if (is_within_c620_deadband(desired_omega, Rx_Data.Now_Omega))
+        {
+            PID_Omega.Set_Integral_Error(0.0f);
+            Target_Current = 0.0f;
+        }
+        else
+        {
+            PID_Omega.TIM_Calculate_PeriodElapsedCallback();
+            Target_Current = PID_Omega.Get_Out();
+        }
 
         break;
     }
@@ -816,11 +841,20 @@ void Class_Motor_DJI_C610::PID_Calculate()
 
         Target_Omega = PID_Angle.Get_Out();
 
-        PID_Omega.Set_Target(Target_Omega + Feedforward_Omega);
+        const float desired_omega = Target_Omega + Feedforward_Omega;
+        PID_Omega.Set_Target(desired_omega);
         PID_Omega.Set_Now(Rx_Data.Now_Omega);
-        PID_Omega.TIM_Calculate_PeriodElapsedCallback();
 
-        Target_Current = PID_Omega.Get_Out();
+        if (is_within_c620_deadband(desired_omega, Rx_Data.Now_Omega))
+        {
+            PID_Omega.Set_Integral_Error(0.0f);
+            Target_Current = 0.0f;
+        }
+        else
+        {
+            PID_Omega.TIM_Calculate_PeriodElapsedCallback();
+            Target_Current = PID_Omega.Get_Out();
+        }
 
         break;
     }

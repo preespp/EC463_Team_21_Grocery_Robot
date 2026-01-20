@@ -71,6 +71,7 @@ extern "C" {
 
 bool init_finished = false;
 static bool can1_inited = false;
+static bool serialplot_uart_ready = false;
 
 Class_Serialplot serialplot;
 Class_Host_UART host_uart;
@@ -212,18 +213,7 @@ void Device_CAN1_Callback(Struct_CAN_Rx_Buffer *Rx_Buffer)
 }
 
 /**
- * @brief UART3 serialplot callback
- *
- * @param Buffer UART3?????
- * @param Length ??
- */
-void Serialplot_UART3_Callback(uint8_t *Buffer, uint16_t Length)
-{
-  serialplot.UART_RxCpltCallback(Buffer, Length);
-}
-
-/**
- * @brief UART2 host callback
+ * @brief UART2 host + serialplot callback
  *
  * @param Buffer UART2收到的消息
  * @param Length 长度
@@ -231,6 +221,10 @@ void Serialplot_UART3_Callback(uint8_t *Buffer, uint16_t Length)
 void Host_UART2_Callback(uint8_t *Buffer, uint16_t Length)
 {
   host_uart.UART_RxCpltCallback(Buffer, Length);
+  if (serialplot_uart_ready)
+  {
+    serialplot.UART_RxCpltCallback(Buffer, Length);
+  }
 }
 
 /**
@@ -395,10 +389,10 @@ int main(void)
   IMU_MPU6500_Init();
   CAN_Init(&hcan1, Device_CAN1_Callback);
   can1_inited = true;
-  UART_Init(&huart3, Serialplot_UART3_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
-  UART_Init(&huart2, Host_UART2_Callback, sizeof(Struct_Host_UART_Rx_Data));
+  UART_Init(&huart2, Host_UART2_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
 
-  serialplot.Init(&huart3, Serialplot_Checksum_8_ENABLE, 0, NULL);
+  serialplot.Init(&huart2, Serialplot_Checksum_8_ENABLE, 0, NULL);
+  serialplot_uart_ready = true;
   serialplot.Set_Data(6, &serialplot_target_angle, &serialplot_now_angle, &serialplot_target_omega,
                       &serialplot_now_omega, &serialplot_target_current, &serialplot_now_current);
 
