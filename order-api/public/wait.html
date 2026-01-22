@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wait</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="center">
+    <img class="logo small" src="logo.png" alt="Logo" />
+    <h1>Wait</h1>
+    <div class="muted" id="info">Order submitted.</div>
+
+    <div class="panel" style="max-width:720px;width:92%">
+      <div class="row" style="justify-content:space-between">
+        <div><b>Order ID:</b> <span id="oid">—</span></div>
+        <div><b>Status:</b> RECEIVED</div>
+      </div>
+      <div class="muted small">ROS2 will fetch the latest order and ACK it.</div>
+    </div>
+
+    <div class="row">
+      <button class="btn primary" id="back">Back</button>
+      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    idleTimeout(60000);
+    const user = getSession();
+    const oid = sessionStorage.getItem("last_order_id") || "—";
+    document.getElementById("oid").textContent = oid;
+
+    document.getElementById("back").onclick = () => {
+      if (!user) window.location.href = "login.html";
+      else if (user.access_level === "customer") window.location.href = "customer.html";
+      else window.location.href = "employee.html";
+    };
+  </script>
+</body>
+</html>

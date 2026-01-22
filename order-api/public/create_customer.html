@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Create Customer</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="row">
+      <span class="badge">CREATE CUSTOMER</span>
+      <span class="muted">account/{username}</span>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="window.location.href='login.html'">Back</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Create customer account</h1>
+
+    <div class="panel">
+      <div class="grid2">
+        <label class="field">
+          <span class="muted">Username (doc id)</span>
+          <input id="username" placeholder="customer_002" />
+        </label>
+        <label class="field">
+          <span class="muted">Password</span>
+          <input id="password" type="password" placeholder="••••••" />
+        </label>
+        <label class="field">
+          <span class="muted">First name</span>
+          <input id="first" placeholder="Alex" />
+        </label>
+        <label class="field">
+          <span class="muted">Last name</span>
+          <input id="last" placeholder="Kim" />
+        </label>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn primary" id="btnCreate">Create</button>
+      </div>
+
+      <div id="msg" class="muted" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    idleTimeout(60000);
+
+    document.getElementById("btnCreate").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      msg.textContent = "";
+
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const first_name = document.getElementById("first").value.trim();
+      const last_name = document.getElementById("last").value.trim();
+
+      try {
+        await apiPost("/api/account/create_customer", { username, password, first_name, last_name });
+        msg.textContent = "Created. You can login now.";
+      } catch (e) {
+        msg.textContent = "Create failed: " + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

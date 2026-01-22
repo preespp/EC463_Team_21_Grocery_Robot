@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Customer</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="row">
+      <span class="badge">CUSTOMER</span>
+      <span class="muted" id="who"></span>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
+      <button class="btn danger" id="logout">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Shop</h1>
+    <p class="muted">Tap + to add items. Submit sends the same format your server expects.</p>
+
+    <div class="grid2">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between">
+          <b>Inventory</b>
+          <button class="btn" id="refresh">Refresh</button>
+        </div>
+        <div class="muted small">Shows: name, price, stock</div>
+        <hr/>
+        <div id="inv"></div>
+      </div>
+
+      <div class="panel">
+        <div class="row" style="justify-content:space-between">
+          <b>Cart</b>
+          <button class="btn" id="clear">Clear</button>
+        </div>
+        <div id="cart"></div>
+        <hr/>
+        <div class="row" style="justify-content:space-between">
+          <div class="muted" id="msg"></div>
+          <button class="btn primary" id="submit">Submit Order</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user.access_level !== "customer") window.location.href = "login.html";
+    document.getElementById("who").textContent = `${user.username}`;
+
+    idleTimeout(60000);
+
+    const invEl = document.getElementById("inv");
+    const cartEl = document.getElementById("cart");
+    const msgEl = document.getElementById("msg");
+
+    let inventory = [];
+    let cart = new Map(); // id -> {inv, qty}
+
+    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="idle.html"; };
+
+    function renderInventory() {
+      invEl.innerHTML = "";
+      const table = document.createElement("table");
+      table.innerHTML = `
+        <thead><tr>
+          <th>Name</th><th>Price</th><th>Stock</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+
+      for (const it of inventory) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${it.name ?? ""}</td>
+          <td>${it.price ?? ""}</td>
+          <td>${it.stock ?? ""}</td>
+          <td><button class="btn">+</button></td>
+        `;
+        tr.querySelector("button").onclick = () => {
+          const entry = cart.get(it.id) || { inv: it, qty: 0 };
+          entry.qty += 1;
+          cart.set(it.id, entry);
+          renderCart();
+        };
+        tbody.appendChild(tr);
+      }
+
+      invEl.appendChild(table);
+    }
+
+    function renderCart() {
+      cartEl.innerHTML = "";
+      if (cart.size === 0) {
+        cartEl.innerHTML = `<div class="muted">Cart is empty</div>`;
+        return;
+      }
+
+      const table = document.createElement("table");
+      table.innerHTML = `
+        <thead><tr>
+          <th>Name</th><th>Qty</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+
+      for (const [id, entry] of cart.entries()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${entry.inv.name}</td>
+          <td class="row">
+            <button class="btn" data-a="-">-</button>
+            <span style="min-width:40px;display:inline-block;text-align:center">${entry.qty}</span>
+            <button class="btn" data-a="+">+</button>
+          </td>
+          <td><button class="btn danger">Remove</button></td>
+        `;
+        const [minus, plus] = tr.querySelectorAll("button[data-a]");
+        minus.onclick = () => { entry.qty = Math.max(1, entry.qty - 1); cart.set(id, entry); renderCart(); };
+        plus.onclick = () => { entry.qty += 1; cart.set(id, entry); renderCart(); };
+        tr.querySelector(".btn.danger").onclick = () => { cart.delete(id); renderCart(); };
+        tbody.appendChild(tr);
+      }
+
+      cartEl.appendChild(table);
+    }
+
+    async function loadInventory() {
+      msgEl.textContent = "";
+      const data = await apiGet("/api/inventory/list");
+      inventory = data.items;
+      renderInventory();
+    }
+
+    document.getElementById("refresh").onclick = loadInventory;
+    document.getElementById("clear").onclick = () => { cart.clear(); renderCart(); };
+
+    document.getElementById("submit").onclick = async () => {
+      msgEl.textContent = "";
+      if (cart.size === 0) { msgEl.textContent = "Cart is empty"; return; }
+
+      // Build payload to match server.js required fields
+      const items = [];
+      for (const entry of cart.values()) {
+        const it = entry.inv;
+        items.push({
+          aisle: it.aisle,
+          name: it.name,
+          price: it.price,
+          rack: it.rack,
+          shelf_level: it.shelf_level,
+          stock: it.stock,
+          qty: entry.qty
+        });
+      }
+
+      try {
+        const resp = await apiPost("/api/order/customer", { id: user.username, items });
+        sessionStorage.setItem("last_order_id", String(resp.order_id || ""));
+        window.location.href = "wait.html";
+      } catch (e) {
+        msgEl.textContent = "Submit failed: " + e.message;
+      }
+    };
+
+    loadInventory();
+    renderCart();
+  </script>
+</body>
+</html>
