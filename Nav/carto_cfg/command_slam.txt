@@ -1,0 +1,22 @@
+ros2 launch sick_scan_xd sick_picoscan.launch.py   hostname:=192.168.8.150   udp_receiver_ip:=192.168.8.143
+ ros2 run rviz2 rviz2
+ 
+ ros2 launch ~/carto_cfg/my_carto.launch.py
+ 
+roslaunch cartographer_ros demo_backpack_2d.launch bag_filename:=/media/crp/0E3C06880E3C0688/b2-2016-04-05-14-44-52.bag
+ros2 run tf2_ros tf2_echo base_link world_1
+ros2 run cartographer_ros cartographer_node   --ros-args   -r points2:=/cloud_all_fields_fullframe   -r imu:=/sick_scansegment_xd/imu   -- -configuration_directory ~/carto_cfg      -configuration_basename pico_2d.lua
+
+rosservice call /write_state "{filename: '/home/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream'}"
+
+saving the map to Maps folder(example testmap1):
+ros2 service call /write_state cartographer_ros_msgs/srv/WriteState "{filename: '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream', include_unfinished_submaps: true}"
+
+translate pbstream into the yaml and pgm file:(example,testmap1 in MAP file)
+ros2 run cartographer_ros cartographer_pbstream_to_ros_map \
+  -pbstream_filename /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream \
+  -map_filestem /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1 \
+  -resolution 0.05
+
+RUNNING IN STATIC SAVE MODE:
+ ros2 launch ~/carto_cfg/my_carto_Localization.launch.py

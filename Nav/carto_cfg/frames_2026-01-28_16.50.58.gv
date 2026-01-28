@@ -1,0 +1,8 @@
+digraph G {
+"odom" -> "world"[label=" Broadcaster: Authority undetectable\nAverage rate: 167.575\nBuffer length: 10.001\nMost recent transform: 1769637058.551029\nOldest transform: 1769637048.549553\n"];
+"map" -> "odom"[label=" Broadcaster: Authority undetectable\nAverage rate: 157.677\nBuffer length: 10.001\nMost recent transform: 1769637058.551029\nOldest transform: 1769637048.549553\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1769637058.565198"[ shape=plaintext ] ;
+}->"map";
+}
