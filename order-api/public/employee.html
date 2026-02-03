@@ -23,18 +23,17 @@
 
     <div class="panel">
       <div class="row" style="justify-content:space-between">
-        <b>Inventory (editable)</b>
+        <b>Inventory</b>
         <button class="btn" id="refresh">Refresh</button>
       </div>
-      <div class="muted small">Editable: aisle, rack, shelf_level, price. Stock updates handled by ROS2 later.</div>
       <hr/>
-      <div id="inv"></div>
+      <div id="inv" class="scroll-box inv-scroll"></div>
       <div class="muted" id="msg"></div>
     </div>
 
     <div class="grid2" style="margin-top:14px">
       <div class="panel">
-        <b>Add new grocery (stock starts at 0)</b>
+        <b>Add new grocery</b>
         <div class="grid2" style="margin-top:10px">
           <label class="field"><span class="muted">Doc ID</span><input id="new_id" placeholder="003"/></label>
           <label class="field"><span class="muted">Name</span><input id="new_name" placeholder="Apple"/></label>
@@ -50,13 +49,12 @@
       </div>
 
       <div class="panel">
-        <b>Create employee account (only here)</b>
+        <b>Create employee account</b>
         <div class="grid2" style="margin-top:10px">
           <label class="field"><span class="muted">Username</span><input id="emp_user" placeholder="employee_002"/></label>
           <label class="field"><span class="muted">Password</span><input id="emp_pass" type="password" placeholder="••••••"/></label>
           <label class="field"><span class="muted">First name</span><input id="emp_first"/></label>
           <label class="field"><span class="muted">Last name</span><input id="emp_last"/></label>
-          <label class="field"><span class="muted">Admin PIN (optional)</span><input id="emp_pin" type="password"/></label>
         </div>
         <div class="row">
           <button class="btn primary" id="btnCreateEmp">Create</button>
@@ -65,7 +63,7 @@
 
         <hr/>
 
-        <b>Restock order (ONE product type)</b>
+        <b>Restock order</b>
         <div class="grid2" style="margin-top:10px">
           <label class="field">
             <span class="muted">Select product</span>
@@ -89,7 +87,17 @@
     const user = requireLogin();
     if (user.access_level !== "employee") window.location.href = "login.html";
     document.getElementById("who").textContent = `${user.username}`;
-    idleTimeout(60000);
+    idleTimeoutWithWarnings({
+        totalMs: 10 * 60 * 1000,      // 10 minutes
+        warnMs: 9 * 60 * 1000,       // 9 minutes
+        warnText: "No activity detected. Logging out in 1 minute...",
+        finalText: "Timeout reached. Logging out in 5 seconds...",
+        finalPopupMs: 5000,
+        onTimeout: () => {
+            clearSession();
+            window.location.href = "idle.html";
+        }
+    });
 
     document.getElementById("logout").onclick = () => { clearSession(); window.location.href="idle.html"; };
 
@@ -191,7 +199,6 @@
           password: document.getElementById("emp_pass").value.trim(),
           first_name: document.getElementById("emp_first").value.trim(),
           last_name: document.getElementById("emp_last").value.trim(),
-          admin_pin: document.getElementById("emp_pin").value.trim(),
         });
         empMsg.textContent = "Employee created";
       } catch (e) {

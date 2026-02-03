@@ -127,13 +127,23 @@ class BTExecutor(Node):
 
         if status in (py_trees.common.Status.SUCCESS, py_trees.common.Status.FAILURE):
             self.get_logger().info(f"BT finished: {status}")
+            try:
+                if self.bb.order is not None:
+                    requests.post(
+                        f"{SERVER}/api/order/complete",
+                        json={"order_id": int(self.bb.order.order_id), "result": str(status)},
+                        timeout=1.0
+                    )
+            except Exception as e:
+                self.get_logger().warn(f"Failed to report completion: {e}")
+            
             self.clear_order()
 
     def convert_json_to_order(self, data: dict) -> Order:
         order = Order()
         order.order_id = int(data["order_id"])
         order.role = data["role"]
-        order.requester_id = str(data["id"])
+        order.requester_id = str(data.get("requester_id", data.get("id", "")))
 
         for it in data["items"]:
             item = OrderItem()

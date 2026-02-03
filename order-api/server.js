@@ -22,7 +22,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Serve kiosk UI
+// Serve UI
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
@@ -30,6 +30,8 @@ app.use(express.static(path.join(__dirname, "public")));
 // Existing Order Inbox API
 let latestOrder = null;
 let orderAvailable = false;
+const orderStatus = new Map(); 
+// order_id -> { status: "RECEIVED"|"IN_PROGRESS"|"DONE"|"FAILED", result?: string, updated_at: string }
 
 function OrderPayload(req, res, role) {
   const { id, items } = req.body;
@@ -61,6 +63,10 @@ function OrderPayload(req, res, role) {
   console.log(`New ${role.toUpperCase()} order received:`);
   console.dir(latestOrder, { depth: null });
 
+  orderStatus.set(String(latestOrder.order_id), {
+    status: "RECEIVED",
+    updated_at: new Date().toISOString(),
+  });
   return res.json({ status: "RECEIVED", order_id: latestOrder.order_id });
 }
 
@@ -75,6 +81,14 @@ app.get("/api/order/latest", (req, res) => {
 app.post("/api/order/ack", (req, res) => {
   console.log("Order acknowledged by ROS");
   orderAvailable = false;
+
+  if (latestOrder?.order_id) {
+    orderStatus.set(String(latestOrder.order_id), {
+      status: "IN_PROGRESS",
+      updated_at: new Date().toISOString(),
+    });
+  }
+
   res.json({ status: "ACKED" });
 });
 
@@ -223,6 +237,31 @@ app.post("/api/inventory/add", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
+});
+
+// UI polls this
+app.get("/api/order/status/:order_id", (req, res) => {
+  const oid = String(req.params.order_id || "");
+  const s = orderStatus.get(oid);
+  if (!s) return res.status(404).json({ error: "Unknown order_id" });
+  res.json({ order_id: oid, ...s });
+});
+
+// BT executor calls this when done
+app.post("/api/order/complete", (req, res) => {
+  const { order_id, result } = req.body || {};
+  if (!order_id) return res.status(400).json({ error: "Missing order_id" });
+
+  const r = String(result || "").toUpperCase();
+  const status = (r === "SUCCESS") ? "DONE" : "FAILED";
+
+  orderStatus.set(String(order_id), {
+    status,
+    result: r,
+    updated_at: new Date().toISOString(),
+  });
+
+  res.json({ ok: true });
 });
 
 // Default route to idle

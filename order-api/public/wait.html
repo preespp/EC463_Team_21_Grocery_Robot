@@ -17,27 +17,76 @@
         <div><b>Order ID:</b> <span id="oid">—</span></div>
         <div><b>Status:</b> RECEIVED</div>
       </div>
-      <div class="muted small">ROS2 will fetch the latest order and ACK it.</div>
-    </div>
-
-    <div class="row">
-      <button class="btn primary" id="back">Back</button>
-      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
     </div>
   </div>
 
   <script src="common.js"></script>
   <script>
-    idleTimeout(60000);
-    const user = getSession();
-    const oid = sessionStorage.getItem("last_order_id") || "—";
-    document.getElementById("oid").textContent = oid;
+  // IMPORTANT: no idle timeout here (this page is supposed to wait)
+  const user = getSession();
+  if (!user) window.location.href = "login.html";
 
-    document.getElementById("back").onclick = () => {
-      if (!user) window.location.href = "login.html";
-      else if (user.access_level === "customer") window.location.href = "customer.html";
+  const oid = sessionStorage.getItem("last_order_id") || "—";
+  document.getElementById("oid").textContent = oid;
+
+  const infoEl = document.getElementById("info");
+
+  function goBackByRole() {
+      if (user.access_level === "customer") window.location.href = "customer.html";
       else window.location.href = "employee.html";
-    };
+  }
+
+  function showDoneAndRedirect(text) {
+      // simple full-screen overlay for 5 seconds
+      const overlay = document.createElement("div");
+      overlay.style.cssText = `
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.65); z-index:9999; padding:22px; text-align:center;
+      `;
+      overlay.innerHTML = `
+      <div style="max-width:720px;width:92%;border-radius:18px;padding:18px;
+                  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);">
+          <div style="font-size:34px;font-weight:900;">${text}</div>
+          <div class="muted" style="margin-top:10px;">Returning in 5 seconds…</div>
+      </div>
+      `;
+      document.body.appendChild(overlay);
+
+      setTimeout(goBackByRole, 5000);
+  }
+
+  async function pollStatus() {
+      try {
+      // NEW endpoint we’ll add in server.js
+      const r = await apiGet(`/api/order/status/${encodeURIComponent(oid)}`);
+      // r = { order_id, status, result? }
+
+      if (r.status === "RECEIVED") {
+          infoEl.textContent = "Order received. Waiting for robot…";
+      } else if (r.status === "IN_PROGRESS") {
+          infoEl.textContent = "Robot is working on your order…";
+      } else if (r.status === "DONE") {
+          showDoneAndRedirect("Done!");
+          return true;
+      } else if (r.status === "FAILED") {
+          showDoneAndRedirect("Failed (check robot)");
+          return true;
+      }
+      } catch (e) {
+      // Node or endpoint not reachable
+      infoEl.textContent = "Waiting… (connection issue)";
+      }
+      return false;
+  }
+
+  // Poll every 1s
+  (async function loop() {
+      while (true) {
+      const finished = await pollStatus();
+      if (finished) break;
+      await new Promise((res) => setTimeout(res, 1000));
+      }
+  })();
   </script>
 </body>
 </html>
