@@ -1,0 +1,43 @@
+running egg_info
+creating ../../../build/robot_task_manager/robot_task_manager.egg-info
+writing ../../../build/robot_task_manager/robot_task_manager.egg-info/PKG-INFO
+writing dependency_links to ../../../build/robot_task_manager/robot_task_manager.egg-info/dependency_links.txt
+writing entry points to ../../../build/robot_task_manager/robot_task_manager.egg-info/entry_points.txt
+writing requirements to ../../../build/robot_task_manager/robot_task_manager.egg-info/requires.txt
+writing top-level names to ../../../build/robot_task_manager/robot_task_manager.egg-info/top_level.txt
+writing manifest file '../../../build/robot_task_manager/robot_task_manager.egg-info/SOURCES.txt'
+reading manifest file '../../../build/robot_task_manager/robot_task_manager.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file '../../../build/robot_task_manager/robot_task_manager.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager
+copying robot_task_manager/blackboard.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager
+copying robot_task_manager/bt_executor.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager
+copying robot_task_manager/__init__.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager
+running install
+running install_lib
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager
+copying /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager/blackboard.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager
+copying /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager/bt_executor.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager
+copying /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager/__init__.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager
+byte-compiling /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager/blackboard.py to blackboard.cpython-310.pyc
+byte-compiling /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager/bt_executor.py to bt_executor.cpython-310.pyc
+byte-compiling /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager/__init__.py to __init__.cpython-310.pyc
+running install_data
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/ament_index
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/ament_index/resource_index
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/ament_index/resource_index/packages
+copying resource/robot_task_manager -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/ament_index/resource_index/packages
+copying package.xml -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/robot_task_manager
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/robot_task_manager/urdf
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/robot_task_manager/launch
+copying launch/sample.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/robot_task_manager/launch
+creating /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/share/robot_task_manager/config
+running install_egg_info
+Copying ../../../build/robot_task_manager/robot_task_manager.egg-info to /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager-1.0.0-py3.10.egg-info
+running install_scripts
+Installing bt_executor script to /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/robot_task_manager
+writing list of installed files to '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/install.log'

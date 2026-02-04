@@ -1,0 +1,25 @@
+[1.833s] Invoking command in '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_task_manager': PYTHONPATH=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../../build/robot_task_manager build --build-base /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build install --record /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/install.log --single-version-externally-managed install_data
+[2.479s] running egg_info
+[2.480s] writing ../../../build/robot_task_manager/robot_task_manager.egg-info/PKG-INFO
+[2.481s] writing dependency_links to ../../../build/robot_task_manager/robot_task_manager.egg-info/dependency_links.txt
+[2.481s] writing entry points to ../../../build/robot_task_manager/robot_task_manager.egg-info/entry_points.txt
+[2.482s] writing requirements to ../../../build/robot_task_manager/robot_task_manager.egg-info/requires.txt
+[2.482s] writing top-level names to ../../../build/robot_task_manager/robot_task_manager.egg-info/top_level.txt
+[2.487s] reading manifest file '../../../build/robot_task_manager/robot_task_manager.egg-info/SOURCES.txt'
+[2.487s] adding license file 'LICENSE'
+[2.489s] writing manifest file '../../../build/robot_task_manager/robot_task_manager.egg-info/SOURCES.txt'
+[2.489s] running build
+[2.489s] running build_py
+[2.490s] copying robot_task_manager/bt_executor.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager
+[2.491s] running install
+[2.491s] running install_lib
+[2.494s] copying /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build/lib/robot_task_manager/bt_executor.py -> /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager
+[2.495s] byte-compiling /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager/bt_executor.py to bt_executor.cpython-310.pyc
+[2.499s] running install_data
+[2.499s] running install_egg_info
+[2.504s] removing '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager-1.0.0-py3.10.egg-info' (and everything under it)
+[2.504s] Copying ../../../build/robot_task_manager/robot_task_manager.egg-info to /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages/robot_task_manager-1.0.0-py3.10.egg-info
+[2.507s] running install_scripts
+[2.559s] Installing bt_executor script to /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/robot_task_manager
+[2.561s] writing list of installed files to '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/install.log'
+[2.672s] Invoked command in '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_task_manager' returned '0': PYTHONPATH=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../../build/robot_task_manager build --build-base /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/build install --record /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_task_manager/install.log --single-version-externally-managed install_data

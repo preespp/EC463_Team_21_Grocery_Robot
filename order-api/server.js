@@ -42,7 +42,7 @@ function OrderPayload(req, res, role) {
   }
 
   for (const item of items) {
-    const required = ["aisle", "name", "price", "rack", "shelf_level", "stock", "qty"];
+    const required = ["product_id", "aisle", "name", "price", "rack", "shelf_level", "stock", "qty"];
     for (const key of required) {
       if (!(key in item)) {
         return res.status(400).json({ error: `Missing field '${key}' in item` });
