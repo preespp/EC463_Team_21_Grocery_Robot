@@ -170,6 +170,7 @@ class Nav2SerialBridge(Node):
         self.last_cmd_time: float | None = None
         self.last_telemetry_time: float | None = None
         self.last_checksum_warning = 0.0
+        self.last_format_hint = 0.0
         self.telemetry_ok_frames = 0
         self.telemetry_bad_checksum = 0
         self.command_echo_frames = 0
@@ -188,7 +189,10 @@ class Nav2SerialBridge(Node):
         self.get_logger().info(
             f"Nav2 serial bridge ready (port={self.serial_port}, baud={self.baud_rate}, "
             f"cmd_topic={self.cmd_topic}, odom_topic={self.odom_topic}, "
-            f"frame={self.frame_id}->{self.child_frame_id}, publish_tf={self.publish_tf})"
+            f"frame={self.frame_id}->{self.child_frame_id}, publish_tf={self.publish_tf}, "
+            f"telemetry_header={[hex(b) for b in self.telemetry_header]}, "
+            f"telemetry_channels={self.telemetry_channels}, "
+            f"telemetry_checksum={self.telemetry_checksum})"
         )
 
     # --------------------------------------------------------------------- #
@@ -360,6 +364,15 @@ class Nav2SerialBridge(Node):
                                 f"(bad={self.telemetry_bad_checksum}, ok={self.telemetry_ok_frames}, "
                                 f"echoed_cmd={self.command_echo_frames})"
                             )
+                            if self.telemetry_ok_frames == 0 and self.telemetry_bad_checksum >= 50:
+                                if (now - self.last_format_hint) >= 5.0:
+                                    self.get_logger().warning(
+                                        "No valid telemetry frame decoded yet. "
+                                        "Likely mismatch: baud_rate (try 1000000), "
+                                        "telemetry_channels (try 10), or checksum setting "
+                                        "(try telemetry_checksum=False). Also verify the flashed firmware build."
+                                    )
+                                    self.last_format_hint = now
                             self.last_checksum_warning = now
                         # Resync on bad checksum by advancing one byte.
                         del self.telemetry_buffer[:1]

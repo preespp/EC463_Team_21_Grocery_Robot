@@ -64,6 +64,9 @@ python3 /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/STM32/Base_Control_
   --ros-args \
   -p serial_port:=/dev/ttyUSB0 \
   -p baud_rate:=115200 \
+  -p telemetry_header:=[171] \
+  -p telemetry_channels:=6 \
+  -p telemetry_checksum:=true \
   -p frame_id:=odom \
   -p child_frame_id:=world \
   -p publish_tf:=false
@@ -73,6 +76,7 @@ Notes:
 
 - `publish_tf:=false` avoids TF conflict with Cartographer (Cartographer already publishes `odom -> world`).
 - If your USB serial path is different, change `serial_port`.
+- For STM32 firmware **v2**, keep `telemetry_channels:=6` and `telemetry_checksum:=true`.
 
 ### 4. Manual keyboard teleop (publishes `/cmd_vel`)
 
