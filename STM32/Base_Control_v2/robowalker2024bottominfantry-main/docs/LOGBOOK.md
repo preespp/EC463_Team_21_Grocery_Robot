@@ -84,7 +84,7 @@ Keyboard mask (bit → action):
 
 Switch encoding uses DR16 semantics (1=UP, 2=MID, 3=DOWN). Left switch DOWN or PC offline disables chassis output.
 
-Serialplot telemetry (STM32 → host): 10 floats (target vx/vy/omega, measured vx/vy/omega, wheel omegas FL/FR/RL/RR). Format matches Serialplot binary protocol.
+Serialplot telemetry (STM32 → host): 6 floats (target vx/vy/omega and measured vx/vy/omega) at 200 Hz. Frame format is `0xAB + 24-byte payload + 8-bit checksum`.
 
 ### 3.2 CAN1 (Wheel Motors)
 - Bus speed: 1 Mbps.

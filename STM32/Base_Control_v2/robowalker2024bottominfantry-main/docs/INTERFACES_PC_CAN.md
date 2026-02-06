@@ -67,7 +67,7 @@ Keyboard mask bits follow the DR16 convention used in `dvc_pc.h`:
 
 ### STM32 → PC telemetry frame (Serialplot)
 
-The firmware reuses the Serialplot binary protocol (see `dvc_serialplot.cpp`). Every 1 ms the following 10 floats are sent (little-endian):
+The firmware reuses the Serialplot transport in `dvc_serialplot.cpp`. Every 5 ms (200 Hz) the following 6 floats are sent (little-endian):
 
 | Channel | Signal |
 | --- | --- |
@@ -77,12 +77,14 @@ The firmware reuses the Serialplot binary protocol (see `dvc_serialplot.cpp`). E
 |3|Measured vx (m/s)|
 |4|Measured vy (m/s)|
 |5|Measured omega (rad/s)|
-|6|Wheel FL omega (rad/s)|
-|7|Wheel FR omega (rad/s)|
-|8|Wheel RL omega (rad/s)|
-|9|Wheel RR omega (rad/s)|
 
-Serialplot frames begin with `0x5A 0xA5`, followed by payload length, checksum, and channel data—see the Serialplot project for exact framing. Hosts that don’t need telemetry may ignore UART2 TX entirely.
+Current firmware frame format on UART2 TX:
+
+- Header: `0xAB`
+- Payload: 6 x `float32` (24 bytes)
+- Checksum: 8-bit sum over payload (1 byte)
+
+Total frame size: 26 bytes, i.e. about 52 kbps at 200 Hz (safe margin at 115200 bps). Hosts that don’t need telemetry may ignore UART2 TX entirely.
 
 ## CAN1 (chassis motors)
 

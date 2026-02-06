@@ -99,16 +99,26 @@ void Task1ms_TIM5_Callback()
 
     robot.TIM_1ms_Calculate_Callback();
 
-    float target_vx = robot.Chassis.Get_Target_Velocity_X();
-    float target_vy = robot.Chassis.Get_Target_Velocity_Y();
-    float target_omega = robot.Chassis.Get_Target_Omega();
-    float now_vx = robot.Chassis.Get_Now_Velocity_X();
-    float now_vy = robot.Chassis.Get_Now_Velocity_Y();
-    float now_omega = robot.Chassis.Get_Now_Omega();
-    // Serialplot channels: target vx/vy/omega, now vx/vy/omega.
-    serialplot.Set_Data(6, &target_vx, &target_vy, &target_omega,
-                        &now_vx, &now_vy, &now_omega);
-    serialplot.TIM_1ms_Write_PeriodElapsedCallback();
+    // UART2 telemetry throttled to 200 Hz:
+    // frame size = 1(header) + 6*4(float) + 1(checksum) = 26 bytes
+    // 26 bytes * 10 bits/byte * 200 Hz = 52 kbps (safe at 115200 bps)
+    static uint8_t telemetry_mod5 = 0;
+    telemetry_mod5++;
+    if (telemetry_mod5 >= 5)
+    {
+        telemetry_mod5 = 0;
+
+        float target_vx = robot.Chassis.Get_Target_Velocity_X();
+        float target_vy = robot.Chassis.Get_Target_Velocity_Y();
+        float target_omega = robot.Chassis.Get_Target_Omega();
+        float now_vx = robot.Chassis.Get_Now_Velocity_X();
+        float now_vy = robot.Chassis.Get_Now_Velocity_Y();
+        float now_omega = robot.Chassis.Get_Now_Omega();
+        // Serialplot channels: target vx/vy/omega, now vx/vy/omega.
+        serialplot.Set_Data(6, &target_vx, &target_vy, &target_omega,
+                            &now_vx, &now_vy, &now_omega);
+        serialplot.TIM_1ms_Write_PeriodElapsedCallback();
+    }
 
     TIM_1ms_CAN_PeriodElapsedCallback();
     TIM_1ms_UART_PeriodElapsedCallback();

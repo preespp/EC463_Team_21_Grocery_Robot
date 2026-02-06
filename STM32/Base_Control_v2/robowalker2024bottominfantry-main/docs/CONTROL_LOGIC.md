@@ -4,7 +4,7 @@ This document summarizes the control logic, chassis kinematics, and PID usage fo
 
 ## Current implementation snapshot (chassis-only, PC UART2)
 - Input: PC UART2 frame (0xAC header, 5 floats + key mask + switches, checksum) at 115200 baud (8-N-1).
-- Scheduling: 1 ms PC parse + chassis target update, 2 ms chassis resolution/control, 1 ms CAN send + Serialplot.
+- Scheduling: 1 ms PC parse + chassis target update, 2 ms chassis resolution/control, 1 ms CAN send + 5 ms Serialplot telemetry.
 - Chassis: 4 mecanum, C620 current mode, outer PID on vx/vy/omega, wheel odom only (no IMU). Wheel direction mismatches (FR/RR wiring) are handled via a compile-time `Wheel_Direction` sign map when sampling encoder data and when issuing motor currents.
 
 ## Project layout and entry points
@@ -27,7 +27,7 @@ Executed in `Task1ms_TIM5_Callback()`:
 - 10 ms: `robot.TIM_10ms_Calculate_PeriodElapsedCallback()` (~~Manifold control + UART send, Supercap send~~ currently empty).
 - 2 ms: `robot.TIM_2ms_Calculate_PeriodElapsedCallback()` (Chassis resolution + control loop).
 - 1 ms: `robot.TIM_1ms_Calculate_Callback()` (~~status, supercap, chassis, gimbal, booster control, plus gimbal and posture updates~~ PC parse + chassis target update).
-- Telemetry: Serialplot writes 10 channels each 1 ms in `Task1ms_TIM5_Callback()`.
+- Telemetry: Serialplot writes 6 channels each 5 ms in `Task1ms_TIM5_Callback()` (200 Hz).
 - Driver layer each 1 ms: `TIM_1ms_CAN_PeriodElapsedCallback()`, `TIM_1ms_UART_PeriodElapsedCallback()`, `TIM_1ms_IWDG_PeriodElapsedCallback()`.
 
 ### Interrupt callbacks
@@ -42,7 +42,7 @@ Executed in `Task1ms_TIM5_Callback()`:
 4. Each 2 ms, `Class_Chassis::Self_Resolution()` computes odom (`vx/vy/omega`) from wheel speeds, then inverse kinematics computes target wheel omegas.
 5. `PID_Velocity_X/Y/Omega` outputs are converted to per-wheel target current (with speed correction + resistance compensation).
 6. `TIM_1ms_CAN_PeriodElapsedCallback()` sends CAN1 0x200 with 4 wheel currents. Motor feedback 0x201-0x204 updates wheel speed/power estimates.
-7. Each 1 ms, Serialplot sends 10 float channels over UART2: target vx/vy/omega, now vx/vy/omega, wheel omegas FL/FR/RL/RR.
+7. Each 5 ms, Serialplot sends 6 float channels over UART2: target vx/vy/omega and now vx/vy/omega.
 
 ## Control logic (operator and subsystem behavior)
 ### Input sources

@@ -90,8 +90,8 @@ class Nav2SerialBridge(Node):
         # Telemetry path configuration
         self.declare_parameter("odom_topic", "/odom")
         self.declare_parameter("frame_id", "odom")
-        self.declare_parameter("child_frame_id", "base_link")
-        self.declare_parameter("publish_tf", True)
+        self.declare_parameter("child_frame_id", "world")
+        self.declare_parameter("publish_tf", False)
         self.declare_parameter("telemetry_header", [0xAB])
         self.declare_parameter("telemetry_channels", 6)
         self.declare_parameter("telemetry_checksum", True)
@@ -180,11 +180,9 @@ class Nav2SerialBridge(Node):
 
         self._open_serial()
         self.get_logger().info(
-            "Nav2 serial bridge ready (port=%s, baud=%d, cmd_topic=%s, odom_topic=%s)",
-            self.serial_port,
-            self.baud_rate,
-            self.cmd_topic,
-            self.odom_topic,
+            f"Nav2 serial bridge ready (port={self.serial_port}, baud={self.baud_rate}, "
+            f"cmd_topic={self.cmd_topic}, odom_topic={self.odom_topic}, "
+            f"frame={self.frame_id}->{self.child_frame_id}, publish_tf={self.publish_tf})"
         )
 
     # --------------------------------------------------------------------- #
@@ -216,7 +214,7 @@ class Nav2SerialBridge(Node):
                 write_timeout=0,
             )
         except SerialException as exc:
-            self.get_logger().error("Unable to open %s: %s", self.serial_port, exc)
+            self.get_logger().error(f"Unable to open {self.serial_port}: {exc}")
             self.serial_conn = None
             return
 
@@ -224,7 +222,7 @@ class Nav2SerialBridge(Node):
             self.serial_conn = conn
             self.serial_conn.reset_input_buffer()
             self.serial_conn.reset_output_buffer()
-        self.get_logger().info("Serial port %s opened", self.serial_port)
+        self.get_logger().info(f"Serial port {self.serial_port} opened")
 
     # --------------------------------------------------------------------- #
     # ROS callbacks
@@ -251,7 +249,7 @@ class Nav2SerialBridge(Node):
             with self.serial_lock:
                 conn.write(frame)
         except SerialException as exc:
-            self.get_logger().error("Serial write failed: %s", exc)
+            self.get_logger().error(f"Serial write failed: {exc}")
             self.serial_conn = None
             return
 
@@ -267,7 +265,7 @@ class Nav2SerialBridge(Node):
             with self.serial_lock:
                 chunk = conn.read(self.serial_read_chunk)
         except SerialException as exc:
-            self.get_logger().error("Serial read failed: %s", exc)
+            self.get_logger().error(f"Serial read failed: {exc}")
             self.serial_conn = None
             return
 
@@ -385,14 +383,9 @@ class Nav2SerialBridge(Node):
 
         # Optional debug output
         self.get_logger().debug(
-            "Cmd target(vx=%.3f, vy=%.3f, w=%.3f) now(vx=%.3f, vy=%.3f, w=%.3f) wheels=%s",
-            target_vx,
-            target_vy,
-            target_omega,
-            now_vx,
-            now_vy,
-            now_omega,
-            ", ".join(f"{w:.1f}" for w in wheel_data),
+            f"Cmd target(vx={target_vx:.3f}, vy={target_vy:.3f}, w={target_omega:.3f}) "
+            f"now(vx={now_vx:.3f}, vy={now_vy:.3f}, w={now_omega:.3f}) "
+            f"wheels={', '.join(f'{w:.1f}' for w in wheel_data)}"
         )
 
     def _update_pose(self, vx: float, vy: float, omega: float, now_ns: int) -> None:
