@@ -93,12 +93,15 @@ class Nav2SerialBridge(Node):
         self.declare_parameter("child_frame_id", "base_link")
         self.declare_parameter("publish_tf", True)
         self.declare_parameter("telemetry_header", [0xAB])
-        self.declare_parameter("telemetry_channels", 10)
+        self.declare_parameter("telemetry_channels", 6)
         self.declare_parameter("telemetry_checksum", True)
+        self.declare_parameter("telemetry_warn_period", 2.0)
         self.declare_parameter("telemetry_poll_rate", 500.0)
         self.declare_parameter("serial_read_chunk", 512)
         self.declare_parameter("pose_covariance_diagonal", [1e-3, 1e-3, 1e-2])
         self.declare_parameter("twist_covariance_diagonal", [1e-2, 1e-2, 1e-2])
+        self.declare_parameter("fallback_odom", True)
+        self.declare_parameter("fallback_timeout", 0.5)
 
         # Resolve configured values once to avoid repeated Parameter lookups
         self.serial_port = self.get_parameter("serial_port").value
@@ -126,6 +129,7 @@ class Nav2SerialBridge(Node):
         if self.telemetry_channels <= 0:
             raise ValueError("telemetry_channels must be > 0")
         self.telemetry_checksum = bool(self.get_parameter("telemetry_checksum").value)
+        self.telemetry_warn_period = float(self.get_parameter("telemetry_warn_period").value)
         poll_hz = float(self.get_parameter("telemetry_poll_rate").value)
         self.telemetry_period = 1.0 / max(1e-3, poll_hz)
         self.serial_read_chunk = int(self.get_parameter("serial_read_chunk").value)
@@ -133,6 +137,8 @@ class Nav2SerialBridge(Node):
         twist_cov_diag = self._resolve_diagonal(self.get_parameter("twist_covariance_diagonal").value)
         self.pose_covariance = self._covariance_from_diagonal(pose_cov_diag)
         self.twist_covariance = self._covariance_from_diagonal(twist_cov_diag)
+        self.fallback_odom = bool(self.get_parameter("fallback_odom").value)
+        self.fallback_timeout = float(self.get_parameter("fallback_timeout").value)
 
         self.telemetry_data_size = self.telemetry_channels * 4
         self.telemetry_frame_size = (
@@ -159,6 +165,8 @@ class Nav2SerialBridge(Node):
         self.last_serial_attempt = 0.0
         self.last_cmd = (0.0, 0.0, 0.0)
         self.last_cmd_time: float | None = None
+        self.last_telemetry_time: float | None = None
+        self.last_checksum_warning = 0.0
 
         self.pose_x = 0.0
         self.pose_y = 0.0
@@ -245,6 +253,9 @@ class Nav2SerialBridge(Node):
         except SerialException as exc:
             self.get_logger().error("Serial write failed: %s", exc)
             self.serial_conn = None
+            return
+
+        self._maybe_publish_fallback_odom(linear_x, linear_y, angular_z)
 
     def _poll_serial(self) -> None:
         conn = self.serial_conn
@@ -313,7 +324,10 @@ class Nav2SerialBridge(Node):
     def _process_telemetry_buffer(self) -> None:
         header = self.telemetry_header
         header_len = len(header)
-        while len(self.telemetry_buffer) >= self.telemetry_frame_size:
+        while True:
+            if len(self.telemetry_buffer) < self.telemetry_frame_size:
+                return
+
             start = self.telemetry_buffer.find(header)
             if start < 0:
                 self.telemetry_buffer.clear()
@@ -323,29 +337,34 @@ class Nav2SerialBridge(Node):
                 if len(self.telemetry_buffer) < self.telemetry_frame_size:
                     return
 
-            if len(self.telemetry_buffer) < self.telemetry_frame_size:
-                return
-
-            frame = self.telemetry_buffer[: self.telemetry_frame_size]
-            del self.telemetry_buffer[: self.telemetry_frame_size]
-
             data_start = header_len
             data_end = data_start + self.telemetry_data_size
+            frame_end = self.telemetry_frame_size
+            frame = self.telemetry_buffer[:frame_end]
             data_bytes = frame[data_start:data_end]
             if len(data_bytes) != self.telemetry_data_size:
+                del self.telemetry_buffer[:1]
                 continue
 
             if self.telemetry_checksum:
                 checksum = frame[-1]
                 if (sum(data_bytes) & 0xFF) != checksum:
-                    self.get_logger().warning("Telemetry checksum mismatch dropped frame")
+                    now = time.monotonic()
+                    if self.telemetry_warn_period >= 0.0 and (now - self.last_checksum_warning) >= self.telemetry_warn_period:
+                        self.get_logger().warning("Telemetry checksum mismatch dropped frame")
+                        self.last_checksum_warning = now
+                    # Resync on bad checksum by advancing one byte
+                    del self.telemetry_buffer[:1]
                     continue
+
+            del self.telemetry_buffer[:frame_end]
 
             try:
                 values = self.telemetry_struct.unpack(data_bytes)
             except struct.error:
                 continue
 
+            self.last_telemetry_time = time.monotonic()
             self._handle_telemetry(values)
 
     # --------------------------------------------------------------------- #
@@ -361,22 +380,38 @@ class Nav2SerialBridge(Node):
 
         now_stamp = self.get_clock().now()
         now_ns = now_stamp.nanoseconds
+        self._update_pose(now_vx, now_vy, now_omega, now_ns)
+        self._publish_odom(now_stamp, now_vx, now_vy, now_omega)
 
+        # Optional debug output
+        self.get_logger().debug(
+            "Cmd target(vx=%.3f, vy=%.3f, w=%.3f) now(vx=%.3f, vy=%.3f, w=%.3f) wheels=%s",
+            target_vx,
+            target_vy,
+            target_omega,
+            now_vx,
+            now_vy,
+            now_omega,
+            ", ".join(f"{w:.1f}" for w in wheel_data),
+        )
+
+    def _update_pose(self, vx: float, vy: float, omega: float, now_ns: int) -> None:
         if self.last_odom_stamp_ns is not None:
             dt = (now_ns - self.last_odom_stamp_ns) * 1e-9
             if dt > 0.0:
-                dx_body = now_vx * dt
-                dy_body = now_vy * dt
+                dx_body = vx * dt
+                dy_body = vy * dt
                 cos_yaw = math.cos(self.pose_yaw)
                 sin_yaw = math.sin(self.pose_yaw)
                 self.pose_x += cos_yaw * dx_body - sin_yaw * dy_body
                 self.pose_y += sin_yaw * dx_body + cos_yaw * dy_body
-                self.pose_yaw = normalize_angle(self.pose_yaw + now_omega * dt)
+                self.pose_yaw = normalize_angle(self.pose_yaw + omega * dt)
         self.last_odom_stamp_ns = now_ns
 
+    def _publish_odom(self, stamp, vx: float, vy: float, omega: float) -> None:
         orientation = yaw_to_quaternion(self.pose_yaw)
         odom = Odometry()
-        odom.header.stamp = now_stamp.to_msg()
+        odom.header.stamp = stamp.to_msg()
         odom.header.frame_id = self.frame_id
         odom.child_frame_id = self.child_frame_id
         odom.pose.pose.position.x = self.pose_x
@@ -386,9 +421,9 @@ class Nav2SerialBridge(Node):
         odom.pose.pose.orientation.z = orientation[2]
         odom.pose.pose.orientation.w = orientation[3]
         odom.pose.covariance = list(self.pose_covariance)
-        odom.twist.twist.linear.x = now_vx
-        odom.twist.twist.linear.y = now_vy
-        odom.twist.twist.angular.z = now_omega
+        odom.twist.twist.linear.x = vx
+        odom.twist.twist.linear.y = vy
+        odom.twist.twist.angular.z = omega
         odom.twist.covariance = list(self.twist_covariance)
 
         self.odom_publisher.publish(odom)
@@ -407,17 +442,16 @@ class Nav2SerialBridge(Node):
             transform.transform.rotation.w = orientation[3]
             self.tf_broadcaster.sendTransform(transform)
 
-        # Optional debug output
-        self.get_logger().debug(
-            "Cmd target(vx=%.3f, vy=%.3f, w=%.3f) now(vx=%.3f, vy=%.3f, w=%.3f) wheels=%s",
-            target_vx,
-            target_vy,
-            target_omega,
-            now_vx,
-            now_vy,
-            now_omega,
-            ", ".join(f"{w:.1f}" for w in wheel_data),
-        )
+    def _maybe_publish_fallback_odom(self, vx: float, vy: float, omega: float) -> None:
+        if not self.fallback_odom:
+            return
+        now = time.monotonic()
+        if self.last_telemetry_time is not None and (now - self.last_telemetry_time) <= self.fallback_timeout:
+            return
+
+        now_stamp = self.get_clock().now()
+        self._update_pose(vx, vy, omega, now_stamp.nanoseconds)
+        self._publish_odom(now_stamp, vx, vy, omega)
 
     # --------------------------------------------------------------------- #
     # Shutdown

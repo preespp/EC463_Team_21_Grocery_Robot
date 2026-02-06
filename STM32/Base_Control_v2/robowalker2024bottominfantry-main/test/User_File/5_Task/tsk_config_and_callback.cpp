@@ -105,15 +105,9 @@ void Task1ms_TIM5_Callback()
     float now_vx = robot.Chassis.Get_Now_Velocity_X();
     float now_vy = robot.Chassis.Get_Now_Velocity_Y();
     float now_omega = robot.Chassis.Get_Now_Omega();
-    float wheel_fl = robot.Chassis.Motor_Wheel[0].Get_Now_Omega();
-    float wheel_fr = robot.Chassis.Motor_Wheel[1].Get_Now_Omega();
-    float wheel_rl = robot.Chassis.Motor_Wheel[2].Get_Now_Omega();
-    float wheel_rr = robot.Chassis.Motor_Wheel[3].Get_Now_Omega();
-
-    // Serialplot channels: target vx/vy/omega, now vx/vy/omega, wheel omegas FL/FR/RL/RR.
-    serialplot.Set_Data(10, &target_vx, &target_vy, &target_omega,
-                        &now_vx, &now_vy, &now_omega,
-                        &wheel_fl, &wheel_fr, &wheel_rl, &wheel_rr);
+    // Serialplot channels: target vx/vy/omega, now vx/vy/omega.
+    serialplot.Set_Data(6, &target_vx, &target_vy, &target_omega,
+                        &now_vx, &now_vy, &now_omega);
     serialplot.TIM_1ms_Write_PeriodElapsedCallback();
 
     TIM_1ms_CAN_PeriodElapsedCallback();
