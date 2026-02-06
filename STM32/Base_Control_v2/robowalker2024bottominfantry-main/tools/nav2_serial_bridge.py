@@ -96,6 +96,8 @@ class Nav2SerialBridge(Node):
         self.declare_parameter("telemetry_channels", 6)
         self.declare_parameter("telemetry_checksum", True)
         self.declare_parameter("telemetry_warn_period", 2.0)
+        self.declare_parameter("telemetry_max_linear_abs", 6.0)
+        self.declare_parameter("telemetry_max_angular_abs", 20.0)
         self.declare_parameter("telemetry_poll_rate", 500.0)
         self.declare_parameter("serial_read_chunk", 512)
         self.declare_parameter("pose_covariance_diagonal", [1e-3, 1e-3, 1e-2])
@@ -130,6 +132,8 @@ class Nav2SerialBridge(Node):
             raise ValueError("telemetry_channels must be > 0")
         self.telemetry_checksum = bool(self.get_parameter("telemetry_checksum").value)
         self.telemetry_warn_period = float(self.get_parameter("telemetry_warn_period").value)
+        self.telemetry_max_linear_abs = float(self.get_parameter("telemetry_max_linear_abs").value)
+        self.telemetry_max_angular_abs = float(self.get_parameter("telemetry_max_angular_abs").value)
         poll_hz = float(self.get_parameter("telemetry_poll_rate").value)
         self.telemetry_period = 1.0 / max(1e-3, poll_hz)
         self.serial_read_chunk = int(self.get_parameter("serial_read_chunk").value)
@@ -168,12 +172,17 @@ class Nav2SerialBridge(Node):
         self.last_serial_attempt = 0.0
         self.last_cmd = (0.0, 0.0, 0.0)
         self.last_cmd_time: float | None = None
+        self.last_cmd_warn = 0.0
         self.last_telemetry_time: float | None = None
         self.last_checksum_warning = 0.0
         self.last_format_hint = 0.0
+        self.last_outlier_warning = 0.0
+        self.cmd_rx_count = 0
+        self.cmd_tx_count = 0
         self.telemetry_ok_frames = 0
         self.telemetry_bad_checksum = 0
         self.command_echo_frames = 0
+        self.telemetry_outlier_frames = 0
 
         self.pose_x = 0.0
         self.pose_y = 0.0
@@ -240,6 +249,7 @@ class Nav2SerialBridge(Node):
     def _cmd_callback(self, msg: Twist) -> None:
         self.last_cmd = (msg.linear.x, msg.linear.y, msg.angular.z)
         self.last_cmd_time = time.monotonic()
+        self.cmd_rx_count += 1
 
     def _send_frame(self) -> None:
         conn = self.serial_conn
@@ -250,6 +260,12 @@ class Nav2SerialBridge(Node):
         now = time.monotonic()
         if self.last_cmd_time is None or (now - self.last_cmd_time) > self.cmd_timeout:
             linear_x = linear_y = angular_z = 0.0
+            if (now - self.last_cmd_warn) >= 2.0:
+                self.get_logger().warning(
+                    "No recent /cmd_vel (or timed out); sending zero command frame. "
+                    f"(cmd_rx={self.cmd_rx_count}, cmd_tx={self.cmd_tx_count})"
+                )
+                self.last_cmd_warn = now
         else:
             linear_x, linear_y, angular_z = self.last_cmd
 
@@ -258,6 +274,7 @@ class Nav2SerialBridge(Node):
         try:
             with self.serial_lock:
                 conn.write(frame)
+                self.cmd_tx_count += 1
         except SerialException as exc:
             self.get_logger().error(f"Serial write failed: {exc}")
             self.serial_conn = None
@@ -384,6 +401,17 @@ class Nav2SerialBridge(Node):
                     values = self.telemetry_struct.unpack(data_bytes)
                 except struct.error:
                     continue
+                if not self._telemetry_plausible(values):
+                    self.telemetry_outlier_frames += 1
+                    now = time.monotonic()
+                    if self.telemetry_warn_period >= 0.0 and (now - self.last_outlier_warning) >= self.telemetry_warn_period:
+                        self.get_logger().warning(
+                            "Telemetry outlier dropped "
+                            f"(outlier={self.telemetry_outlier_frames}, bad_checksum={self.telemetry_bad_checksum}, "
+                            f"ok={self.telemetry_ok_frames})"
+                        )
+                        self.last_outlier_warning = now
+                    continue
 
                 self.telemetry_ok_frames += 1
                 self.last_telemetry_time = time.monotonic()
@@ -410,6 +438,24 @@ class Nav2SerialBridge(Node):
                 self.telemetry_buffer.clear()
                 return
             del self.telemetry_buffer[:min(candidates)]
+
+    def _telemetry_plausible(self, values: Tuple[float, ...]) -> bool:
+        for value in values:
+            if not math.isfinite(value):
+                return False
+
+        if len(values) >= 6:
+            target_vx, target_vy, target_omega = values[:3]
+            now_vx, now_vy, now_omega = values[3:6]
+            lin_limit = max(0.1, self.telemetry_max_linear_abs)
+            ang_limit = max(0.1, self.telemetry_max_angular_abs)
+
+            if abs(now_vx) > lin_limit or abs(now_vy) > lin_limit or abs(now_omega) > ang_limit:
+                return False
+            if abs(target_vx) > (2.0 * lin_limit) or abs(target_vy) > (2.0 * lin_limit) or abs(target_omega) > (2.0 * ang_limit):
+                return False
+
+        return True
 
     # --------------------------------------------------------------------- #
     # Odometry publishing
