@@ -92,6 +92,18 @@ void Class_Serialplot::UART_RxCpltCallback(uint8_t *Rx_Data, uint16_t Length)
  */
 void Class_Serialplot::TIM_1ms_Write_PeriodElapsedCallback()
 {
+    if (UART_Manage_Object == NULL || UART_Manage_Object->UART_Handler == NULL)
+    {
+        return;
+    }
+
+    // IT send is asynchronous and uses Tx_Buffer directly.
+    // Skip this period if TX is busy to avoid mutating bytes mid-frame.
+    if (UART_Manage_Object->UART_Handler->gState != HAL_UART_STATE_READY)
+    {
+        return;
+    }
+
     Output();
 
     size_t data_length = 1;

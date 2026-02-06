@@ -147,6 +147,9 @@ class Nav2SerialBridge(Node):
             + (1 if self.telemetry_checksum else 0)
         )
         self.telemetry_struct = struct.Struct("<{}f".format(self.telemetry_channels))
+        self.command_header = bytes((HEADER,))
+        self.command_payload_size = COMMAND_STRUCT.size
+        self.command_frame_size = 1 + self.command_payload_size + 1
 
         qos = QoSProfile(depth=10)
         self.cmd_subscription = self.create_subscription(Twist, self.cmd_topic, self._cmd_callback, qos)
@@ -167,6 +170,9 @@ class Nav2SerialBridge(Node):
         self.last_cmd_time: float | None = None
         self.last_telemetry_time: float | None = None
         self.last_checksum_warning = 0.0
+        self.telemetry_ok_frames = 0
+        self.telemetry_bad_checksum = 0
+        self.command_echo_frames = 0
 
         self.pose_x = 0.0
         self.pose_y = 0.0
@@ -322,48 +328,75 @@ class Nav2SerialBridge(Node):
     def _process_telemetry_buffer(self) -> None:
         header = self.telemetry_header
         header_len = len(header)
+        command_header = self.command_header
         while True:
-            if len(self.telemetry_buffer) < self.telemetry_frame_size:
+            if len(self.telemetry_buffer) < min(self.telemetry_frame_size, self.command_frame_size):
                 return
 
-            start = self.telemetry_buffer.find(header)
-            if start < 0:
-                self.telemetry_buffer.clear()
-                return
-            if start > 0:
-                del self.telemetry_buffer[:start]
-                if len(self.telemetry_buffer) < self.telemetry_frame_size:
-                    return
+            telemetry_start = self.telemetry_buffer.find(header)
+            command_start = -1
+            if command_header != header:
+                command_start = self.telemetry_buffer.find(command_header)
 
-            data_start = header_len
-            data_end = data_start + self.telemetry_data_size
-            frame_end = self.telemetry_frame_size
-            frame = self.telemetry_buffer[:frame_end]
-            data_bytes = frame[data_start:data_end]
-            if len(data_bytes) != self.telemetry_data_size:
-                del self.telemetry_buffer[:1]
-                continue
-
-            if self.telemetry_checksum:
-                checksum = frame[-1]
-                if (sum(data_bytes) & 0xFF) != checksum:
-                    now = time.monotonic()
-                    if self.telemetry_warn_period >= 0.0 and (now - self.last_checksum_warning) >= self.telemetry_warn_period:
-                        self.get_logger().warning("Telemetry checksum mismatch dropped frame")
-                        self.last_checksum_warning = now
-                    # Resync on bad checksum by advancing one byte
+            # Telemetry header is at the current buffer start.
+            if telemetry_start == 0:
+                data_start = header_len
+                data_end = data_start + self.telemetry_data_size
+                frame_end = self.telemetry_frame_size
+                frame = self.telemetry_buffer[:frame_end]
+                data_bytes = frame[data_start:data_end]
+                if len(data_bytes) != self.telemetry_data_size:
                     del self.telemetry_buffer[:1]
                     continue
 
-            del self.telemetry_buffer[:frame_end]
+                if self.telemetry_checksum:
+                    checksum = frame[-1]
+                    if (sum(data_bytes) & 0xFF) != checksum:
+                        self.telemetry_bad_checksum += 1
+                        now = time.monotonic()
+                        if self.telemetry_warn_period >= 0.0 and (now - self.last_checksum_warning) >= self.telemetry_warn_period:
+                            self.get_logger().warning(
+                                "Telemetry checksum mismatch dropped frame "
+                                f"(bad={self.telemetry_bad_checksum}, ok={self.telemetry_ok_frames}, "
+                                f"echoed_cmd={self.command_echo_frames})"
+                            )
+                            self.last_checksum_warning = now
+                        # Resync on bad checksum by advancing one byte.
+                        del self.telemetry_buffer[:1]
+                        continue
 
-            try:
-                values = self.telemetry_struct.unpack(data_bytes)
-            except struct.error:
+                del self.telemetry_buffer[:frame_end]
+
+                try:
+                    values = self.telemetry_struct.unpack(data_bytes)
+                except struct.error:
+                    continue
+
+                self.telemetry_ok_frames += 1
+                self.last_telemetry_time = time.monotonic()
+                self._handle_telemetry(values)
                 continue
 
-            self.last_telemetry_time = time.monotonic()
-            self._handle_telemetry(values)
+            # Some serial links echo host TX bytes back to RX. Drop echoed command frames.
+            if command_start == 0:
+                cmd_frame = self.telemetry_buffer[:self.command_frame_size]
+                if len(cmd_frame) < self.command_frame_size:
+                    return
+                cmd_payload = cmd_frame[1:-1]
+                cmd_checksum = cmd_frame[-1]
+                if (sum(cmd_payload) & 0xFF) == cmd_checksum:
+                    del self.telemetry_buffer[:self.command_frame_size]
+                    self.command_echo_frames += 1
+                    continue
+                del self.telemetry_buffer[:1]
+                continue
+
+            # No valid sync byte at current start; seek the next potential frame boundary.
+            candidates = [idx for idx in (telemetry_start, command_start) if idx > 0]
+            if not candidates:
+                self.telemetry_buffer.clear()
+                return
+            del self.telemetry_buffer[:min(candidates)]
 
     # --------------------------------------------------------------------- #
     # Odometry publishing
