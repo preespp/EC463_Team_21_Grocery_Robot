@@ -44,7 +44,7 @@ If you have a workspace overlay, source it as usual.
 ```bash
 ros2 launch sick_scan_xd sick_picoscan.launch.py \
   hostname:=192.168.8.150 \
-  udp_receiver_ip:=192.168.8.143 \
+  udp_receiver_ip:=192.168.8.249 \
   publish_frame_id:=base_link \
   publish_imu_frame_id:=base_link \
   custom_pointclouds:='cloud_all_fields_fullframe' \
