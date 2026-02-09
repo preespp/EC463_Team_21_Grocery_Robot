@@ -65,7 +65,7 @@ python3 /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/STM32/Base_Control_
   -p serial_port:=/dev/ttyUSB0 \
   -p baud_rate:=115200 \
   -p cmd_topics:='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]' \
-  -p telemetry_enabled:=false \
+  -p telemetry_enabled:=true \
   -p left_switch:=1 \
   -p right_switch:=1 \
   -p frame_id:=odom \
@@ -77,8 +77,8 @@ Notes:
 
 - `publish_tf:=false` avoids TF conflict with Cartographer (Cartographer already publishes `odom -> base_link`).
 - If your USB serial path is different, change `serial_port`.
-- `telemetry_enabled:=false` is recommended when UART2 is dedicated to control frames and telemetry is moved to UART3.
-- If your firmware still outputs telemetry on UART2, set `telemetry_enabled:=true` and pass matching telemetry format parameters.
+- Use `telemetry_enabled:=true` when STM32 Serialplot telemetry is on UART2 (shared command + telemetry link).
+- For command-only debugging, you can temporarily set `telemetry_enabled:=false`.
 - For keyboard control, keep both switches in UP (`left_switch:=1`, `right_switch:=1`), otherwise chassis logic may stay disabled.
 
 ### 4. Manual keyboard teleop (publishes `/cmd_vel`)
