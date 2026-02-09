@@ -58,6 +58,12 @@ def clamp(value: float, limit: float) -> float:
     return value
 
 
+def canonical_zero(value: float, eps: float = 1e-9) -> float:
+    if abs(value) < eps:
+        return 0.0
+    return value
+
+
 def normalize_angle(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
@@ -103,6 +109,7 @@ class Nav2SerialBridge(Node):
         self.declare_parameter("telemetry_max_angular_abs", 20.0)
         self.declare_parameter("telemetry_poll_rate", 500.0)
         self.declare_parameter("serial_read_chunk", 512)
+        self.declare_parameter("serial_write_timeout", 0.2)
         self.declare_parameter("pose_covariance_diagonal", [1e-3, 1e-3, 1e-2])
         self.declare_parameter("twist_covariance_diagonal", [1e-2, 1e-2, 1e-2])
         self.declare_parameter("fallback_odom", True)
@@ -142,6 +149,7 @@ class Nav2SerialBridge(Node):
         poll_hz = float(self.get_parameter("telemetry_poll_rate").value)
         self.telemetry_period = 1.0 / max(1e-3, poll_hz)
         self.serial_read_chunk = int(self.get_parameter("serial_read_chunk").value)
+        self.serial_write_timeout = max(0.0, float(self.get_parameter("serial_write_timeout").value))
         pose_cov_diag = self._resolve_diagonal(self.get_parameter("pose_covariance_diagonal").value)
         twist_cov_diag = self._resolve_diagonal(self.get_parameter("twist_covariance_diagonal").value)
         self.pose_covariance = self._covariance_from_diagonal(pose_cov_diag)
@@ -208,6 +216,7 @@ class Nav2SerialBridge(Node):
             f"Nav2 serial bridge ready (port={self.serial_port}, baud={self.baud_rate}, "
             f"cmd_topics={self.cmd_topics}, odom_topic={self.odom_topic}, "
             f"frame={self.frame_id}->{self.child_frame_id}, publish_tf={self.publish_tf}, "
+            f"serial_write_timeout={self.serial_write_timeout}, "
             f"telemetry_enabled={self.telemetry_enabled}, "
             f"telemetry_header={[hex(b) for b in self.telemetry_header]}, "
             f"telemetry_channels={self.telemetry_channels}, "
@@ -238,8 +247,9 @@ class Nav2SerialBridge(Node):
                 if topic and topic not in topics:
                     topics.append(topic)
         fallback = str(fallback_topic).strip()
-        if fallback and fallback not in topics:
-            topics.insert(0, fallback)
+        # If cmd_topics is explicitly provided, honor it without auto-injecting cmd_topic.
+        if not topics and fallback:
+            topics.append(fallback)
         if not topics:
             topics = ["/cmd_vel"]
         return topics
@@ -261,7 +271,7 @@ class Nav2SerialBridge(Node):
                 self.serial_port,
                 self.baud_rate,
                 timeout=0,
-                write_timeout=0,
+                write_timeout=self.serial_write_timeout,
             )
         except SerialException as exc:
             self.get_logger().error(f"Unable to open {self.serial_port}: {exc}")
@@ -304,7 +314,12 @@ class Nav2SerialBridge(Node):
 
         try:
             with self.serial_lock:
-                conn.write(frame)
+                frame_len = len(frame)
+                written = conn.write(frame)
+                if written is None or written != frame_len:
+                    raise SerialException(
+                        f"serial short write ({0 if written is None else written}/{frame_len} bytes sent)"
+                    )
                 self.cmd_tx_count += 1
         except SerialException as exc:
             self.get_logger().error(f"Serial write failed: {exc}")
@@ -342,6 +357,9 @@ class Nav2SerialBridge(Node):
         left_y = clamp(linear_x / max(self.max_linear_speed, 1e-6), 1.0)
         left_x = clamp(-linear_y / max(self.max_lateral_speed, 1e-6), 1.0)
         yaw = clamp(-angular_z / max(self.max_yaw_speed, 1e-6), 1.0)
+        left_y = canonical_zero(left_y)
+        left_x = canonical_zero(left_x)
+        yaw = canonical_zero(yaw)
         key_mask = self._build_key_mask(left_x, left_y, yaw)
         payload = COMMAND_STRUCT.pack(
             0.0,  # right_x (unused)

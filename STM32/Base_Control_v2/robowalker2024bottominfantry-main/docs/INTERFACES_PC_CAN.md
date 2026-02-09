@@ -27,7 +27,7 @@ Offset  Size  Type     Name
 13      4     float    Left stick Y   (forward, -1..1)
 17      4     float    Yaw            (spin, -1..1)
 21      2     uint16   Keyboard mask  (bitfield, see below)
-23      1     uint8    Left switch    (DR16 encoding: 1=UP, 2=MID, 3=DOWN)
+23      1     uint8    Left switch    (DR16 encoding: 1=UP, 2=DOWN, 3=MID)
 24      1     uint8    Right switch   (same as left)
 25      1     uint8    Checksum = sum(bytes[1..24]) & 0xFF
 ```
@@ -63,7 +63,7 @@ Keyboard mask bits follow the DR16 convention used in `dvc_pc.h`:
 
 - When integrating with ROS 2 on Jetson, reuse the frame format above—only the transport layer changes (wrap `pyserial`/`asio` inside a ROS 2 node).
 - Keep the UART window focused (if using `pynput`) so key events propagate; otherwise no bits are set.
-- Left switch down (`value == 3`) or loss of frames for >100 ms disables the chassis (`Chassis_Control_Type_DISABLE`).
+- Left switch down (`value == 2`) or loss of frames for >100 ms disables the chassis (`Chassis_Control_Type_DISABLE`).
 
 ### STM32 → PC telemetry frame (Serialplot)
 

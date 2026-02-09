@@ -3,7 +3,9 @@ ros2 launch sick_scan_xd sick_picoscan.launch.py \
   hostname:=192.168.8.150 \
   udp_receiver_ip:=192.168.8.143 \
   publish_frame_id:=base_link \
-  cloud_topic:=/cloud_all_fields_fullframe \
+  publish_imu_frame_id:=base_link \
+  custom_pointclouds:='cloud_all_fields_fullframe' \
+  cloud_all_fields_fullframe:='coordinateNotation=3 updateMethod=0 fields=x,y,z,i,range,azimuth,elevation,t,ts,lidar_sec,lidar_nsec,ring,layer,echo,reflector echos=0,1,2 layers=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 topic=/cloud_all_fields_fullframe frameid=base_link publish=1' \
   publish_laserscan_fullframe_topic:=/scan_fullframe \
   imu_topic:=/sick_scansegment_xd/imu
 

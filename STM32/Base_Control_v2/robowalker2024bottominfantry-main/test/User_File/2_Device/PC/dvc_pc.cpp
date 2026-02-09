@@ -7,6 +7,7 @@
 
 #include "dvc_pc.h"
 #include "1_Middleware/1_Driver/Math/drv_math.h"
+#include <string.h>
 
 /* Private function declarations ---------------------------------------------*/
 
@@ -109,26 +110,74 @@ void Class_PC::TIM_1ms_Calculate_PeriodElapsedCallback()
 
 bool Class_PC::Parse_Frame(uint8_t *Rx_Data, uint16_t Length)
 {
-    if (Length < PC_CONTROL_FRAME_SIZE)
+    if (Length == 0)
     {
         return false;
     }
 
-    for (uint16_t i = 0; i + PC_CONTROL_FRAME_SIZE <= Length; i++)
+    // Append incoming bytes into local stream cache.
+    if (Length >= STREAM_CACHE_SIZE)
     {
-        if (Rx_Data[i] != PC_CONTROL_FRAME_HEADER)
+        memcpy(Stream_Cache, Rx_Data + (Length - STREAM_CACHE_SIZE), STREAM_CACHE_SIZE);
+        Stream_Cache_Length = STREAM_CACHE_SIZE;
+    }
+    else
+    {
+        uint16_t copy_len = Length;
+        if ((Stream_Cache_Length + copy_len) > STREAM_CACHE_SIZE)
         {
-            continue;
+            uint16_t drop = Stream_Cache_Length + copy_len - STREAM_CACHE_SIZE;
+            if (drop >= Stream_Cache_Length)
+            {
+                Stream_Cache_Length = 0;
+            }
+            else
+            {
+                memmove(Stream_Cache, Stream_Cache + drop, Stream_Cache_Length - drop);
+                Stream_Cache_Length -= drop;
+            }
+        }
+        memcpy(Stream_Cache + Stream_Cache_Length, Rx_Data, copy_len);
+        Stream_Cache_Length += copy_len;
+    }
+
+    bool parsed_any = false;
+    while (Stream_Cache_Length >= PC_CONTROL_FRAME_SIZE)
+    {
+        uint16_t header_index = 0;
+        while (header_index < Stream_Cache_Length && Stream_Cache[header_index] != PC_CONTROL_FRAME_HEADER)
+        {
+            header_index++;
         }
 
-        uint8_t checksum = Math_Sum_8(Rx_Data + i + 1, PC_CONTROL_PAYLOAD_SIZE);
-        uint8_t rx_checksum = Rx_Data[i + 1 + PC_CONTROL_PAYLOAD_SIZE];
+        if (header_index >= Stream_Cache_Length)
+        {
+            Stream_Cache_Length = 0;
+            break;
+        }
+
+        if (header_index > 0)
+        {
+            memmove(Stream_Cache, Stream_Cache + header_index, Stream_Cache_Length - header_index);
+            Stream_Cache_Length -= header_index;
+        }
+
+        if (Stream_Cache_Length < PC_CONTROL_FRAME_SIZE)
+        {
+            break;
+        }
+
+        uint8_t checksum = Math_Sum_8(Stream_Cache + 1, PC_CONTROL_PAYLOAD_SIZE);
+        uint8_t rx_checksum = Stream_Cache[1 + PC_CONTROL_PAYLOAD_SIZE];
         if (checksum != rx_checksum)
         {
+            // Bad frame at current header, drop one byte and re-sync.
+            memmove(Stream_Cache, Stream_Cache + 1, Stream_Cache_Length - 1);
+            Stream_Cache_Length -= 1;
             continue;
         }
 
-        const uint8_t *payload = Rx_Data + i + 1;
+        const uint8_t *payload = Stream_Cache + 1;
         memcpy(&Data.Right_X, payload + 0, sizeof(float));
         memcpy(&Data.Right_Y, payload + 4, sizeof(float));
         memcpy(&Data.Left_X, payload + 8, sizeof(float));
@@ -139,10 +188,13 @@ bool Class_PC::Parse_Frame(uint8_t *Rx_Data, uint16_t Length)
         Raw_Switch_Left = payload[22];
         Raw_Switch_Right = payload[23];
 
-        return true;
+        // Consume parsed frame and keep scanning so the freshest frame wins.
+        memmove(Stream_Cache, Stream_Cache + PC_CONTROL_FRAME_SIZE, Stream_Cache_Length - PC_CONTROL_FRAME_SIZE);
+        Stream_Cache_Length -= PC_CONTROL_FRAME_SIZE;
+        parsed_any = true;
     }
 
-    return false;
+    return parsed_any;
 }
 
 void Class_PC::_Judge_Switch(Enum_DR16_Switch_Status *Switch, uint8_t Status, uint8_t Pre_Status)

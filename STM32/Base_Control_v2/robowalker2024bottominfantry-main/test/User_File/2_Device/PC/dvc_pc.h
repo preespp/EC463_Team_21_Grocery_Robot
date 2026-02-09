@@ -100,6 +100,11 @@ protected:
     Enum_DR16_Status PC_Status = DR16_Status_DISABLE;
     Struct_DR16_Data Data;
 
+    // stream parser cache to support fragmented UART DMA callbacks
+    static constexpr uint16_t STREAM_CACHE_SIZE = 256;
+    uint8_t Stream_Cache[STREAM_CACHE_SIZE] = {0};
+    uint16_t Stream_Cache_Length = 0;
+
     bool Parse_Frame(uint8_t *Rx_Data, uint16_t Length);
 
     void _Judge_Switch(Enum_DR16_Switch_Status *Switch, uint8_t Status, uint8_t Pre_Status);
