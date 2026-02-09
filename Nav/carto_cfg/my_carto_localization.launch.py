@@ -2,6 +2,7 @@ from pathlib import Path
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -53,6 +54,11 @@ def generate_launch_description():
             default_value="1.0",
             description="Occupancy grid publish period",
         ),
+        DeclareLaunchArgument(
+            "publish_occupancy_grid",
+            default_value="false",
+            description="Whether to publish Cartographer occupancy grid during localization",
+        ),
         Node(
             package="cartographer_ros",
             executable="cartographer_node",
@@ -78,10 +84,14 @@ def generate_launch_description():
             executable="cartographer_occupancy_grid_node",
             name="carto_grid",
             output="screen",
+            condition=IfCondition(LaunchConfiguration("publish_occupancy_grid")),
             parameters=[{
                 "resolution": ParameterValue(LaunchConfiguration("resolution"), value_type=float),
                 "publish_period_sec": ParameterValue(LaunchConfiguration("publish_period_sec"), value_type=float),
             }],
+            remappings=[
+                ("/map", "/cartographer_map"),
+            ],
         ),
     ])
 

@@ -2,7 +2,7 @@
 ros2 launch sick_scan_xd sick_picoscan.launch.py \
   hostname:=192.168.8.150 \
   udp_receiver_ip:=192.168.8.143 \
-  publish_frame_id:=world \
+  publish_frame_id:=base_link \
   cloud_topic:=/cloud_all_fields_fullframe \
   publish_laserscan_fullframe_topic:=/scan_fullframe \
   imu_topic:=/sick_scansegment_xd/imu
@@ -24,7 +24,8 @@ ros2 run cartographer_ros cartographer_pbstream_to_ros_map \
 
 # 6) Start Cartographer localization
 ros2 launch /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/carto_cfg/my_carto_localization.launch.py \
-  load_state_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream
+  load_state_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream \
+  publish_occupancy_grid:=false
 
 # 7) Start Nav2
 ros2 launch nav2_bringup navigation_launch.py \

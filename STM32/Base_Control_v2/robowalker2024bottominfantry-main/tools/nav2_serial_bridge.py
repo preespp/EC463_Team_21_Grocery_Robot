@@ -20,6 +20,7 @@ from geometry_msgs.msg import TransformStamped, Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
+from rclpy.utilities import ok as rclpy_ok
 
 try:
     from tf2_ros import TransformBroadcaster
@@ -77,6 +78,7 @@ class Nav2SerialBridge(Node):
         self.declare_parameter("baud_rate", 115200)
         self.declare_parameter("send_rate", 50.0)
         self.declare_parameter("cmd_topic", "/cmd_vel")
+        self.declare_parameter("cmd_topics", ["/cmd_vel", "/cmd_vel_nav", "/cmd_vel_smoothed"])
         self.declare_parameter("cmd_timeout", 0.2)
         self.declare_parameter("max_linear_speed", 2.0)
         self.declare_parameter("max_lateral_speed", 2.0)
@@ -90,8 +92,9 @@ class Nav2SerialBridge(Node):
         # Telemetry path configuration
         self.declare_parameter("odom_topic", "/odom")
         self.declare_parameter("frame_id", "odom")
-        self.declare_parameter("child_frame_id", "world")
+        self.declare_parameter("child_frame_id", "base_link")
         self.declare_parameter("publish_tf", False)
+        self.declare_parameter("telemetry_enabled", True)
         self.declare_parameter("telemetry_header", [0xAB])
         self.declare_parameter("telemetry_channels", 6)
         self.declare_parameter("telemetry_checksum", True)
@@ -110,6 +113,7 @@ class Nav2SerialBridge(Node):
         self.baud_rate = int(self.get_parameter("baud_rate").value)
         self.send_period = 1.0 / max(1e-3, float(self.get_parameter("send_rate").value))
         self.cmd_topic = self.get_parameter("cmd_topic").value
+        self.cmd_topics = self._resolve_cmd_topics(self.get_parameter("cmd_topics").value, self.cmd_topic)
         self.cmd_timeout = float(self.get_parameter("cmd_timeout").value)
         self.max_linear_speed = float(self.get_parameter("max_linear_speed").value)
         self.max_lateral_speed = float(self.get_parameter("max_lateral_speed").value)
@@ -124,6 +128,7 @@ class Nav2SerialBridge(Node):
         self.frame_id = self.get_parameter("frame_id").value
         self.child_frame_id = self.get_parameter("child_frame_id").value
         self.publish_tf = bool(self.get_parameter("publish_tf").value)
+        self.telemetry_enabled = bool(self.get_parameter("telemetry_enabled").value)
         header_param = self.get_parameter("telemetry_header").value
         header_bytes = bytes(int(v) & 0xFF for v in header_param) or bytes([0xAB])
         self.telemetry_header = header_bytes
@@ -156,7 +161,9 @@ class Nav2SerialBridge(Node):
         self.command_frame_size = 1 + self.command_payload_size + 1
 
         qos = QoSProfile(depth=10)
-        self.cmd_subscription = self.create_subscription(Twist, self.cmd_topic, self._cmd_callback, qos)
+        self.cmd_subscriptions = [
+            self.create_subscription(Twist, topic, self._cmd_callback, qos) for topic in self.cmd_topics
+        ]
         self.odom_publisher = self.create_publisher(Odometry, self.odom_topic, qos)
 
         self.tf_broadcaster = None
@@ -192,13 +199,16 @@ class Nav2SerialBridge(Node):
         self.telemetry_buffer = bytearray()
 
         self.command_timer = self.create_timer(self.send_period, self._send_frame)
-        self.telemetry_timer = self.create_timer(self.telemetry_period, self._poll_serial)
+        self.telemetry_timer = None
+        if self.telemetry_enabled:
+            self.telemetry_timer = self.create_timer(self.telemetry_period, self._poll_serial)
 
         self._open_serial()
         self.get_logger().info(
             f"Nav2 serial bridge ready (port={self.serial_port}, baud={self.baud_rate}, "
-            f"cmd_topic={self.cmd_topic}, odom_topic={self.odom_topic}, "
+            f"cmd_topics={self.cmd_topics}, odom_topic={self.odom_topic}, "
             f"frame={self.frame_id}->{self.child_frame_id}, publish_tf={self.publish_tf}, "
+            f"telemetry_enabled={self.telemetry_enabled}, "
             f"telemetry_header={[hex(b) for b in self.telemetry_header]}, "
             f"telemetry_channels={self.telemetry_channels}, "
             f"telemetry_checksum={self.telemetry_checksum})"
@@ -212,6 +222,27 @@ class Nav2SerialBridge(Node):
         while len(result) < 3:
             result.append(0.0)
         return (float(result[0]), float(result[1]), float(result[2]))
+
+    def _resolve_cmd_topics(self, values: Sequence[str], fallback_topic: str) -> List[str]:
+        topics: List[str] = []
+        if isinstance(values, (str, bytes)):
+            raw = str(values).strip()
+            if raw.startswith("[") and raw.endswith("]"):
+                raw = raw[1:-1]
+                values = [segment.strip().strip("\"'") for segment in raw.split(",")]
+            else:
+                values = [raw]
+        if isinstance(values, Iterable):
+            for item in values:
+                topic = str(item).strip()
+                if topic and topic not in topics:
+                    topics.append(topic)
+        fallback = str(fallback_topic).strip()
+        if fallback and fallback not in topics:
+            topics.insert(0, fallback)
+        if not topics:
+            topics = ["/cmd_vel"]
+        return topics
 
     def _covariance_from_diagonal(self, diag: Tuple[float, float, float]) -> List[float]:
         cov = [0.0] * 36
@@ -283,6 +314,8 @@ class Nav2SerialBridge(Node):
         self._maybe_publish_fallback_odom(linear_x, linear_y, angular_z)
 
     def _poll_serial(self) -> None:
+        if not self.telemetry_enabled:
+            return
         conn = self.serial_conn
         if conn is None or not conn.is_open:
             self._open_serial()
@@ -561,7 +594,8 @@ def main(args: List[str] | None = None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy_ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

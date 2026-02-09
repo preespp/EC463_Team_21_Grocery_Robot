@@ -33,7 +33,7 @@ ros2 run rviz2 rviz2
 Tips:
 
 - Load our saved RViz config (if we have one) so the **map**, **TF**, and **point cloud** displays are already set up.
-- Make sure the **fixed frame** is set correctly (usually `map` or `world`).
+- Make sure the **fixed frame** is set correctly (usually `map` or `base_link`).
 
 ---
 
@@ -54,7 +54,7 @@ What this does:
 
 If Cartographer is running correctly, you’ll see:
 
-- The **TF tree** including `map`, `odom`, and `world`
+- The **TF tree** including `map`, `odom`, and `base_link`
 - Submaps and the global map being updated in RViz
 
 ---
@@ -104,7 +104,7 @@ After a few seconds of moving the robot, the map should gradually appear in RViz
 
 We have two reference diagrams:
 
-- `frames.png` – TF tree showing `map -> odom -> world`
+- `frames.png` – TF tree showing `map -> odom -> base_link`
 - `rosgraph.png` – Node graph showing connections between:
   - `/sick_scansegment_xd`
   - `/cloud_all_fields_fullframe`
@@ -132,10 +132,10 @@ If SLAM isn’t working:
    ```bash
    ros2 run tf2_tools view_frames
    ```
-   Then open the generated PDF/PNG and verify that `map`, `odom`, and `world` are connected as expected.
+   Then open the generated PDF/PNG and verify that `map`, `odom`, and `base_link` are connected as expected.
 
 3. **Check RViz Fixed Frame**  
-   Set it to `map` or `world` (depending on our config) to avoid “No transform” errors.
+   Set it to `map` or `base_link` (depending on our config) to avoid “No transform” errors.
 
 ---
 

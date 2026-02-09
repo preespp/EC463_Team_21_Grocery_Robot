@@ -9,8 +9,8 @@ This README is the **actual runbook** for this repo on Jetson.
 
 ## Frame and Topic Convention (current project)
 
-- TF chain: `map -> odom -> world`
-- Robot base frame used by Nav2: `world`
+- TF chain: `map -> odom -> base_link`
+- Robot base frame used by Nav2: `base_link`
 - Cartographer input point cloud: `/cloud_all_fields_fullframe`
 - Cartographer IMU input: `/sick_scansegment_xd/imu`
 - Odometry topic consumed by Nav2: `/odom` (from serial bridge)
@@ -45,7 +45,7 @@ If you have a workspace overlay, source it as usual.
 ros2 launch sick_scan_xd sick_picoscan.launch.py \
   hostname:=192.168.8.150 \
   udp_receiver_ip:=192.168.8.143 \
-  publish_frame_id:=world \
+  publish_frame_id:=base_link \
   cloud_topic:=/cloud_all_fields_fullframe \
   publish_laserscan_fullframe_topic:=/scan_fullframe \
   imu_topic:=/sick_scansegment_xd/imu
@@ -64,21 +64,21 @@ python3 /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/STM32/Base_Control_
   --ros-args \
   -p serial_port:=/dev/ttyUSB0 \
   -p baud_rate:=115200 \
-  -p telemetry_header:=[171] \
-  -p telemetry_channels:=6 \
-  -p telemetry_checksum:=true \
+  -p cmd_topics:='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]' \
+  -p telemetry_enabled:=false \
   -p left_switch:=1 \
   -p right_switch:=1 \
   -p frame_id:=odom \
-  -p child_frame_id:=world \
+  -p child_frame_id:=base_link \
   -p publish_tf:=false
 ```
 
 Notes:
 
-- `publish_tf:=false` avoids TF conflict with Cartographer (Cartographer already publishes `odom -> world`).
+- `publish_tf:=false` avoids TF conflict with Cartographer (Cartographer already publishes `odom -> base_link`).
 - If your USB serial path is different, change `serial_port`.
-- For STM32 firmware **v2**, keep `telemetry_channels:=6` and `telemetry_checksum:=true`.
+- `telemetry_enabled:=false` is recommended when UART2 is dedicated to control frames and telemetry is moved to UART3.
+- If your firmware still outputs telemetry on UART2, set `telemetry_enabled:=true` and pass matching telemetry format parameters.
 - For keyboard control, keep both switches in UP (`left_switch:=1`, `right_switch:=1`), otherwise chassis logic may stay disabled.
 
 ### 4. Manual keyboard teleop (publishes `/cmd_vel`)
@@ -131,7 +131,8 @@ Then start:
 
 ```bash
 ros2 launch /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/carto_cfg/my_carto_localization.launch.py \
-  load_state_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream
+  load_state_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream \
+  publish_occupancy_grid:=false
 ```
 
 ### 2. Nav2 stack
@@ -143,6 +144,8 @@ ros2 launch nav2_bringup navigation_launch.py \
   map:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.yaml \
   params_file:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/nav2_params_cartographer.yaml
 ```
+
+Note: this parameter file disables AMCL TF broadcast so Cartographer remains the only `map -> odom` publisher.
 
 ### 3. Nav2 RViz
 
@@ -161,6 +164,8 @@ ros2 topic list
 ros2 topic hz /cloud_all_fields_fullframe
 ros2 topic echo /odom --once
 ros2 topic echo /cmd_vel --once
+ros2 topic echo /cmd_vel_nav --once
+ros2 topic echo /cmd_vel_smoothed --once
 ```
 
 ### TF checks
@@ -169,7 +174,7 @@ ros2 topic echo /cmd_vel --once
 ros2 run tf2_tools view_frames
 ```
 
-Expect a connected tree including `map`, `odom`, `world`.
+Expect a connected tree including `map`, `odom`, `base_link`.
 
 ## Common pitfalls
 
@@ -183,4 +188,9 @@ Confirm serial bridge is running and STM32 UART port/baud are correct.
 Confirm point cloud topic exists and matches `/cloud_all_fields_fullframe`.
 
 4. TF conflict warnings.
-Keep serial bridge `publish_tf:=false` while Cartographer is publishing `odom -> world`.
+Keep serial bridge `publish_tf:=false` while Cartographer is publishing `odom -> base_link`.
+
+5. Two maps flashing / map jumps / TF disappearing.
+Do not let multiple localization/map publishers run on the same topics and transforms:
+- In localization phase keep Cartographer `publish_occupancy_grid:=false` to avoid `/map` conflict with Nav2 map_server.
+- Keep AMCL TF broadcast disabled in `Nav/nav2_params_cartographer.yaml` when Cartographer localization is active.

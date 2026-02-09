@@ -52,11 +52,12 @@ void Device_CAN1_Callback(Struct_CAN_Rx_Buffer *CAN_RxMessage)
 
 void PC_UART2_Callback(uint8_t *Buffer, uint16_t Length)
 {
-    bool parsed = robot.PC.UART_RxCpltCallback(Buffer, Length);
-    if (!parsed)
-    {
-        serialplot.UART_RxCpltCallback(Buffer, Length);
-    }
+    robot.PC.UART_RxCpltCallback(Buffer, Length);
+}
+
+void Serialplot_UART3_Callback(uint8_t *Buffer, uint16_t Length)
+{
+    serialplot.UART_RxCpltCallback(Buffer, Length);
 }
 
 void Task100us_TIM4_Callback()
@@ -99,7 +100,7 @@ void Task1ms_TIM5_Callback()
 
     robot.TIM_1ms_Calculate_Callback();
 
-    // UART2 telemetry throttled to 200 Hz:
+    // UART3 telemetry throttled to 200 Hz:
     // frame size = 1(header) + 6*4(float) + 1(checksum) = 26 bytes
     // 26 bytes * 10 bits/byte * 200 Hz = 52 kbps (safe at 115200 bps)
     static uint8_t telemetry_mod5 = 0;
@@ -134,12 +135,13 @@ void Task_Init()
 
     CAN_Init(&hcan1, Device_CAN1_Callback);
     UART_Init(&huart2, PC_UART2_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
+    UART_Init(&huart3, Serialplot_UART3_Callback, SERIALPLOT_RX_VARIABLE_ASSIGNMENT_MAX_LENGTH);
 
     TIM_Init(&htim4, Task100us_TIM4_Callback);
     TIM_Init(&htim5, Task1ms_TIM5_Callback);
     IWDG_Independent_Feed();
 
-    serialplot.Init(&huart2, Serialplot_Checksum_8_ENABLE);
+    serialplot.Init(&huart3, Serialplot_Checksum_8_ENABLE);
 
     robot.Init();
 
