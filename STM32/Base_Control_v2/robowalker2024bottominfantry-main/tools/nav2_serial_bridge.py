@@ -58,12 +58,6 @@ def clamp(value: float, limit: float) -> float:
     return value
 
 
-def canonical_zero(value: float, eps: float = 1e-9) -> float:
-    if abs(value) < eps:
-        return 0.0
-    return value
-
-
 def normalize_angle(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
@@ -314,12 +308,15 @@ class Nav2SerialBridge(Node):
 
         try:
             with self.serial_lock:
+                sent = 0
                 frame_len = len(frame)
-                written = conn.write(frame)
-                if written is None or written != frame_len:
-                    raise SerialException(
-                        f"serial short write ({0 if written is None else written}/{frame_len} bytes sent)"
-                    )
+                while sent < frame_len:
+                    written = conn.write(frame[sent:])
+                    if written is None or written <= 0:
+                        raise SerialException(
+                            f"serial short write ({sent}/{frame_len} bytes sent)"
+                        )
+                    sent += written
                 self.cmd_tx_count += 1
         except SerialException as exc:
             self.get_logger().error(f"Serial write failed: {exc}")
@@ -357,9 +354,6 @@ class Nav2SerialBridge(Node):
         left_y = clamp(linear_x / max(self.max_linear_speed, 1e-6), 1.0)
         left_x = clamp(-linear_y / max(self.max_lateral_speed, 1e-6), 1.0)
         yaw = clamp(-angular_z / max(self.max_yaw_speed, 1e-6), 1.0)
-        left_y = canonical_zero(left_y)
-        left_x = canonical_zero(left_x)
-        yaw = canonical_zero(yaw)
         key_mask = self._build_key_mask(left_x, left_y, yaw)
         payload = COMMAND_STRUCT.pack(
             0.0,  # right_x (unused)
