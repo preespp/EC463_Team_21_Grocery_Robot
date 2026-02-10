@@ -140,25 +140,83 @@ ros2 launch /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/carto_cfg/m
   publish_occupancy_grid:=false
 ```
 
-### 2. Nav2 stack
+### 2. Start map server (load saved map YAML)
+
+```bash
+ros2 run nav2_map_server map_server --ros-args \
+  -p use_sim_time:=false \
+  -p yaml_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.yaml
+```
+
+### 3. Activate map server lifecycle
+
+```bash
+ros2 run nav2_lifecycle_manager lifecycle_manager --ros-args \
+  -p use_sim_time:=false \
+  -p autostart:=true \
+  -p node_names:='["map_server"]'
+```
+
+### 4. Nav2 stack
 
 ```bash
 ros2 launch nav2_bringup navigation_launch.py \
   use_sim_time:=false \
   autostart:=true \
-  map:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.yaml \
   params_file:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/nav2_params_cartographer.yaml
 ```
 
-Note: this parameter file disables AMCL TF broadcast so Cartographer remains the only `map -> odom` publisher.
+Notes:
 
-### 3. Nav2 RViz
+- This parameter file disables AMCL TF broadcast so Cartographer remains the only `map -> odom` publisher.
+- `navigation_launch.py` does not launch `map_server`, so start `map_server` first (steps 2 and 3).
+
+### 5. Nav2 RViz
 
 ```bash
 ros2 launch nav2_bringup rviz_launch.py
 ```
 
 Now set a Nav2 goal in RViz and verify `/cmd_vel` is being published.
+
+### 6. Send Nav2 goal or waypoints
+
+Check Nav2 actions are available:
+
+```bash
+ros2 action list | grep -E 'navigate_to_pose|follow_waypoints'
+ros2 action info /navigate_to_pose
+ros2 action info /follow_waypoints
+```
+
+Send a single goal from CLI (`map` frame):
+
+```bash
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: map}, pose: {position: {x: 1.0, y: 0.0, z: 0.0}, orientation: {z: 0.0, w: 1.0}}}}"
+```
+
+Send multiple waypoints from CLI (`map` frame):
+
+```bash
+ros2 action send_goal /follow_waypoints nav2_msgs/action/FollowWaypoints \
+  "{poses: [
+    {header: {frame_id: map}, pose: {position: {x: 1.0, y: 0.0, z: 0.0}, orientation: {z: 0.0, w: 1.0}}},
+    {header: {frame_id: map}, pose: {position: {x: 1.5, y: 0.5, z: 0.0}, orientation: {z: 0.0, w: 1.0}}},
+    {header: {frame_id: map}, pose: {position: {x: 0.5, y: 1.0, z: 0.0}, orientation: {z: 0.0, w: 1.0}}}
+  ]}"
+```
+
+RViz method:
+
+- Use the Nav2 Goal tool (`2D Goal Pose`) for a single destination.
+- Use the Nav2 Waypoint tool/plugin to queue multiple goals.
+
+While a goal is active, verify command output:
+
+```bash
+ros2 topic hz /cmd_vel
+```
 
 ## Quick checks
 
@@ -167,6 +225,8 @@ Now set a Nav2 goal in RViz and verify `/cmd_vel` is being published.
 ```bash
 ros2 topic list
 ros2 topic hz /cloud_all_fields_fullframe
+ros2 topic info /map
+ros2 topic echo /map_metadata --once
 ros2 topic echo /odom --once
 ros2 topic echo /cmd_vel --once
 ros2 topic echo /cmd_vel_nav --once
@@ -192,10 +252,13 @@ Confirm serial bridge is running and STM32 UART port/baud are correct.
 3. Nav2 costmap no obstacles.
 Confirm point cloud topic exists and matches `/cloud_all_fields_fullframe`.
 
-4. TF conflict warnings.
+4. No saved map appears in RViz / `/map` has no publisher.
+Start `map_server` and activate lifecycle manager (`node_names:='["map_server"]'`) before launching `navigation_launch.py`.
+
+5. TF conflict warnings.
 Keep serial bridge `publish_tf:=false` while Cartographer is publishing `odom -> base_link`.
 
-5. Two maps flashing / map jumps / TF disappearing.
+6. Two maps flashing / map jumps / TF disappearing.
 Do not let multiple localization/map publishers run on the same topics and transforms:
 - In localization phase keep Cartographer `publish_occupancy_grid:=false` to avoid `/map` conflict with Nav2 map_server.
 - Keep AMCL TF broadcast disabled in `Nav/nav2_params_cartographer.yaml` when Cartographer localization is active.
