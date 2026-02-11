@@ -91,6 +91,7 @@ class BTExecutor(Node):
         self.bb.items = []
         self.bb.item_index = 0
         self.bb.current_item = None
+        self.bb.num_current_item = 0
         self.bb.mode = None
         self.bb.nav_goal = (0.0, 0.0)
         self.bb.rack_goal = 1

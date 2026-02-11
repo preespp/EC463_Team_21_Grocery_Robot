@@ -15,13 +15,22 @@ class SetCurrentItem(py_trees.behaviour.Behaviour):
     def update(self):
         items = getattr(self.bb, "items", [])
         idx = getattr(self.bb, "item_index", 0)
+        total_items = len(items)
 
-        if idx >= len(items):
+        if idx >= total_items:
             return py_trees.common.Status.FAILURE
 
         item = items[idx]
         self.bb.current_item = item
         self.bb.item_index = idx + 1
+        # Order items are ROS messages (OrderItem), not dicts.
+        self.bb.num_current_item = int(getattr(item, "qty", 0))
+
+        item_name = getattr(item, "name", "unknown")
+        print(
+            f"Processing item {idx + 1}/{total_items}: "
+            f"{item_name} (qty={self.bb.num_current_item})"
+        )
 
         # TODO: Replace with real map look up from database
         self.bb.nav_goal = getattr(self.bb, "nav_goal", None)

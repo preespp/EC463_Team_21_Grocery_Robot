@@ -28,7 +28,7 @@ class ChangeInventory(py_trees.behaviour.Behaviour):
         product_id = str(item.product_id)
         ref = self.db.collection("grocery_inventory").document(product_id)
         ref.update({
-            "stock": firestore.Increment(-1)
+            "stock": firestore.Increment(-self.bb.num_current_item)
         })
 
         return py_trees.common.Status.SUCCESS
