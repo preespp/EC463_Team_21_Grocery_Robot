@@ -13,7 +13,6 @@
       <span class="muted" id="who"></span>
     </div>
     <div class="row">
-      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
       <button class="btn danger" id="logout">Logout</button>
     </div>
   </div>
@@ -71,7 +70,11 @@
           </label>
           <label class="field">
             <span class="muted">Restock qty</span>
-            <input id="restock_qty" type="number" min="1" value="1" />
+            <div class="row">
+              <button class="btn" id="restock_minus" type="button">-</button>
+              <input id="restock_qty" type="number" min="1" value="1" />
+              <button class="btn" id="restock_plus" type="button">+</button>
+            </div>
           </label>
         </div>
         <div class="row">
@@ -99,7 +102,7 @@
         }
     });
 
-    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="idle.html"; };
+    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="login.html"; };
 
     const invEl = document.getElementById("inv");
     const msgEl = document.getElementById("msg");
@@ -116,13 +119,14 @@
         </tr></thead>
         <tbody></tbody>
       `;
+      // <td><button class="btn danger">Delete</button></td>
       const tbody = table.querySelector("tbody");
 
       for (const it of inventory) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${it.id}</td>
-          <td>${it.name ?? ""}</td>
+          <td><input value="${it.name ?? ""}" data-k="name"></td>
           <td><input style="width:90px" value="${it.aisle ?? ""}" data-k="aisle"></td>
           <td><input style="width:70px" type="number" value="${it.rack ?? 0}" data-k="rack"></td>
           <td><input style="width:70px" type="number" value="${it.shelf_level ?? 0}" data-k="shelf_level"></td>
@@ -147,6 +151,11 @@
       }
 
       invEl.appendChild(table);
+      // tr.querySelector(".btn.danger").onclick = async () => {
+      //   if (!confirm(`Delete ${it.name}?`)) return;
+      //   await apiPost("/api/inventory/delete", { id: it.id });
+      //   await loadInventory();
+      // };
     }
 
     function renderRestockSelect() {
@@ -230,6 +239,7 @@
       try {
         const resp = await apiPost("/api/order/employee", { id: user.username, items });
         sessionStorage.setItem("last_order_id", String(resp.order_id || ""));
+        sessionStorage.setItem("last_order_items", JSON.stringify(items));
         window.location.href = "wait.html";
       } catch (e) {
         restockMsg.textContent = "Submit failed: " + e.message;
@@ -237,6 +247,15 @@
     };
 
     loadInventory();
+
+    const qtyEl = document.getElementById("restock_qty");
+    document.getElementById("restock_minus").addEventListener("click", () => {
+      qtyEl.value = Math.max(1, Number(qtyEl.value || 1) - 1);
+    });
+    document.getElementById("restock_plus").addEventListener("click", () => {
+      qtyEl.value = Number(qtyEl.value || 1) + 1;
+    });
+
   </script>
 </body>
 </html>
