@@ -1,0 +1,37 @@
+# 1) Start SICK PicoScan150 driver
+ros2 launch sick_scan_xd sick_picoscan.launch.py \
+  hostname:=192.168.8.150 \
+  udp_receiver_ip:=192.168.8.249 \
+  publish_frame_id:=base_link \
+  publish_imu_frame_id:=base_link \
+  custom_pointclouds:='cloud_all_fields_fullframe' \
+  cloud_all_fields_fullframe:='coordinateNotation=3 updateMethod=0 fields=x,y,z,i,range,azimuth,elevation,t,ts,lidar_sec,lidar_nsec,ring,layer,echo,reflector echos=0,1,2 layers=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 topic=/cloud_all_fields_fullframe frameid=base_link publish=1' \
+  publish_laserscan_fullframe_topic:=/scan_fullframe \
+  imu_topic:=/sick_scansegment_xd/imu
+
+# 2) Start Cartographer mapping
+ros2 launch /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/carto_cfg/my_carto.launch.py
+
+# 3) (optional) RViz
+ros2 run rviz2 rviz2
+
+# 4) Save pbstream map
+ros2 service call /write_state cartographer_ros_msgs/srv/WriteState "{filename: '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream', include_unfinished_submaps: true}"
+
+# 5) Convert pbstream -> yaml/pgm (required for Nav2 static map)
+ros2 run cartographer_ros cartographer_pbstream_to_ros_map \
+  -pbstream_filename /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream \
+  -map_filestem /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1 \
+  -resolution 0.05
+
+# 6) Start Cartographer localization
+ros2 launch /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/carto_cfg/my_carto_localization.launch.py \
+  load_state_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.pbstream \
+  publish_occupancy_grid:=false
+
+# 7) Start Nav2
+ros2 launch nav2_bringup navigation_launch.py \
+  use_sim_time:=false \
+  autostart:=true \
+  map:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmap1.yaml \
+  params_file:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Nav/nav2_params_cartographer.yaml
