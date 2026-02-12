@@ -13,7 +13,6 @@
       <span class="muted" id="who"></span>
     </div>
     <div class="row">
-      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
       <button class="btn danger" id="logout">Logout</button>
     </div>
   </div>
@@ -82,7 +81,7 @@
     let inventory = [];
     let cart = new Map();
 
-    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="idle.html"; };
+    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="login.html"; };
 
 function renderInventory() {
   invEl.innerHTML = "";
@@ -148,6 +147,11 @@ function renderInventory() {
       `;
       const tbody = table.querySelector("tbody");
 
+          //           <td>
+          //   <input class="qty-input" type="number" min="1"
+          //     value="${entry.qty}" />
+          // </td>
+
       for (const [id, entry] of cart.entries()) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -161,10 +165,10 @@ function renderInventory() {
         `;
         const [minus, plus] = tr.querySelectorAll("button[data-a]");
         minus.onclick = () => {
-        entry.qty = Math.max(1, entry.qty - 1);
-        cart.set(id, entry);
-        renderCart();
-        renderInventory();
+          entry.qty = Math.max(1, entry.qty - 1);
+          cart.set(id, entry);
+          renderCart();
+          renderInventory();
         };
 
         plus.onclick = () => {
@@ -197,6 +201,16 @@ function renderInventory() {
       renderInventory();
     }
 
+    // const qtyInput = tr.querySelector(".qty-input");
+    // qtyInput.addEventListener("change", () => {
+    //   const dbStock = Number(entry.inv.stock || 0);
+    //   const v = Math.max(1, Number(qtyInput.value || 1));
+    //   entry.qty = Math.min(v, dbStock);     // clamp to stock
+    //   cart.set(id, entry);
+    //   renderCart();
+    //   renderInventory();
+    // });
+
     // document.getElementById("refresh").onclick = loadInventory;
     document.getElementById("clear").onclick = () => { cart.clear(); renderCart(); renderInventory();};
 
@@ -222,6 +236,7 @@ function renderInventory() {
       try {
         const resp = await apiPost("/api/order/customer", { id: user.username, items });
         sessionStorage.setItem("last_order_id", String(resp.order_id || ""));
+        sessionStorage.setItem("last_order_items", JSON.stringify(items));
         window.location.href = "wait.html";
       } catch (e) {
         msgEl.textContent = "Submit failed: " + e.message;

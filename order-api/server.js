@@ -198,10 +198,11 @@ app.get("/api/inventory/list", async (req, res) => {
 // Employee: update fields (aisle, rack, shelf_level, price) - stock changes handled elsewhere
 app.post("/api/inventory/update", async (req, res) => {
   try {
-    const { id, aisle, rack, shelf_level, price } = req.body;
+    const { id, name, aisle, rack, shelf_level, price } = req.body;
     if (!id) return res.status(400).json({ error: "Missing inventory id" });
 
     const patch = {};
+    if (name !== undefined) patch.name = name;
     if (aisle !== undefined) patch.aisle = aisle;
     if (rack !== undefined) patch.rack = rack;
     if (shelf_level !== undefined) patch.shelf_level = shelf_level;
@@ -239,6 +240,13 @@ app.post("/api/inventory/add", async (req, res) => {
   }
 });
 
+// Employee: delete grocery
+app.post("/api/inventory/delete", async (req,res)=>{
+  const {id}=req.body;
+  await db.collection("grocery_inventory").doc(id).delete();
+  res.json({ok:true});
+});
+
 // UI polls this
 app.get("/api/order/status/:order_id", (req, res) => {
   const oid = String(req.params.order_id || "");
@@ -253,7 +261,7 @@ app.post("/api/order/complete", (req, res) => {
   if (!order_id) return res.status(400).json({ error: "Missing order_id" });
 
   const r = String(result || "").toUpperCase();
-  const status = (r === "SUCCESS") ? "DONE" : "FAILED";
+  const status = (r.includes("SUCCESS")) ? "DONE" : "FAILED";
 
   orderStatus.set(String(order_id), {
     status,
