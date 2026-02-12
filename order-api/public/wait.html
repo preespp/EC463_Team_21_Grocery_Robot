@@ -18,11 +18,20 @@
         <div><b>Status:</b> RECEIVED</div>
       </div>
     </div>
+    <div id="orderList" class="scroll-box" style="height:35vh"></div>
   </div>
 
   <script src="common.js"></script>
   <script>
-  // IMPORTANT: no idle timeout here (this page is supposed to wait)
+  const items = JSON.parse(sessionStorage.getItem("last_order_items") || "[]");
+  const list = document.getElementById("orderList");
+  list.innerHTML = items.map(it =>
+    `<div class="card">
+        <div style="font-weight:900">${it.name} × ${it.qty}</div>
+        <div class="muted small">Aisle ${it.aisle}, Rack ${it.rack}, Shelf ${it.shelf_level}</div>
+    </div>`
+    ).join("");
+
   const user = getSession();
   if (!user) window.location.href = "login.html";
 

@@ -36,6 +36,7 @@
       <div class="row" style="margin-top:14px">
         <button class="btn primary" id="btnLogin">Login</button>
         <button class="btn" onclick="window.location.href='create_customer.html'">Create Customer Account</button>
+        <button class="btn" id="guest">Continue as Guest</button>
       </div>
 
       <div id="msg" class="muted" style="margin-top:12px"></div>
@@ -63,6 +64,11 @@
         msg.textContent = "Login failed: " + e.message;
       }
     });
+
+    document.getElementById("guest").onclick = () => {
+      setSession({ username: `guest_${Date.now()}`, access_level: "customer", guest: true });
+      window.location.href = "customer.html";
+    };
   </script>
 </body>
 </html>
