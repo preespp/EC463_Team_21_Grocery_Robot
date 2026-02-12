@@ -14,7 +14,7 @@ We are using:
 ## Network Setup
 
 - **LiDAR IP (hostname)**: `192.168.8.150`  
-- **Jetson IP (UDP receiver)**: `192.168.8.143`
+- **Jetson IP (UDP receiver)**: `192.168.8.249`  
 
 The LiDAR sends UDP packets to the Jetson, where `sick_scan_xd` publishes point clouds to ROS2.
 
@@ -33,7 +33,7 @@ ros2 run rviz2 rviz2
 Tips:
 
 - Load our saved RViz config (if we have one) so the **map**, **TF**, and **point cloud** displays are already set up.
-- Make sure the **fixed frame** is set correctly (usually `map` or `world`).
+- Make sure the **fixed frame** is set correctly (usually `map` or `base_link`).
 
 ---
 
@@ -54,7 +54,7 @@ What this does:
 
 If Cartographer is running correctly, you’ll see:
 
-- The **TF tree** including `map`, `odom`, and `world`
+- The **TF tree** including `map`, `odom`, and `base_link`
 - Submaps and the global map being updated in RViz
 
 ---
@@ -64,7 +64,7 @@ If Cartographer is running correctly, you’ll see:
 This brings up the LiDAR, receives data from the physical sensor, and publishes it into ROS2.
 
 ```bash
-ros2 launch sick_scan_xd sick_picoscan.launch.py   hostname:=192.168.8.150   udp_receiver_ip:=192.168.8.143
+ros2 launch sick_scan_xd sick_picoscan.launch.py   hostname:=192.168.8.150   udp_receiver_ip:=192.168.8.249
 ```
 
 Explanation:
@@ -93,7 +93,7 @@ In practice, you can start them in any order, but this sequence is easy to follo
    ```
 3. **Start the LiDAR driver**:
    ```bash
-   ros2 launch sick_scan_xd sick_picoscan.launch.py      hostname:=192.168.8.150      udp_receiver_ip:=192.168.8.143
+   ros2 launch sick_scan_xd sick_picoscan.launch.py      hostname:=192.168.8.150      udp_receiver_ip:=192.168.8.249
    ```
 
 After a few seconds of moving the robot, the map should gradually appear in RViz.
@@ -104,7 +104,7 @@ After a few seconds of moving the robot, the map should gradually appear in RViz
 
 We have two reference diagrams:
 
-- `frames.png` – TF tree showing `map -> odom -> world`
+- `frames.png` – TF tree showing `map -> odom -> base_link`
 - `rosgraph.png` – Node graph showing connections between:
   - `/sick_scansegment_xd`
   - `/cloud_all_fields_fullframe`
@@ -132,10 +132,10 @@ If SLAM isn’t working:
    ```bash
    ros2 run tf2_tools view_frames
    ```
-   Then open the generated PDF/PNG and verify that `map`, `odom`, and `world` are connected as expected.
+   Then open the generated PDF/PNG and verify that `map`, `odom`, and `base_link` are connected as expected.
 
 3. **Check RViz Fixed Frame**  
-   Set it to `map` or `world` (depending on our config) to avoid “No transform” errors.
+   Set it to `map` or `base_link` (depending on our config) to avoid “No transform” errors.
 
 ---
 
@@ -149,7 +149,7 @@ ros2 run rviz2 rviz2
 ros2 launch ~/carto_cfg/my_carto.launch.py
 
 # 3. Start LiDAR and send UDP to Jetson
-ros2 launch sick_scan_xd sick_picoscan.launch.py   hostname:=192.168.8.150   udp_receiver_ip:=192.168.8.143
+ros2 launch sick_scan_xd sick_picoscan.launch.py   hostname:=192.168.8.150   udp_receiver_ip:=192.168.8.249
 ```
 
 Keep this README with the project so anyone on the team can bring up SLAM on the Jetson quickly.

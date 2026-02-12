@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool
 import struct
-from smbus2 import SMBus
+from smbus2 import SMBus, i2c_msg
 
 
 class DistanceSensor(Node):
@@ -14,7 +14,7 @@ class DistanceSensor(Node):
         self.declare_parameter("bus", 7)
         self.declare_parameter("addr", 9)
         self.declare_parameter("rate", 20.0)
-        self.declare_parameter("threshold_m", 0.30)
+        self.declare_parameter("threshold_m", 0.05)
         self.declare_parameter("name", "front")
 
         self.bus_id = int(self.get_parameter("bus").value)
@@ -57,9 +57,15 @@ class DistanceSensor(Node):
 
     def timer_callback(self):
         try:
-            # Read 8 bytes: left + right ultrasonic
-            data = self.bus.read_i2c_block_data(self.addr, 0x00, 8)
-            dist_left_m, dist_right_m = struct.unpack('ff', bytes(data))
+            # Read exactly 8 bytes from the slave without SMBus command byte.
+            # ESP-IDF i2c slave APIs expect raw I2C transfers.
+            msg = i2c_msg.read(self.addr, 8)
+            self.bus.i2c_rdwr(msg)
+            dist_left_m, dist_right_m = struct.unpack("<ff", bytes(msg))
+
+            self.get_logger().info(
+                f"{dist_left_m}, {dist_right_m}"
+            )
 
             alert = (
                 0 < dist_left_m < self.threshold_m or
