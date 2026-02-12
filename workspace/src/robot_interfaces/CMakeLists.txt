@@ -28,8 +28,9 @@ find_package(tf2_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  #"srv/"
-  #"msg/"
+  "srv/NewOrder.srv"
+  "msg/Order.msg"
+  "msg/OrderItem.msg"
   #"action/"
   DEPENDENCIES 
   builtin_interfaces 

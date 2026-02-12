@@ -55,6 +55,42 @@ dkms.conf
 sdkconfig
 build/
 .vscode
+
+# For Database credential + Nodejs
+credential.json
+node_modules/
+package.json
+package-lock.json
+
+.DS_store
+__pycache__/
+*.pyc
+
+# ROS2 build and install artifacts
+build/
+install/
+log/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python build
+*.egg-info/
+dist/
+
+# Editor and Operating Systems
+*.swp
+*.swo
+.DS_Store
+.vscode/
+.idea/
+
+# Colcon metadata
+.colcon/
+.colcon_release_metadata/
 STM32/Base_Control_v2/robowalker2024bottominfantry-main/tools/__pycache__/nav2_serial_bridge.cpython-312.pyc
 order -api/node_modules/
 Nav/carto_cfg/__pycache__

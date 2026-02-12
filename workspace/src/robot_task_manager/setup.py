@@ -7,7 +7,11 @@ package_name = 'robot_task_manager'
 setup(
     name=package_name,
     version='1.0.0',
-    packages=[package_name],
+    packages=find_packages(exclude=["test"]),
+    include_package_data=True,
+    package_data={
+    	"robot_task_manager": ["bt_nodes/credential.json"],
+    },
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
@@ -28,7 +32,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'central = robot_task_manager.central:main',
+            'bt_executor = robot_task_manager.bt_executor:main',
         ],
     },
 )

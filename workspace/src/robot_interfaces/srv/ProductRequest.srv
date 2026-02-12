@@ -1,5 +1,0 @@
-string product_id
----
-bool found
-string product_name
-string product_location
