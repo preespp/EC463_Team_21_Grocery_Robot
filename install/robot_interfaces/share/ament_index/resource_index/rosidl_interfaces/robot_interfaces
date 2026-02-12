@@ -1,8 +1,0 @@
-msg/Order.idl
-msg/Order.msg
-msg/OrderItem.idl
-msg/OrderItem.msg
-srv/NewOrder.idl
-srv/NewOrder.srv
-srv/NewOrder_Request.msg
-srv/NewOrder_Response.msg
