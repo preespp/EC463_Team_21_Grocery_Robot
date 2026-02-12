@@ -7,9 +7,10 @@ class ChangeInventory(py_trees.behaviour.Behaviour):
     """
     Uses bb.current_item and calls inventory update (service later).
     """
-    def __init__(self, bb):
+    def __init__(self, bb, mode):
         super().__init__("ChangeInventory")
         self.bb = bb
+        self.mode = mode
 
         # Resolve credential.json next to this file (bt_nodes folder)
         cred_path = Path(__file__).resolve().parent / "credential.json"
@@ -27,8 +28,9 @@ class ChangeInventory(py_trees.behaviour.Behaviour):
 
         product_id = str(item.product_id)
         ref = self.db.collection("grocery_inventory").document(product_id)
+        number_change = -self.bb.num_current_item if self.mode == "customer" else self.bb.num_current_item
         ref.update({
-            "stock": firestore.Increment(-self.bb.num_current_item)
+            "stock": firestore.Increment(number_change)
         })
 
         return py_trees.common.Status.SUCCESS
