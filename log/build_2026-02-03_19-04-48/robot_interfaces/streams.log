@@ -1,0 +1,213 @@
+[0.031s] Invoking command in '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager:/opt/ros/humble /usr/bin/cmake --build /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces -- -j6 -l6
+[0.147s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_generator_c[0m
+[0.169s] [  2%] Built target robot_interfaces__cpp
+[0.176s] [ 12%] Built target robot_interfaces__rosidl_generator_c
+[0.196s] [ 12%] Built target ament_cmake_python_copy_robot_interfaces
+[0.198s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_cpp[0m
+[0.198s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_fastrtps_cpp[0m
+[0.200s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_introspection_cpp[0m
+[0.209s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_fastrtps_c[0m
+[0.219s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_introspection_c[0m
+[0.229s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_c[0m
+[0.247s] [ 23%] Built target robot_interfaces__rosidl_typesupport_cpp
+[0.252s] [ 34%] Built target robot_interfaces__rosidl_typesupport_fastrtps_cpp
+[0.257s] [ 46%] Built target robot_interfaces__rosidl_typesupport_fastrtps_c
+[0.257s] [ 55%] Built target robot_interfaces__rosidl_typesupport_introspection_cpp
+[0.262s] [ 65%] Built target robot_interfaces__rosidl_typesupport_c
+[0.271s] [ 76%] Built target robot_interfaces__rosidl_typesupport_introspection_c
+[0.330s] [ 76%] Built target robot_interfaces
+[0.386s] [ 78%] Built target robot_interfaces__py
+[0.415s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_generator_py[0m
+[0.456s] [ 87%] Built target robot_interfaces__rosidl_generator_py
+[0.484s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_fastrtps_c__pyext[0m
+[0.485s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_c__pyext[0m
+[0.485s] [35m[1mConsolidate compiler generated dependencies of target robot_interfaces__rosidl_typesupport_introspection_c__pyext[0m
+[0.519s] [100%] Built target robot_interfaces__rosidl_typesupport_c__pyext
+[0.520s] [100%] Built target robot_interfaces__rosidl_typesupport_introspection_c__pyext
+[0.520s] [100%] Built target robot_interfaces__rosidl_typesupport_fastrtps_c__pyext
+[0.964s] running egg_info
+[0.966s] writing robot_interfaces.egg-info/PKG-INFO
+[0.967s] writing dependency_links to robot_interfaces.egg-info/dependency_links.txt
+[0.967s] writing top-level names to robot_interfaces.egg-info/top_level.txt
+[0.974s] reading manifest file 'robot_interfaces.egg-info/SOURCES.txt'
+[0.976s] writing manifest file 'robot_interfaces.egg-info/SOURCES.txt'
+[1.088s] [100%] Built target ament_cmake_python_build_robot_interfaces_egg
+[1.123s] Invoked command in '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager:/opt/ros/humble /usr/bin/cmake --build /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces -- -j6 -l6
+[1.155s] Invoking command in '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager:/opt/ros/humble /usr/bin/cmake --install /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces
+[1.178s] -- Install configuration: ""
+[1.178s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/ament_index/resource_index/rosidl_interfaces/robot_interfaces
+[1.179s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces
+[1.179s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv
+[1.179s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail
+[1.179s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__type_support.h
+[1.180s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__struct.h
+[1.180s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__functions.c
+[1.180s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__functions.h
+[1.180s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/new_order.h
+[1.180s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg
+[1.181s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail
+[1.181s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__type_support.h
+[1.181s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__functions.h
+[1.181s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__functions.h
+[1.182s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__type_support.h
+[1.182s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__functions.c
+[1.182s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__struct.h
+[1.182s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__struct.h
+[1.182s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__functions.c
+[1.182s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/rosidl_generator_c__visibility_control.h
+[1.183s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/order.h
+[1.183s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/order_item.h
+[1.183s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/library_path.sh
+[1.183s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/library_path.dsv
+[1.184s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_generator_c.so
+[1.184s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces
+[1.184s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv
+[1.185s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail
+[1.185s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__rosidl_typesupport_fastrtps_c.h
+[1.185s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg
+[1.185s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail
+[1.185s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__rosidl_typesupport_fastrtps_c.h
+[1.186s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__rosidl_typesupport_fastrtps_c.h
+[1.186s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/rosidl_typesupport_fastrtps_c__visibility_control.h
+[1.186s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_typesupport_fastrtps_c.so
+[1.186s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces
+[1.186s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv
+[1.187s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail
+[1.187s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__type_support.c
+[1.187s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__rosidl_typesupport_introspection_c.h
+[1.187s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg
+[1.187s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__type_support.c
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__type_support.c
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__rosidl_typesupport_introspection_c.h
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__rosidl_typesupport_introspection_c.h
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/rosidl_typesupport_introspection_c__visibility_control.h
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_typesupport_introspection_c.so
+[1.188s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_typesupport_c.so
+[1.189s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces
+[1.189s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv
+[1.189s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail
+[1.189s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__type_support.hpp
+[1.189s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__builder.hpp
+[1.189s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__traits.hpp
+[1.190s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__struct.hpp
+[1.190s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/new_order.hpp
+[1.190s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg
+[1.190s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/order.hpp
+[1.190s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/order_item.hpp
+[1.191s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail
+[1.191s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__struct.hpp
+[1.191s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__builder.hpp
+[1.191s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__type_support.hpp
+[1.191s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__traits.hpp
+[1.191s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__type_support.hpp
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__struct.hpp
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__traits.hpp
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__builder.hpp
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/rosidl_generator_cpp__visibility_control.hpp
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail
+[1.192s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/dds_fastrtps
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__rosidl_typesupport_fastrtps_cpp.hpp
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__rosidl_typesupport_fastrtps_cpp.hpp
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/dds_fastrtps
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__rosidl_typesupport_fastrtps_cpp.hpp
+[1.193s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/rosidl_typesupport_fastrtps_cpp__visibility_control.h
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_typesupport_fastrtps_cpp.so
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__type_support.cpp
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/srv/detail/new_order__rosidl_typesupport_introspection_cpp.hpp
+[1.194s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__type_support.cpp
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__type_support.cpp
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order_item__rosidl_typesupport_introspection_cpp.hpp
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/include/robot_interfaces/robot_interfaces/msg/detail/order__rosidl_typesupport_introspection_cpp.hpp
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_typesupport_introspection_cpp.so
+[1.195s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_typesupport_cpp.so
+[1.196s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/pythonpath.sh
+[1.196s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/pythonpath.dsv
+[1.196s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces-2.0.0-py3.10.egg-info
+[1.196s] -- Installing: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces-2.0.0-py3.10.egg-info/top_level.txt
+[1.196s] -- Installing: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces-2.0.0-py3.10.egg-info/dependency_links.txt
+[1.196s] -- Installing: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces-2.0.0-py3.10.egg-info/PKG-INFO
+[1.197s] -- Installing: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces-2.0.0-py3.10.egg-info/SOURCES.txt
+[1.197s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces
+[1.197s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/robot_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-310-aarch64-linux-gnu.so
+[1.197s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/srv
+[1.197s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/srv/_new_order_s.c
+[1.197s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/srv/_new_order.py
+[1.197s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/srv/__init__.py
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/_robot_interfaces_s.ep.rosidl_typesupport_c.c
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/_robot_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/librobot_interfaces__rosidl_generator_py.so
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/_robot_interfaces_s.ep.rosidl_typesupport_introspection_c.c
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/robot_interfaces_s__rosidl_typesupport_c.cpython-310-aarch64-linux-gnu.so
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/__init__.py
+[1.198s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg
+[1.199s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg/_order_s.c
+[1.199s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg/_order_item_s.c
+[1.199s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg/_order.py
+[1.199s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg/__init__.py
+[1.199s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg/_order_item.py
+[1.199s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/robot_interfaces_s__rosidl_typesupport_introspection_c.cpython-310-aarch64-linux-gnu.so
+[1.276s] Listing '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces'...
+[1.276s] Listing '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/msg'...
+[1.276s] Listing '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/srv'...
+[1.293s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/robot_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-310-aarch64-linux-gnu.so
+[1.294s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/robot_interfaces_s__rosidl_typesupport_introspection_c.cpython-310-aarch64-linux-gnu.so
+[1.294s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/local/lib/python3.10/dist-packages/robot_interfaces/robot_interfaces_s__rosidl_typesupport_c.cpython-310-aarch64-linux-gnu.so
+[1.294s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/lib/librobot_interfaces__rosidl_generator_py.so
+[1.294s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/srv/NewOrder.idl
+[1.295s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/msg/Order.idl
+[1.295s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/msg/OrderItem.idl
+[1.295s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/srv/NewOrder.srv
+[1.295s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/srv/NewOrder_Request.msg
+[1.296s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/srv/NewOrder_Response.msg
+[1.296s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/msg/Order.msg
+[1.296s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/msg/OrderItem.msg
+[1.296s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/ament_index/resource_index/package_run_dependencies/robot_interfaces
+[1.296s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/ament_index/resource_index/parent_prefix_path/robot_interfaces
+[1.297s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/ament_prefix_path.sh
+[1.297s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/ament_prefix_path.dsv
+[1.297s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/path.sh
+[1.297s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/environment/path.dsv
+[1.297s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/local_setup.bash
+[1.297s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/local_setup.sh
+[1.298s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/local_setup.zsh
+[1.298s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/local_setup.dsv
+[1.298s] -- Installing: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/package.dsv
+[1.298s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/ament_index/resource_index/packages/robot_interfaces
+[1.298s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_generator_cExport.cmake
+[1.299s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_generator_cExport-noconfig.cmake
+[1.299s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_typesupport_fastrtps_cExport.cmake
+[1.299s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_typesupport_fastrtps_cExport-noconfig.cmake
+[1.299s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_introspection_cExport.cmake
+[1.299s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_introspection_cExport-noconfig.cmake
+[1.299s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_cExport.cmake
+[1.300s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_cExport-noconfig.cmake
+[1.300s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_generator_cppExport.cmake
+[1.300s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_typesupport_fastrtps_cppExport.cmake
+[1.300s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_typesupport_fastrtps_cppExport-noconfig.cmake
+[1.301s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_introspection_cppExport.cmake
+[1.301s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_introspection_cppExport-noconfig.cmake
+[1.302s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_cppExport.cmake
+[1.302s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfaces__rosidl_typesupport_cppExport-noconfig.cmake
+[1.302s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_generator_pyExport.cmake
+[1.302s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/export_robot_interfaces__rosidl_generator_pyExport-noconfig.cmake
+[1.302s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/rosidl_cmake-extras.cmake
+[1.302s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/ament_cmake_export_dependencies-extras.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/ament_cmake_export_include_directories-extras.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/ament_cmake_export_libraries-extras.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/ament_cmake_export_targets-extras.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/rosidl_cmake_export_typesupport_targets-extras.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfacesConfig.cmake
+[1.303s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/cmake/robot_interfacesConfig-version.cmake
+[1.304s] -- Up-to-date: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_interfaces/share/robot_interfaces/package.xml
+[1.311s] Invoked command in '/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/robot_task_manager:/opt/ros/humble /usr/bin/cmake --install /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/build/robot_interfaces

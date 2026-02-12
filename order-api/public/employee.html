@@ -1,0 +1,242 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Employee</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="row">
+      <span class="badge">EMPLOYEE</span>
+      <span class="muted" id="who"></span>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
+      <button class="btn danger" id="logout">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Inventory & Restock</h1>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <b>Inventory</b>
+        <button class="btn" id="refresh">Refresh</button>
+      </div>
+      <hr/>
+      <div id="inv" class="scroll-box inv-scroll"></div>
+      <div class="muted" id="msg"></div>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div class="panel">
+        <b>Add new grocery</b>
+        <div class="grid2" style="margin-top:10px">
+          <label class="field"><span class="muted">Doc ID</span><input id="new_id" placeholder="003"/></label>
+          <label class="field"><span class="muted">Name</span><input id="new_name" placeholder="Apple"/></label>
+          <label class="field"><span class="muted">Aisle</span><input id="new_aisle" placeholder="A2"/></label>
+          <label class="field"><span class="muted">Rack</span><input id="new_rack" type="number" value="0"/></label>
+          <label class="field"><span class="muted">Shelf level</span><input id="new_shelf" type="number" value="0"/></label>
+          <label class="field"><span class="muted">Price</span><input id="new_price" type="number" value="0"/></label>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btnAdd">Add</button>
+        </div>
+        <div class="muted" id="addMsg"></div>
+      </div>
+
+      <div class="panel">
+        <b>Create employee account</b>
+        <div class="grid2" style="margin-top:10px">
+          <label class="field"><span class="muted">Username</span><input id="emp_user" placeholder="employee_002"/></label>
+          <label class="field"><span class="muted">Password</span><input id="emp_pass" type="password" placeholder="••••••"/></label>
+          <label class="field"><span class="muted">First name</span><input id="emp_first"/></label>
+          <label class="field"><span class="muted">Last name</span><input id="emp_last"/></label>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btnCreateEmp">Create</button>
+        </div>
+        <div class="muted" id="empMsg"></div>
+
+        <hr/>
+
+        <b>Restock order</b>
+        <div class="grid2" style="margin-top:10px">
+          <label class="field">
+            <span class="muted">Select product</span>
+            <select id="restock_select"></select>
+          </label>
+          <label class="field">
+            <span class="muted">Restock qty</span>
+            <input id="restock_qty" type="number" min="1" value="1" />
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btnRestock">Submit Restock Order</button>
+        </div>
+        <div class="muted" id="restockMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    const user = requireLogin();
+    if (user.access_level !== "employee") window.location.href = "login.html";
+    document.getElementById("who").textContent = `${user.username}`;
+    idleTimeoutWithWarnings({
+        totalMs: 10 * 60 * 1000,      // 10 minutes
+        warnMs: 9 * 60 * 1000,       // 9 minutes
+        warnText: "No activity detected. Logging out in 1 minute...",
+        finalText: "Timeout reached. Logging out in 5 seconds...",
+        finalPopupMs: 5000,
+        onTimeout: () => {
+            clearSession();
+            window.location.href = "idle.html";
+        }
+    });
+
+    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="idle.html"; };
+
+    const invEl = document.getElementById("inv");
+    const msgEl = document.getElementById("msg");
+    const sel = document.getElementById("restock_select");
+
+    let inventory = [];
+
+    function renderInventory() {
+      invEl.innerHTML = "";
+      const table = document.createElement("table");
+      table.innerHTML = `
+        <thead><tr>
+          <th>ID</th><th>Name</th><th>Aisle</th><th>Rack</th><th>Shelf</th><th>Price</th><th>Stock</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+
+      for (const it of inventory) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${it.id}</td>
+          <td>${it.name ?? ""}</td>
+          <td><input style="width:90px" value="${it.aisle ?? ""}" data-k="aisle"></td>
+          <td><input style="width:70px" type="number" value="${it.rack ?? 0}" data-k="rack"></td>
+          <td><input style="width:70px" type="number" value="${it.shelf_level ?? 0}" data-k="shelf_level"></td>
+          <td><input style="width:90px" type="number" value="${it.price ?? 0}" data-k="price"></td>
+          <td>${it.stock ?? 0}</td>
+          <td><button class="btn primary">Save</button></td>
+        `;
+        tr.querySelector("button").onclick = async () => {
+          msgEl.textContent = "";
+          const inputs = tr.querySelectorAll("input[data-k]");
+          const patch = { id: it.id };
+          inputs.forEach(inp => patch[inp.dataset.k] = inp.value);
+          try {
+            await apiPost("/api/inventory/update", patch);
+            msgEl.textContent = `Saved ${it.id}`;
+            await loadInventory();
+          } catch (e) {
+            msgEl.textContent = `Save failed: ${e.message}`;
+          }
+        };
+        tbody.appendChild(tr);
+      }
+
+      invEl.appendChild(table);
+    }
+
+    function renderRestockSelect() {
+      sel.innerHTML = "";
+      for (const it of inventory) {
+        const opt = document.createElement("option");
+        opt.value = it.id;
+        opt.textContent = `${it.id} - ${it.name} (stock ${it.stock})`;
+        sel.appendChild(opt);
+      }
+    }
+
+    async function loadInventory() {
+      msgEl.textContent = "";
+      const data = await apiGet("/api/inventory/list");
+      inventory = data.items;
+      renderInventory();
+      renderRestockSelect();
+    }
+
+    document.getElementById("refresh").onclick = loadInventory;
+
+    // Add new grocery
+    document.getElementById("btnAdd").onclick = async () => {
+      const addMsg = document.getElementById("addMsg");
+      addMsg.textContent = "";
+      try {
+        await apiPost("/api/inventory/add", {
+          id: document.getElementById("new_id").value.trim(),
+          name: document.getElementById("new_name").value.trim(),
+          aisle: document.getElementById("new_aisle").value.trim(),
+          rack: Number(document.getElementById("new_rack").value),
+          shelf_level: Number(document.getElementById("new_shelf").value),
+          price: Number(document.getElementById("new_price").value),
+        });
+        addMsg.textContent = "Added new grocery (stock=0)";
+        await loadInventory();
+      } catch (e) {
+        addMsg.textContent = "Add failed: " + e.message;
+      }
+    };
+
+    // Create employee account
+    document.getElementById("btnCreateEmp").onclick = async () => {
+      const empMsg = document.getElementById("empMsg");
+      empMsg.textContent = "";
+      try {
+        await apiPost("/api/account/create_employee", {
+          username: document.getElementById("emp_user").value.trim(),
+          password: document.getElementById("emp_pass").value.trim(),
+          first_name: document.getElementById("emp_first").value.trim(),
+          last_name: document.getElementById("emp_last").value.trim(),
+        });
+        empMsg.textContent = "Employee created";
+      } catch (e) {
+        empMsg.textContent = "Create failed: " + e.message;
+      }
+    };
+
+    // Restock order (ONE product)
+    document.getElementById("btnRestock").onclick = async () => {
+      const restockMsg = document.getElementById("restockMsg");
+      restockMsg.textContent = "";
+      const id = sel.value;
+      const qty = Number(document.getElementById("restock_qty").value || 1);
+      const it = inventory.find(x => x.id === id);
+      if (!it) { restockMsg.textContent = "Pick a product"; return; }
+
+      // Send the SAME order format; items array length = 1
+      const items = [{
+      	product_id: it.id,
+        aisle: it.aisle,
+        name: it.name,
+        price: it.price,
+        rack: it.rack,
+        shelf_level: it.shelf_level,
+        stock: it.stock,
+        qty: qty
+      }];
+
+      try {
+        const resp = await apiPost("/api/order/employee", { id: user.username, items });
+        sessionStorage.setItem("last_order_id", String(resp.order_id || ""));
+        window.location.href = "wait.html";
+      } catch (e) {
+        restockMsg.textContent = "Submit failed: " + e.message;
+      }
+    };
+
+    loadInventory();
+  </script>
+</body>
+</html>

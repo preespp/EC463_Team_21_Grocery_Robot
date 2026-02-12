@@ -1,0 +1,18 @@
+// generated from rosidl_adapter/resource/srv.idl.em
+// with input from robot_interfaces/srv/NewOrder.srv
+// generated code does not contain a copyright notice
+
+#include "robot_interfaces/msg/Order.idl"
+
+module robot_interfaces {
+  module srv {
+    struct NewOrder_Request {
+      robot_interfaces::msg::Order order;
+    };
+    struct NewOrder_Response {
+      boolean accepted;
+
+      string message;
+    };
+  };
+};

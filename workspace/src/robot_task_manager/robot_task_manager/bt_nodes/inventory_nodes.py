@@ -1,0 +1,35 @@
+import py_trees
+import firebase_admin
+from firebase_admin import credentials, firestore
+from pathlib import Path
+
+class ChangeInventory(py_trees.behaviour.Behaviour):
+    """
+    Uses bb.current_item and calls inventory update (service later).
+    """
+    def __init__(self, bb):
+        super().__init__("ChangeInventory")
+        self.bb = bb
+
+        # Resolve credential.json next to this file (bt_nodes folder)
+        cred_path = Path(__file__).resolve().parent / "credential.json"
+        self.cred = credentials.Certificate(str(cred_path))
+
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(self.cred)
+
+        self.db = firestore.client()
+
+    def update(self):
+        item = getattr(self.bb, "current_item", None)
+        if item is None:
+            return py_trees.common.Status.FAILURE
+
+        product_id = str(item.product_id)
+        ref = self.db.collection("grocery_inventory").document(product_id)
+        ref.update({
+            "stock": firestore.Increment(-self.bb.num_current_item)
+        })
+
+        return py_trees.common.Status.SUCCESS
+        
