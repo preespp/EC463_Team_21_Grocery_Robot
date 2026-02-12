@@ -1,0 +1,19 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from robot_interfaces/msg/Order.msg
+// generated code does not contain a copyright notice
+
+#include "robot_interfaces/msg/OrderItem.idl"
+
+module robot_interfaces {
+  module msg {
+    struct Order {
+      int64 order_id;
+
+      string role;
+
+      string requester_id;
+
+      sequence<robot_interfaces::msg::OrderItem> items;
+    };
+  };
+};

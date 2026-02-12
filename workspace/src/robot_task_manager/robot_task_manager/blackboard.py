@@ -11,6 +11,7 @@ def setup_blackboard():
     bb.items = []
     bb.item_index = 0
     bb.current_item = None
+    bb.num_current_item = 0
 
     bb.nav_goal = (0.0, 0.0)
     bb.rack_goal = 1

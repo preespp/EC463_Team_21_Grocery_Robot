@@ -223,6 +223,7 @@ function renderInventory() {
       for (const entry of cart.values()) {
         const it = entry.inv;
         items.push({
+        	product_id: it.id,
           aisle: it.aisle,
           name: it.name,
           price: it.price,

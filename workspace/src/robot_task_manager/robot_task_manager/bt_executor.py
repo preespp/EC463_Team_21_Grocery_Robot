@@ -6,13 +6,12 @@ import py_trees
 from robot_interfaces.srv import NewOrder
 from robot_interfaces.msg import Order, OrderItem
 
-from blackboard import setup_blackboard
-from trees.customer import create_customer_tree
-from trees.restock import create_restock_tree
-
-import bt_nodes
+from robot_task_manager.blackboard import setup_blackboard
+from robot_task_manager.trees.customer import create_customer_tree
+from robot_task_manager.trees.restock import create_restock_tree
 
 SERVER = "http://localhost:3000"
+
 
 class BTExecutor(Node):
     def __init__(self):
@@ -31,7 +30,6 @@ class BTExecutor(Node):
         self.bt_tick_timer = self.create_timer(0.1, self.tick_bt)
 
         self.get_logger().info("BTExecutor ready (order intake + blackboard + BT)")
-
 
     def new_order_cb(self, request, response):
         if self.current_order is not None:
@@ -59,8 +57,12 @@ class BTExecutor(Node):
 
             requests.post(f"{SERVER}/api/order/ack", timeout=1.0)
 
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             self.get_logger().warn(f"Node.js unreachable: {e}")
+
+        except Exception as e:
+            self.get_logger().error(f"BT build error: {e}")
+            self.clear_order()
 
     def accept_order(self, order: Order):
         self.current_order = order
@@ -89,6 +91,7 @@ class BTExecutor(Node):
         self.bb.items = []
         self.bb.item_index = 0
         self.bb.current_item = None
+        self.bb.num_current_item = 0
         self.bb.mode = None
         self.bb.nav_goal = (0.0, 0.0)
         self.bb.rack_goal = 1
@@ -103,14 +106,16 @@ class BTExecutor(Node):
 
         mode = self.bb.mode
         if mode not in ("customer", "employee"):
-            self.get_logger().error(f"Unknown role/mode: {mode}. Expected 'customer' or 'employee'.")
+            self.get_logger().error(
+                f"Unknown role/mode: {mode}. Expected 'customer' or 'employee'."
+            )
             self.clear_order()
             return
 
         if mode == "customer":
-            root = create_customer_tree(self, bt_nodes, self.bb)
+            root = create_customer_tree(self.bb)
         else:
-            root = create_restock_tree(self, bt_nodes, self.bb)
+            root = create_restock_tree(self.bb)
 
         self.tree = py_trees.trees.BehaviourTree(root)
         self.tree.setup(timeout=5)
@@ -131,12 +136,15 @@ class BTExecutor(Node):
                 if self.bb.order is not None:
                     requests.post(
                         f"{SERVER}/api/order/complete",
-                        json={"order_id": int(self.bb.order.order_id), "result": str(status)},
-                        timeout=1.0
+                        json={
+                            "order_id": int(self.bb.order.order_id),
+                            "result": str(status),
+                        },
+                        timeout=1.0,
                     )
             except Exception as e:
                 self.get_logger().warn(f"Failed to report completion: {e}")
-            
+
             self.clear_order()
 
     def convert_json_to_order(self, data: dict) -> Order:
@@ -147,6 +155,7 @@ class BTExecutor(Node):
 
         for it in data["items"]:
             item = OrderItem()
+            item.product_id = it["product_id"]
             item.name = it["name"]
             item.aisle = it["aisle"]
             item.rack = int(it["rack"])
@@ -169,3 +178,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
