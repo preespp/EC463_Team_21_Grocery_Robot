@@ -72,6 +72,12 @@ ros2 run robot_navigation nav_assistant export-map --map-name testmap1
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 ```
 
+Headless Jetson default:
+
+```bash
+ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 --with-nav2-rviz false
+```
+
 ### 5. Send goal or waypoints
 
 ```bash

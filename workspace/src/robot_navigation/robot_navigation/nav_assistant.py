@@ -608,7 +608,7 @@ def build_parser() -> argparse.ArgumentParser:
     localization_parser.add_argument("--pbstream-file", default="")
     localization_parser.add_argument("--map-yaml", default="")
     localization_parser.add_argument("--nav2-params-file", default="")
-    localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=True)
+    localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
 
     teleop_common = argparse.ArgumentParser(add_help=False)
     teleop_common.add_argument("--topic", default="/cmd_vel")

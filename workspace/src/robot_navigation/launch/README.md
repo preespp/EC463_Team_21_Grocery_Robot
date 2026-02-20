@@ -17,6 +17,12 @@ Localization + Nav2 phase:
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 ```
 
+For headless Jetson:
+
+```bash
+ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 --with-nav2-rviz false
+```
+
 If you prefer direct launch usage:
 
 ```bash

@@ -40,22 +40,25 @@ def generate_launch_description():
     default_map_yaml = str(maps_dir / "testmap1.yaml")
     default_nav2_params = str(package_share / "config" / "nav2_params_cartographer.yaml")
 
-    sick_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
+    # sick_picoscan.launch.py forwards sys.argv directly to sick_generic_caller.
+    # Launching the caller node directly guarantees these args are applied.
+    sick_driver = Node(
+        package="sick_scan_xd",
+        executable="sick_generic_caller",
+        output="screen",
+        arguments=[
             PathJoinSubstitution(
-                [FindPackageShare("sick_scan_xd"), "launch", "sick_picoscan.launch.py"]
-            )
-        ),
-        launch_arguments={
-            "hostname": LaunchConfiguration("hostname"),
-            "udp_receiver_ip": LaunchConfiguration("udp_receiver_ip"),
-            "publish_frame_id": "base_link",
-            "publish_imu_frame_id": "base_link",
-            "custom_pointclouds": "cloud_all_fields_fullframe",
-            "cloud_all_fields_fullframe": POINTCLOUD_CONFIG,
-            "publish_laserscan_fullframe_topic": "/scan_fullframe",
-            "imu_topic": "/sick_scansegment_xd/imu",
-        }.items(),
+                [FindPackageShare("sick_scan_xd"), "launch", "sick_picoscan.launch"]
+            ),
+            ["hostname:=", LaunchConfiguration("hostname")],
+            ["udp_receiver_ip:=", LaunchConfiguration("udp_receiver_ip")],
+            "publish_frame_id:=base_link",
+            "publish_imu_frame_id:=base_link",
+            "custom_pointclouds:=cloud_all_fields_fullframe",
+            ["cloud_all_fields_fullframe:=", POINTCLOUD_CONFIG],
+            "publish_laserscan_fullframe_topic:=/scan_fullframe",
+            "imu_topic:=/sick_scansegment_xd/imu",
+        ],
     )
 
     serial_bridge = Node(
@@ -161,8 +164,8 @@ def generate_launch_description():
             DeclareLaunchArgument("pbstream_file", default_value=default_pbstream),
             DeclareLaunchArgument("map_yaml", default_value=default_map_yaml),
             DeclareLaunchArgument("nav2_params_file", default_value=default_nav2_params),
-            DeclareLaunchArgument("with_nav2_rviz", default_value="true"),
-            sick_launch,
+            DeclareLaunchArgument("with_nav2_rviz", default_value="false"),
+            sick_driver,
             serial_bridge,
             cartographer_localization,
             map_server,
