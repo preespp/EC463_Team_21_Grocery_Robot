@@ -19,7 +19,7 @@ setup(
     zip_safe=True,
     maintainer='grocery',
     maintainer_email='prees26@bu.edu',
-    description='Navigation, Collision Detection and Wheel Controller',
+    description='Navigation and Wheel Controller',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -28,7 +28,6 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'lidar.py = robot_navigation.lidar:main',
             'navigation = robot_navigation.navigation:main',
             'wheel_motor = robot_navigation.wheel_motor:main',
             'nav2_serial_bridge = robot_navigation.nav2_serial_bridge:main',
