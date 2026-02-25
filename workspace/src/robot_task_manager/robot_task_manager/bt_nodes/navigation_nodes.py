@@ -2,7 +2,12 @@ import py_trees
 import rclpy
 import threading
 import time
-from geometry_msgs.msg import Twist
+import math
+
+from rclpy.action import ActionClient
+from geometry_msgs.msg import PoseStamped, Twist
+from nav2_msgs.action import NavigateToPose
+from action_msgs.msg import GoalStatus
 
 class NavigateToGoalPose(py_trees.behaviour.Behaviour):
     """
@@ -24,6 +29,78 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
 
         # TODO: replace with Nav2 action client call
         return py_trees.common.Status.SUCCESS
+
+class SendNavGoal(py_trees.behaviour.Behaviour):
+
+    def __init__(self, node, name, x, y, yaw):
+        super().__init__(name)
+        self.node = node
+        self.x = x
+        self.y = y
+        self.yaw = yaw
+
+        self.client = ActionClient(
+            self.node,
+            NavigateToPose,
+            "navigate_to_pose"
+        )
+
+        self.goal_handle = None
+        self.result_future = None
+        self.sent_goal = False
+
+    def setup(self, **kwargs):
+        self.node.get_logger().info("Waiting for nav2 action server...")
+        self.client.wait_for_server()
+
+
+    def initialise(self):
+        self.node.get_logger().info("Sending navigation goal")
+
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose = self.build_pose()
+
+        send_future = self.client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(self.node, send_future)
+
+        self.goal_handle = send_future.result()
+
+        if not self.goal_handle.accepted:
+            self.node.get_logger().error("Goal rejected")
+            self.sent_goal = False
+            return
+
+        self.result_future = self.goal_handle.get_result_async()
+        self.sent_goal = True
+
+
+    def update(self):
+        if not self.sent_goal:
+            return py_trees.common.Status.FAILURE
+
+        if not self.result_future.done():
+            return py_trees.common.Status.RUNNING
+
+        result = self.result_future.result()
+
+        if result.status == GoalStatus.STATUS_SUCCEEDED:
+            return py_trees.common.Status.SUCCESS
+
+        return py_trees.common.Status.FAILURE
+
+    def build_pose(self):
+        pose = PoseStamped()
+        pose.header.frame_id = "map"
+        pose.header.stamp = self.node.get_clock().now().to_msg()
+
+        pose.pose.position.x = self.x
+        pose.pose.position.y = self.y
+
+        half = self.yaw * 0.5
+        pose.pose.orientation.z = math.sin(half)
+        pose.pose.orientation.w = math.cos(half)
+
+        return pose
 
 
 ### Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)

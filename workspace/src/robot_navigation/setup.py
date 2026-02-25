@@ -28,7 +28,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'navigation = robot_navigation.navigation:main',
+            'teleop_ros = robot_navigation.teleop_ros:main',
             'wheel_motor = robot_navigation.wheel_motor:main',
             'nav2_serial_bridge = robot_navigation.nav2_serial_bridge:main',
             'teleop_cmd_vel = robot_navigation.teleop_cmd_vel:main',
