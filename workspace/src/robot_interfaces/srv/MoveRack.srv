@@ -1,9 +1,0 @@
-float32 target_angle_deg
-float32 speed_deg_s
-bool blocking
-string rack_id
-
----
-# Response
-bool success
-string message

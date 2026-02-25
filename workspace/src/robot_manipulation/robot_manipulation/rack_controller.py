@@ -1,125 +1,139 @@
-#!/usr/bin/env python3
-import json
-import threading
-from typing import Optional
+import struct
+import time
 
 import rclpy
 from rclpy.node import Node
-from rclpy.duration import Duration
+from rclpy.action import ActionServer
 
-from rack_interfaces.srv import MoveRack
-from rack_interfaces.msg import RackCommand
+from smbus2 import SMBus, i2c_msg
 
-from std_msgs.msg import String
+from robot_interfaces.action import MoveRack
 
 
-class RackSystemMotorNode(Node):
+STATE_IDLE = 0
+STATE_MOVING = 1
+STATE_DONE = 2
+STATE_ERROR = 3
+
+
+class RackActionServer(Node):
+
     def __init__(self):
-        super().__init__("rack_system_motor_node")
+        super().__init__("rack_action_server")
 
-        # Publish commands to the motor node
-        self.cmd_pub = self.create_publisher(RackCommand, "/rack/command", 10)
+        # ---------- PARAMETERS ----------
+        self.declare_parameter("i2c_bus", 7)
+        self.declare_parameter("i2c_addr", 0x13)
 
-        # Subscribe to rack state
-        self.state_sub = self.create_subscription(String, "/rack/state", self.on_state, 10)
+        self.declare_parameter("shelf1_mm", 0.0)
+        self.declare_parameter("shelf2_mm", 120.0)
+        self.declare_parameter("shelf3_mm", 240.0)
 
-        # Service for high-level requests
-        self.srv = self.create_service(MoveRack, "/move_rack", self.on_move_rack)
+        self.bus_id = self.get_parameter("i2c_bus").value
+        self.addr = self.get_parameter("i2c_addr").value
 
-        # Internal state tracking
-        self.lock = threading.Lock()
-        self.last_state: dict = {
-            "rack_id": "",
-            "state": "IDLE",
-            "current_angle_deg": 0.0,
-            "detail": "",
+        self.shelf_map = {
+            1: self.get_parameter("shelf1_mm").value,
+            2: self.get_parameter("shelf2_mm").value,
+            3: self.get_parameter("shelf3_mm").value,
         }
-        self.state_changed = threading.Event()
 
-        self.get_logger().info("RackSystemMotorNode ready: service /move_rack, pub /rack/command, sub /rack/state")
+        self.bus = SMBus(self.bus_id)
 
-    def on_state(self, msg: String):
+        # ---------- ACTION SERVER ----------
+        self._action_server = ActionServer(
+            self,
+            MoveRack,
+            "move_rack",
+            execute_callback=self.execute_callback,
+        )
+
+        self.get_logger().info("Rack Action Server Ready")
+
+    # -------------------------------------------------------
+    # I2C HELPERS
+    # -------------------------------------------------------
+
+    def send_height(self, height_mm: float):
+        data = struct.pack("<f", height_mm)
+        msg = i2c_msg.write(self.addr, data)
+        self.bus.i2c_rdwr(msg)
+
+    def read_state(self):
+        msg = i2c_msg.read(self.addr, 1)
+        self.bus.i2c_rdwr(msg)
+        return list(msg)[0]
+
+    # -------------------------------------------------------
+    # ACTION EXECUTION
+    # -------------------------------------------------------
+
+    async def execute_callback(self, goal_handle):
+
+        shelf = goal_handle.request.shelf_level
+
+        if shelf not in self.shelf_map:
+            goal_handle.abort()
+            result = MoveRack.Result()
+            result.success = False
+            result.message = "Invalid shelf"
+            return result
+
+        height = self.shelf_map[shelf]
+
+        self.get_logger().info(
+            f"Move rack -> Shelf {shelf} ({height} mm)"
+        )
 
         try:
-            data = json.loads(msg.data)
-        except Exception:
-            data = {"rack_id": "", "state": msg.data, "current_angle_deg": 0.0, "detail": ""}
+            self.send_height(height)
+        except Exception as e:
+            goal_handle.abort()
+            result = MoveRack.Result()
+            result.success = False
+            result.message = str(e)
+            return result
 
-        with self.lock:
-            self.last_state.update({
-                "rack_id": data.get("rack_id", ""),
-                "state": data.get("state", "UNKNOWN"),
-                "current_angle_deg": float(data.get("current_angle_deg", 0.0)),
-                "detail": data.get("detail", ""),
-            })
-            self.state_changed.set()
+        feedback_msg = MoveRack.Feedback()
+        feedback_msg.target_height_mm = float(height)
 
-    def on_move_rack(self, req: MoveRack.Request, resp: MoveRack.Response):
-        # Basic validation
-        if req.speed_deg_s <= 0.0:
-            resp.success = False
-            resp.message = "speed_deg_s must be > 0"
-            return resp
+        timeout = 25.0
+        start = time.time()
 
-        rack_id = req.rack_id if req.rack_id else "rack_default"
+        while True:
 
-        # Publish command to motor node
-        cmd = RackCommand()
-        cmd.rack_id = rack_id
-        cmd.target_angle_deg = float(req.target_angle_deg)
-        cmd.speed_deg_s = float(req.speed_deg_s)
-        cmd.stamp = self.get_clock().now().to_msg()
-        self.cmd_pub.publish(cmd)
+            state = self.read_state()
 
-        # Immediately publish a local state update too (optional)
-        self.publish_local_state(rack_id, "COMMAND_SENT", detail=f"target={req.target_angle_deg}, speed={req.speed_deg_s}")
+            feedback_msg.state = state
+            goal_handle.publish_feedback(feedback_msg)
 
-        if not req.blocking:
-            resp.success = True
-            resp.message = "Command published (non-blocking)"
-            return resp
+            if state == STATE_DONE:
+                goal_handle.succeed()
+                result = MoveRack.Result()
+                result.success = True
+                result.message = "Rack motion complete"
+                return result
 
-        # If blocking=True: wait for DONE/ERROR from motor node
-        ok, msg = self.wait_until_done(rack_id, timeout_sec=20.0)
-        resp.success = ok
-        resp.message = msg
-        return resp
+            if state == STATE_ERROR:
+                goal_handle.abort()
+                result = MoveRack.Result()
+                result.success = False
+                result.message = "ESP32 error"
+                return result
 
-    def Await_until_done(self, rack_id: str, timeout_sec: float) -> tuple[bool, str]:
-        deadline = self.get_clock().now() + Duration(seconds=timeout_sec)
+            if time.time() - start > timeout:
+                goal_handle.abort()
+                result = MoveRack.Result()
+                result.success = False
+                result.message = "Timeout"
+                return result
 
-        # clear event before waiting
-        self._state_changed.clear()
-
-        while self.get_clock().now() < deadline:
-            # Wait for any state update
-            self._state_changed.wait(timeout=0.2)
-            self._state_changed.clear()
-
-            with self._lock:
-                s_rack = self._last_state.get("rack_id", "")
-                s_state = self._last_state.get("state", "UNKNOWN")
-                s_detail = self._last_state.get("detail", "")
-
-            # If motor node doesn’t set rack_id, we still allow it
-            if s_rack and s_rack != rack_id:
-                continue
-
-            if s_state == "DONE":
-                return True, "Move complete (DONE)"
-            if s_state == "ERROR":
-                return False, f"Move failed (ERROR): {s_detail}"
-
-        return False, f"Timeout waiting for DONE/ERROR ({timeout_sec:.1f}s)"
+            time.sleep(0.05)
 
 
 def main():
     rclpy.init()
-    node = RackSystemMotorNode()
+    node = RackActionServer()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
-
-if __name__ == "__main__":
-    main()
