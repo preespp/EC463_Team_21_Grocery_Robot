@@ -4,6 +4,7 @@ This document defines the test setup and execution plan for the Team 21 Grocery 
 It combines:
 
 - SLAM and Nav2 bringup (`Nav/README_SLAM_UPDATED.md`)
+- Power distribution and wiring diagram (`Nav/README_POWER_BLOCK_DIAGRAM.md`)
 - Base command bridge (`STM32/Base_Control_v2/robowalker2024bottominfantry-main/tools/nav2_serial_bridge.py`)
 - Remote teleop (`STM32/Base_Control_v2/robowalker2024bottominfantry-main/tools/teleop_cmd_vel.py`)
 - Behavior Tree order execution (`workspace/src/robot_task_manager/robot_task_manager/bt_executor.py`)
