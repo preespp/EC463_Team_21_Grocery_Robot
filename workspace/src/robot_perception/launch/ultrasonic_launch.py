@@ -11,16 +11,16 @@ def generate_launch_description():
 
     return LaunchDescription([
 
-        # Node(
-        #     package="robot_perception",
-        #     executable="distance_sensor",
-        #     name="ultrasonic_front",
-        #     parameters=[
-        #        common,
-        #        {"addr": 0x09, "name": "front"},
-        #     ],
-        #     output="screen",
-        # ),
+        Node(
+            package="robot_perception",
+            executable="distance_sensor",
+            name="ultrasonic_front",
+            parameters=[
+               common,
+               {"addr": 0x09, "name": "front"},
+            ],
+            output="screen",
+        ),
 
         Node(
             package="robot_perception",
@@ -33,25 +33,25 @@ def generate_launch_description():
             output="screen",
         ),
 
-        # Node(
-        #    package="robot_perception",
-        #    executable="distance_sensor",
-        #    name="ultrasonic_left",
-        #     parameters=[
-        #        common,
-        #        {"addr": 0x10, "name": "left"},
-        #     ],
-        #     output="screen",
-        # ),
+        Node(
+           package="robot_perception",
+           executable="distance_sensor",
+           name="ultrasonic_left",
+            parameters=[
+               common,
+               {"addr": 0x10, "name": "left"},
+            ],
+            output="screen",
+        ),
 
-        # Node(
-        #    package="robot_perception",
-        #    executable="distance_sensor",
-        #    name="ultrasonic_back",
-        #     parameters=[
-        #        common,
-        #        {"addr": 0x12, "name": "back"},
-        #    ],
-        #    output="screen",
-        # ),
+        Node(
+           package="robot_perception",
+           executable="distance_sensor",
+           name="ultrasonic_back",
+            parameters=[
+               common,
+               {"addr": 0x12, "name": "back"},
+           ],
+           output="screen",
+        ),
     ])

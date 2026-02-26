@@ -41,6 +41,34 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ```
 
+### 0. Running Collision Detection (Required hardware setup with 4 directions)
+
+Run this command in separated terminal
+
+```bash
+ros2 launch robot_perception ultrasonic_launch.py
+```
+
+#### If not integrate collision detection
+
+Run this command in 4 separated terminals to set flag as 0 (1 is object detected in range)
+
+```bash
+ros2 topic pub -r 100 /right_alert std_msgs/msg/Bool "{data: false}"
+```
+
+```bash
+ros2 topic pub -r 100 /front_alert std_msgs/msg/Bool "{data: false}"
+```
+
+```bash
+ros2 topic pub -r 100 /left_alert std_msgs/msg/Bool "{data: false}"
+```
+
+```bash
+ros2 topic pub -r 100 /back_alert std_msgs/msg/Bool "{data: false}"
+```
+
 ### 1. Start mapping stack
 
 ```bash

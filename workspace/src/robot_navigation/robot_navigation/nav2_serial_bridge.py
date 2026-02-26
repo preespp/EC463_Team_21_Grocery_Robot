@@ -15,9 +15,12 @@ import threading
 import time
 from typing import Iterable, List, Sequence, Tuple
 
+from jupyter_server_terminals import msg
+
 import rclpy
 from geometry_msgs.msg import TransformStamped, Twist
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Bool
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.utilities import ok as rclpy_ok
@@ -217,6 +220,55 @@ class Nav2SerialBridge(Node):
             f"telemetry_checksum={self.telemetry_checksum})"
         )
 
+        # For Collision Detection
+        self.allow_forward = True
+        self.allow_backward = True
+        self.allow_left = True
+        self.allow_right = True
+
+        self.front_sub = self.create_subscription(
+            Bool,
+            "/front_alert",
+            self.front_alert_callback,
+            10
+        )
+
+        self.back_sub = self.create_subscription(
+            Bool,
+            "/back_alert",
+            self.back_alert_callback,
+            10
+        )
+
+        self.left_sub = self.create_subscription(
+            Bool,
+            "/left_alert",
+            self.left_alert_callback,
+            10
+        )
+
+        self.right_sub = self.create_subscription(
+            Bool,
+            "/right_alert",
+            self.right_alert_callback,
+            10
+        )
+
+    # --------------------------------------------------------------------- #
+    # Collision detection callbacks (True = Blocked, False = Clear)
+    # --------------------------------------------------------------------- #
+    def front_alert_callback(self, msg):
+        self.allow_forward = not msg.data
+
+    def back_alert_callback(self, msg):
+        self.allow_backward = not msg.data
+
+    def left_alert_callback(self, msg):
+        self.allow_left = not msg.data
+
+    def right_alert_callback(self, msg):
+        self.allow_right = not msg.data
+
     # --------------------------------------------------------------------- #
     # Setup helpers
     # --------------------------------------------------------------------- #
@@ -303,6 +355,19 @@ class Nav2SerialBridge(Node):
                 self.last_cmd_warn = now
         else:
             linear_x, linear_y, angular_z = self.last_cmd
+
+        # Forward
+        if linear_x > 0 and not self.allow_forward:
+            linear_x = 0.0
+        # Backward
+        if linear_x < 0 and not self.allow_backward:
+            linear_x = 0.0
+        # Left
+        if linear_y > 0 and not self.allow_left:
+            linear_y = 0.0
+        # Right
+        if linear_y < 0 and not self.allow_right:
+            linear_y = 0.0
 
         frame = self._build_command_frame(linear_x, linear_y, angular_z)
 

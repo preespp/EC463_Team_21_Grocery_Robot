@@ -3,6 +3,8 @@
 ## Purpose
 This document summarizes the current navigation/localization architecture in `robot_navigation`, then proposes a systematic plan to add `robot_localization` while preserving the current workflow style (mapping phase + localization/Nav2 phase + headless Jetson usage).
 
+Collision detection is implemented on serial-uart transmission module to low-level control, not on the high-level autonomy logic. Current publish rate is 100 Hz.
+
 ---
 
 ## 0. Geometry Lock-In (Must Be Done First)
