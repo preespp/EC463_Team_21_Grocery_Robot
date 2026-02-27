@@ -577,3 +577,321 @@ For Strategy A + geometry correction only (no BT integration yet):
 8. Phase 6 (BT Nav2 action integration)
 
 This sequence gives measurable improvements early while containing risk.
+
+---
+
+## 12. Implementation Packet (Sensor Fusion + `robot_localization`)
+
+This section is the concrete rollout plan to implement sensor fusion from base odom + LiDAR IMU with minimal TF risk.
+
+### 12.1 Scope and source of truth
+
+- Runtime source of truth for bridge/launch/config is `workspace/src/robot_navigation/*`.
+- `STM32/.../tools/*.py` is treated as archive/reference only (not runtime source of truth).
+- STM32 firmware geometry constants remain authoritative for chassis kinematics.
+
+### 12.2 Phase SF-1: Geometry + LiDAR extrinsics lock
+
+Modify:
+- `workspace/src/robot_navigation/launch/slam_mapping_stack.launch.py`
+- `workspace/src/robot_navigation/launch/nav2_localization_stack.launch.py`
+
+Actions:
+1. Add static TF publisher: `base_link -> lidar_link` with measured `(x, y, z, roll, pitch, yaw)`.
+2. Change SICK driver frame args from `base_link` to `lidar_link`:
+   - `publish_frame_id`
+   - `publish_imu_frame_id`
+   - pointcloud `frameid=...`
+
+Goal:
+- Sensor frame reflects real mount location instead of implicit zero-offset on `base_link`.
+
+### 12.3 Phase SF-2: Bridge raw odom contract for fusion
+
+Modify:
+- `workspace/src/robot_navigation/launch/slam_mapping_stack.launch.py`
+- `workspace/src/robot_navigation/launch/nav2_localization_stack.launch.py`
+- `workspace/src/robot_navigation/robot_navigation/nav2_serial_bridge.py` (parameter use only, no protocol break)
+
+Actions:
+1. Set bridge output topic to `/odom_raw`.
+2. Keep `publish_tf:=false` on bridge.
+3. Set `fallback_odom:=false` for EKF input path.
+
+Goal:
+- EKF receives sensor-based raw odom only, without command-integrated synthetic fallback.
+
+### 12.4 Phase SF-3: Add EKF node
+
+Modify:
+- `workspace/src/robot_navigation/package.xml`
+- new file `workspace/src/robot_navigation/config/ekf_odom_base_imu.yaml`
+- both stack launch files to spawn EKF
+
+Actions:
+1. Add `<depend>robot_localization</depend>`.
+2. Add EKF config with:
+   - `two_d_mode: true`
+   - `publish_tf: false` (keep TF authority unchanged in first rollout)
+   - `odom0: /odom_raw` with twist-only selection (`vx`, `vy`, `vyaw`)
+   - `imu0: /sick_scansegment_xd/imu`
+   - `sensor_timeout` tuned for asynchronous startup (recommend `0.2~0.3 s`)
+3. Remap EKF output `odometry/filtered -> /odom`.
+
+Goal:
+- Stable fused odom output without requiring synchronous sensor startup.
+
+### 12.5 Phase SF-4: Cartographer odom assistance
+
+Modify:
+- `workspace/src/robot_navigation/config/pico_2d.lua`
+- `workspace/src/robot_navigation/config/pico_2d_localization.lua`
+
+Actions:
+1. Set `use_odometry = true`.
+2. Keep `use_imu_data = false` in first rollout (avoid double-weighting IMU while EKF already fuses it).
+
+Goal:
+- Improve local scan-matching stability with fused odom prior.
+
+### 12.6 Phase SF-5: Holonomic tuning (after fusion baseline passes)
+
+Modify:
+- `workspace/src/robot_navigation/config/nav2_params_cartographer.yaml`
+
+Actions:
+1. Enable lateral motion limits (`max_vel_y`, `min_vel_y`, `acc_lim_y`, `decel_lim_y`, `vy_samples`).
+2. Update velocity smoother Y-axis limits consistently.
+
+Goal:
+- Recover mecanum holonomic behavior after localization baseline is stable.
+
+### 12.7 Phase SF-6: Documentation and profile split
+
+Modify docs:
+- `workspace/src/robot_navigation/README.md`
+- `Nav/README_SLAM_UPDATED.md`
+
+Add two run profiles:
+1. `normal_mode`:
+   - `/odom_raw -> EKF -> /odom`
+   - Cartographer `use_odometry=true`
+2. `bench_mode` (wheel-off-ground / maintenance):
+   - disable EKF or exclude `/odom_raw` from EKF
+   - set Cartographer `use_odometry=false`
+
+Goal:
+- Avoid test contamination from wheel-slip/air-spin conditions.
+
+---
+
+## 13. Node-by-Node Test and Validation Targets
+
+Use this section as a one-by-one checklist during bringup.
+
+### 13.1 `sick_generic_caller` (LiDAR + IMU)
+
+Expected:
+1. `/cloud_all_fields_fullframe` active at stable sensor rate.
+2. `/sick_scansegment_xd/imu` active and timestamped.
+3. Published sensor frame is `lidar_link` (not `base_link`).
+
+Validation:
+1. `ros2 topic hz /cloud_all_fields_fullframe`
+2. `ros2 topic hz /sick_scansegment_xd/imu`
+3. `ros2 topic echo /cloud_all_fields_fullframe --once` (check `header.frame_id`)
+4. `ros2 topic echo /sick_scansegment_xd/imu --once` (check `header.frame_id`)
+
+Expected command output:
+1. `ros2 topic hz /cloud_all_fields_fullframe`
+   - contains `average rate: ...`
+   - rate is stable (no repeated `0.0`/timeout line)
+2. `ros2 topic hz /sick_scansegment_xd/imu`
+   - contains `average rate: ...`
+   - rate is stable and non-zero
+3. `ros2 topic echo /cloud_all_fields_fullframe --once`
+   - contains `header:`
+   - contains `frame_id: lidar_link`
+4. `ros2 topic echo /sick_scansegment_xd/imu --once`
+   - contains `header:`
+   - contains `frame_id: lidar_link` (or your chosen dedicated IMU frame if you configured one)
+
+Pass criteria:
+1. No frame mismatch warnings from Cartographer TF lookup.
+2. Both topics present before Nav2 activation.
+
+### 13.2 `static_transform_publisher` (`base_link -> lidar_link`)
+
+Expected:
+1. Exactly one static TF edge `base_link -> lidar_link`.
+2. Transform values equal measured geometry.
+
+Validation:
+1. `ros2 run tf2_ros tf2_echo base_link lidar_link`
+2. `ros2 run tf2_tools view_frames`
+
+Expected command output:
+1. `ros2 run tf2_ros tf2_echo base_link lidar_link`
+   - prints `At time ...`
+   - prints `Translation: [x, y, z]` matching measured mount offset
+   - prints `Rotation: in Quaternion ...` matching measured RPY conversion
+2. `ros2 run tf2_tools view_frames`
+   - generated frame graph contains edge `base_link -> lidar_link`
+   - only one parent for `lidar_link` (no duplicate broadcaster conflict)
+
+Pass criteria:
+1. Edge exists and is stable.
+2. No duplicate TF publisher conflict on same edge.
+
+### 13.3 `nav2_serial_bridge` (raw odom producer)
+
+Expected:
+1. Startup log shows `odom_topic=/odom_raw`.
+2. `publish_tf=false`.
+3. Telemetry decoding stable (no persistent checksum storm).
+4. `/odom_raw` published continuously from telemetry.
+
+Validation:
+1. `ros2 topic hz /odom_raw`
+2. `ros2 topic echo /odom_raw --once`
+3. Observe bridge logs for bad checksum/outlier counters.
+
+Expected command output:
+1. bridge startup log includes:
+   - `odom_topic=/odom_raw`
+   - `frame=odom->base_link`
+   - `publish_tf=False`
+2. `ros2 topic hz /odom_raw`
+   - contains `average rate: ...`
+   - expected near telemetry output rate (typically around `180-210 Hz` with current firmware setting)
+3. `ros2 topic echo /odom_raw --once`
+   - contains `header.frame_id: odom`
+   - contains `child_frame_id: base_link`
+4. bridge runtime logs:
+   - no continuous checksum mismatch flood
+   - no persistent "No valid telemetry frame decoded yet" warning loop
+
+Pass criteria:
+1. `/odom_raw` available and monotonic.
+2. No persistent parser mismatch condition.
+
+### 13.4 `ekf_filter_node` (`robot_localization`)
+
+Expected:
+1. Node starts even if IMU and odom start at different moments.
+2. Fused output `/odom` remains continuous once inputs arrive.
+3. No TF conflict (`publish_tf=false` in initial rollout).
+
+Validation:
+1. `ros2 topic hz /odom`
+2. `ros2 topic echo /odom --once`
+3. `ros2 node list | grep ekf`
+
+Expected command output:
+1. `ros2 node list | grep ekf`
+   - contains EKF node name (for example `ekf_filter_node`)
+2. `ros2 topic hz /odom`
+   - contains `average rate: ...`
+   - rate tracks EKF frequency target (for example `~50 Hz` if configured as 50)
+3. `ros2 topic echo /odom --once`
+   - contains `header.frame_id: odom`
+   - contains `child_frame_id: base_link`
+   - pose/twist values are finite and update continuously across repeated samples
+
+Pass criteria:
+1. `/odom` rate near EKF configured frequency.
+2. No large discontinuities when delayed sensor starts publishing.
+
+### 13.5 `cartographer_node` (mapping/localization)
+
+Expected:
+1. Consumes pointcloud in `lidar_link` via TF to `base_link`.
+2. Uses fused odom prior (`use_odometry=true`).
+3. Maintains connected TF chain `map -> odom -> base_link`.
+
+Validation:
+1. `ros2 run tf2_tools view_frames`
+2. Monitor Cartographer logs for transform timeout/extrapolation warnings.
+
+Expected command output:
+1. `ros2 run tf2_tools view_frames`
+   - connected chain includes `map -> odom -> base_link -> lidar_link`
+2. cartographer logs:
+   - startup includes trajectory creation (for example `Added trajectory ...`)
+   - no repeated transform timeout / extrapolation error spam during steady run
+
+Pass criteria:
+1. Reduced scan-matching instability in straight aisles/turn entries.
+2. No repeated transform lookup failures.
+
+### 13.6 `map_server` + `lifecycle_manager`
+
+Expected:
+1. `map_server` active before Nav2 planner/controller start using static map.
+
+Validation:
+1. `ros2 lifecycle get /map_server`
+2. `ros2 topic info /map`
+
+Expected command output:
+1. `ros2 lifecycle get /map_server`
+   - contains `active` (or `active [3]` depending ROS 2 output style)
+2. `ros2 topic info /map`
+   - contains at least one publisher
+   - topic type shown as `nav_msgs/msg/OccupancyGrid`
+
+Pass criteria:
+1. Lifecycle state is `active`.
+2. `/map` publisher present before sending goals.
+
+### 13.7 Nav2 core nodes (`planner_server`, `controller_server`, `bt_navigator`)
+
+Expected:
+1. Bringup reaches active state.
+2. Goal execution produces `/cmd_vel` stream.
+3. Motion behavior is stable with fused `/odom`.
+
+Validation:
+1. `ros2 action list | grep navigate_to_pose`
+2. `ros2 topic hz /cmd_vel`
+3. Send one test goal in clear environment.
+
+Expected command output:
+1. `ros2 action list | grep navigate_to_pose`
+   - contains `/navigate_to_pose`
+2. `ros2 topic hz /cmd_vel`
+   - while goal is active, contains non-zero `average rate`
+3. goal execution (`ros2 action send_goal /navigate_to_pose ...`)
+   - response includes goal accepted
+   - final result reports success for reachable test goal
+
+Pass criteria:
+1. Goal accepted and completed without TF timeout failure.
+2. Reduced heading oscillation versus pre-fusion baseline.
+
+### 13.8 Wheel-off-ground fallback (`bench_mode`)
+
+Purpose:
+- Prevent false odom confidence when wheels spin in air.
+
+Settings:
+1. Disable EKF or remove `/odom_raw` from EKF input.
+2. Set Cartographer `use_odometry=false`.
+3. Keep command/telemetry transport tests only.
+
+Validation:
+1. Confirm stack still runs for communication diagnostics.
+2. Do not use bench-mode data as mapping/localization quality evidence.
+
+Expected command output:
+1. `ros2 topic hz /odom_raw`
+   - remains active (communication path still testable)
+2. if EKF disabled in bench mode:
+   - `ros2 node list | grep ekf` returns no EKF node
+   - `/odom` may be absent or unchanged by EKF path (expected for this profile)
+3. Cartographer bench-mode run:
+   - no requirement to pass map-quality metrics from this mode
+
+Pass criteria:
+1. Communication path can be debugged safely.
+2. No production map quality claims from suspended-wheel runs.
