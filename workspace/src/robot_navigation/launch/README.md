@@ -23,6 +23,12 @@ For headless Jetson:
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 --with-nav2-rviz false
 ```
 
+Both stacks now default to:
+
+- LiDAR frame `lidar_link` + static transform `base_link -> lidar_link`.
+- Raw bridge odom on `/odom_raw`.
+- EKF fusion (`robot_localization`) output on `/odom`.
+
 If you prefer direct launch usage:
 
 ```bash

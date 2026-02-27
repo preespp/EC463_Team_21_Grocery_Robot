@@ -391,7 +391,7 @@ class NavAssistant(Node):
 
 
 def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
-    return [
+    command = [
         "ros2",
         "launch",
         "robot_navigation",
@@ -404,9 +404,21 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
+        f"odom_topic:={args.odom_topic}",
+        f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
+        f"use_ekf:={bool_to_launch(args.use_ekf)}",
+        f"lidar_x:={args.lidar_x}",
+        f"lidar_y:={args.lidar_y}",
+        f"lidar_z:={args.lidar_z}",
+        f"lidar_roll:={args.lidar_roll}",
+        f"lidar_pitch:={args.lidar_pitch}",
+        f"lidar_yaw:={args.lidar_yaw}",
         f"with_collision:={bool_to_launch(args.with_collision)}",
         f"with_rviz:={bool_to_launch(args.with_rviz)}",
     ]
+    if args.ekf_params_file:
+        command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
+    return command
 
 
 def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
@@ -426,10 +438,21 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
+        f"odom_topic:={args.odom_topic}",
+        f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
+        f"use_ekf:={bool_to_launch(args.use_ekf)}",
+        f"lidar_x:={args.lidar_x}",
+        f"lidar_y:={args.lidar_y}",
+        f"lidar_z:={args.lidar_z}",
+        f"lidar_roll:={args.lidar_roll}",
+        f"lidar_pitch:={args.lidar_pitch}",
+        f"lidar_yaw:={args.lidar_yaw}",
         f"pbstream_file:={pbstream_path}",
         f"map_yaml:={yaml_path}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
     ]
+    if args.ekf_params_file:
+        command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     if args.nav2_params_file:
         command.append(f"nav2_params_file:={Path(args.nav2_params_file)}")
     return command
@@ -588,6 +611,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stack_common.add_argument("--left-switch", type=int, default=1)
     stack_common.add_argument("--right-switch", type=int, default=1)
+    stack_common.add_argument("--odom-topic", default="/odom_raw")
+    stack_common.add_argument("--fallback-odom", type=parse_bool, default=False)
+    stack_common.add_argument("--use-ekf", type=parse_bool, default=True)
+    stack_common.add_argument("--ekf-params-file", default="")
+    stack_common.add_argument("--lidar-x", type=float, default=0.254)
+    stack_common.add_argument("--lidar-y", type=float, default=0.0)
+    stack_common.add_argument("--lidar-z", type=float, default=0.0)
+    stack_common.add_argument("--lidar-roll", type=float, default=0.0)
+    stack_common.add_argument("--lidar-pitch", type=float, default=0.0)
+    stack_common.add_argument("--lidar-yaw", type=float, default=0.0)
     stack_common.add_argument("--dry-run", action="store_true")
 
     mapping_parser = subparsers.add_parser(

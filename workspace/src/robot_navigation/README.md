@@ -22,7 +22,7 @@ ros2 run robot_navigation nav_assistant <subcommand>
 ## Folder overview
 
 - `robot_navigation/nav_assistant.py`: unified CLI helper.
-- `robot_navigation/nav2_serial_bridge.py`: `/cmd_vel` to STM32 UART bridge and `/odom` publisher.
+- `robot_navigation/nav2_serial_bridge.py`: `/cmd_vel` to STM32 UART bridge and raw odom publisher (`/odom_raw` by default).
 - `robot_navigation/teleop_cmd_vel.py`: manual keyboard teleop.
 - `robot_navigation/teleop_cmd_vel_collision.py`: teleop with collision stop input.
 - `launch/slam_mapping_stack.launch.py`: mapping stack launch.
@@ -99,6 +99,13 @@ ros2 run robot_navigation nav_assistant export-map --map-name testmap1
 ```bash
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 ```
+
+Default behavior in both mapping/localization stacks:
+
+- LiDAR and IMU are published in `lidar_link`.
+- Static TF `base_link -> lidar_link` is published with default offset `(x=0.254, y=0, z=0, rpy=0,0,0)`.
+- Bridge publishes `/odom_raw`.
+- EKF (`robot_localization`) fuses `/odom_raw + /sick_scansegment_xd/imu` and publishes filtered `/odom`.
 
 Headless Jetson default:
 
@@ -181,4 +188,6 @@ ros2 run robot_navigation nav_assistant quick-check
 - Default serial port is `/dev/ttyUSB0` and default baud is `115200`.
 - Default command topics bridged to STM32 are:
   `[/cmd_vel, /cmd_vel_nav, /cmd_vel_smoothed]`
+- To disable EKF for troubleshooting, use:
+  `--use-ekf false --odom-topic /odom` on `mapping-stack` or `localization-stack`.
 - For Linux deployment, use lowercase launch filename `my_carto_localization.launch.py` if you run Nav-level launch scripts directly.

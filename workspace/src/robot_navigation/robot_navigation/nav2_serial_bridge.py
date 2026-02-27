@@ -15,8 +15,6 @@ import threading
 import time
 from typing import Iterable, List, Sequence, Tuple
 
-from jupyter_server_terminals import msg
-
 import rclpy
 from geometry_msgs.msg import TransformStamped, Twist
 from nav_msgs.msg import Odometry
