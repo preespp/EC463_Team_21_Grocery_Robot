@@ -1,0 +1,21 @@
+arm_motor:
+  ros__parameters:
+    i2c_bus: 7
+    i2c_addr: 8
+    joint_count: 5
+    trajectory_topic: "/arm/joint_trajectory_cmd"
+    direct_topic: "/arm/joint_cmd"
+    default_point_dt_sec: 0.05
+
+    joint_names:
+      - "joint1_base_yaw"
+      - "joint2_shoulder"
+      - "joint3_elbow"
+      - "joint4_wrist_roll"
+      - "joint5_gripper"
+
+    # deg = offset + direction * rad * 180/pi
+    servo_offset_deg: [135.0, 90.0, 0.0, 135.0, 0.0]
+    servo_direction: [1, 1, 1, 1, 1]
+    servo_min_deg: [0.0, 0.0, 0.0, 0.0, 0.0]
+    servo_max_deg: [270.0, 270.0, 270.0, 270.0, 270.0]
