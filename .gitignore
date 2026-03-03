@@ -56,6 +56,41 @@ sdkconfig
 build/
 .vscode
 
+# For Database credential + Nodejs
+credential.json
+node_modules/
+package.json
+package-lock.json
+
+.DS_store
+__pycache__/
+*.pyc
+
+# ROS2 build and install artifacts
+build/
+install/
+log/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Python build
+*.egg-info/
+dist/
+
+# Editor and Operating Systems
+*.swp
+*.swo
+.DS_Store
+.vscode/
+.idea/
+
+# Colcon metadata
+.colcon/
+.colcon_release_metadata/
 # ROS2 colcon
 ros_ws/build/
 ros_ws/install/

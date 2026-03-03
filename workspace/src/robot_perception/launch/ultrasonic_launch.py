@@ -5,8 +5,8 @@ from launch_ros.actions import Node
 def generate_launch_description():
     common = {
         "bus": 7,
-        "rate": 20.0,
-        "threshold_m": 0.30,
+        "rate": 100.0,
+        "threshold_m": 0.10,
     }
 
     return LaunchDescription([
@@ -16,8 +16,8 @@ def generate_launch_description():
             executable="distance_sensor",
             name="ultrasonic_front",
             parameters=[
-                common,
-                {"addr": 0x09, "name": "front"},
+               common,
+               {"addr": 0x09, "name": "front"},
             ],
             output="screen",
         ),
@@ -28,30 +28,30 @@ def generate_launch_description():
             name="ultrasonic_right",
             parameters=[
                 common,
-                {"addr": 0x0A, "name": "right"},
+                {"addr": 0x11, "name": "right"},
             ],
             output="screen",
         ),
 
         Node(
-            package="robot_perception",
-            executable="distance_sensor",
-            name="ultrasonic_left",
+           package="robot_perception",
+           executable="distance_sensor",
+           name="ultrasonic_left",
             parameters=[
-                common,
-                {"addr": 0x0B, "name": "left"},
+               common,
+               {"addr": 0x10, "name": "left"},
             ],
             output="screen",
         ),
 
         Node(
-            package="robot_perception",
-            executable="distance_sensor",
-            name="ultrasonic_back",
+           package="robot_perception",
+           executable="distance_sensor",
+           name="ultrasonic_back",
             parameters=[
-                common,
-                {"addr": 0x0C, "name": "back"},
-            ],
-            output="screen",
+               common,
+               {"addr": 0x12, "name": "back"},
+           ],
+           output="screen",
         ),
     ])

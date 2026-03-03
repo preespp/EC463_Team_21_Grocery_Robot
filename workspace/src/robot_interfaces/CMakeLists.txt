@@ -24,7 +24,10 @@ find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/NewOrder.srv"
   "srv/ProductRequest.srv"
+  "msg/Order.msg"
+  "msg/OrderItem.msg"
   "action/MoveRack.action"
   "action/PickArm.action"
   DEPENDENCIES 
