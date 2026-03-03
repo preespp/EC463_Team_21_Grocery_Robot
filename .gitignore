@@ -91,3 +91,12 @@ dist/
 # Colcon metadata
 .colcon/
 .colcon_release_metadata/
+# ROS2 colcon
+ros_ws/build/
+ros_ws/install/
+ros_ws/log/
+
+# common junk
+**/__pycache__/
+*.pyc
+.DS_Store
