@@ -60,11 +60,20 @@ ament_target_dependencies(arm_to_gazebo
   sensor_msgs
 )
 
+add_executable(arm_waypoint_server src/arm_waypoint_server.cpp)
+ament_target_dependencies(arm_waypoint_server
+  rclcpp
+  rclcpp_action
+  trajectory_msgs
+  robot_interfaces
+)
+
 install(TARGETS
   rack_controller
   arm_motor
   arm_controller
   arm_to_gazebo
+  arm_waypoint_server
   DESTINATION lib/${PROJECT_NAME}
 )
 

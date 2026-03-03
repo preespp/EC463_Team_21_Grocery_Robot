@@ -1,0 +1,23 @@
+arm_waypoint_server:
+  ros__parameters:
+    action_name: "pick_arm_waypoint"
+    joint_trajectory_topic: "/arm/joint_trajectory_cmd"
+
+    joint_names:
+      - "joint1_base_yaw"
+      - "joint2_shoulder"
+      - "joint3_elbow"
+      - "joint5_gripper"
+
+    point_duration_sec: 1.5
+    wait_padding_sec: 0.2
+
+    open_gripper_pos: 1.0
+    closed_gripper_pos: 0.0
+
+    # Units follow your arm_motor_bridge expectation (joint positions consumed by trajectory bridge).
+    # Tune these for your hardware/sim.
+    waypoint_home: [0.0, 0.4, 0.2, 1.0]
+    waypoint_pregrasp: [0.0, 0.8, 0.5, 1.0]
+    waypoint_grasp: [0.0, 1.0, 0.7, 1.0]
+    waypoint_retreat: [0.0, 0.6, 0.4, 0.0]
