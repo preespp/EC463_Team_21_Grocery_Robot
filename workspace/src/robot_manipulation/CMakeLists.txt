@@ -31,7 +31,7 @@ ament_target_dependencies(rack_controller
   robot_interfaces
 )
 
-add_executable(arm_motor src/arm_motor.cpp)
+add_executable(arm_motor src/arm_bridge_I2C.cpp)
 ament_target_dependencies(arm_motor
   rclcpp
   std_msgs

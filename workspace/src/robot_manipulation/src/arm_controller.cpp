@@ -51,7 +51,7 @@ public:
         "joint1_base_yaw",
         "joint2_shoulder",
         "joint3_elbow",
-        "joint4_wrist_roll",
+        //"joint4_wrist_roll",
         "joint5_gripper"
       });
 

@@ -27,40 +27,40 @@ public:
   ArmMotorBridge()
   : Node("arm_motor"), bus_fd_(-1)
   {
-    bus_id_ = this->declare_parameter<int>("i2c_bus", 7);
-    addr_ = this->declare_parameter<int>("i2c_addr", 0x08);
-    joint_count_ = static_cast<size_t>(this->declare_parameter<int>("joint_count", 5));
+    bus_id = this->declare_parameter<int>("i2c_bus", 7);
+    addr = this->declare_parameter<int>("i2c_addr", 0x08);
+    joint_count = static_cast<size_t>(this->declare_parameter<int>("joint_count", 4));
 
-    trajectory_topic_ = this->declare_parameter<std::string>(
+    trajectory_topic_= this->declare_parameter<std::string>(
       "trajectory_topic", "/arm/joint_trajectory_cmd");
-    direct_topic_ = this->declare_parameter<std::string>("direct_topic", "/arm/joint_cmd");
+    direct_topic = this->declare_parameter<std::string>("direct_topic", "/arm/joint_cmd");
 
-    joint_names_ = this->declare_parameter<std::vector<std::string>>(
+    joint_names = this->declare_parameter<std::vector<std::string>>(
       "joint_names",
       {
         "joint1_base_yaw",
         "joint2_shoulder",
         "joint3_elbow",
-        "joint4_wrist_roll",
+        //"joint4_wrist_roll",
         "joint5_gripper"
       });
 
-    servo_offset_deg_ = this->declare_parameter<std::vector<double>>(
+    servo_offset_deg = this->declare_parameter<std::vector<double>>(
       "servo_offset_deg",
-      {135.0, 90.0, 0.0, 135.0, 0.0});
+      {0.0, 0.0, 0.0, 0.0, 0.0});
 
-    servo_min_deg_ = this->declare_parameter<std::vector<double>>(
+    servo_min_deg = this->declare_parameter<std::vector<double>>(
       "servo_min_deg",
       std::vector<double>(joint_count_, 0.0));
 
-    servo_max_deg_ = this->declare_parameter<std::vector<double>>(
+    servo_max_deg = this->declare_parameter<std::vector<double>>(
       "servo_max_deg",
-      std::vector<double>(joint_count_, 270.0));
+      std::vector<double>(joint_count_, 180.0));
 
     const auto dir_vals = this->declare_parameter<std::vector<int64_t>>(
       "servo_direction", std::vector<int64_t>(joint_count_, 1));
 
-    default_point_dt_sec_ = this->declare_parameter<double>("default_point_dt_sec", 0.05);
+    default_point_dt_sec = this->declare_parameter<double>("default_point_dt_sec", 0.05);
 
     servo_direction_.reserve(dir_vals.size());
     for (const auto v : dir_vals) {
@@ -70,28 +70,28 @@ public:
     validate_config_sizes();
     open_i2c();
 
-    traj_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-      trajectory_topic_,
+    traj_sub = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+      trajectory_topic,
       10,
       std::bind(&ArmMotorBridge::trajectory_callback, this, std::placeholders::_1));
 
-    direct_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-      direct_topic_,
+    direct_sub = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+      direct_topic,
       10,
       std::bind(&ArmMotorBridge::direct_callback, this, std::placeholders::_1));
 
     RCLCPP_INFO(
       this->get_logger(),
       "arm_motor started on /dev/i2c-%d addr=0x%02X",
-      bus_id_,
-      addr_);
+      bus_id,
+      addr);
   }
 
   ~ArmMotorBridge() override
   {
     if (bus_fd_ >= 0) {
-      close(bus_fd_);
-      bus_fd_ = -1;
+      close(bus_fd);
+      bus_fd = -1;
     }
   }
 
@@ -115,13 +115,13 @@ private:
 
   void open_i2c()
   {
-    const std::string dev = "/dev/i2c-" + std::to_string(bus_id_);
-    bus_fd_ = open(dev.c_str(), O_RDWR);
-    if (bus_fd_ < 0) {
+    const std::string dev = "/dev/i2c-" + std::to_string(bus_id);
+    bus_fd = open(dev.c_str(), O_RDWR);
+    if (bus_fd < 0) {
       throw std::runtime_error("Failed to open " + dev);
     }
 
-    if (ioctl(bus_fd_, I2C_SLAVE, addr_) < 0) {
+    if (ioctl(bus_fd_, I2C_SLAVE, addr) < 0) {
       close(bus_fd_);
       bus_fd_ = -1;
       throw std::runtime_error("Failed to set I2C address");
@@ -158,8 +158,8 @@ private:
         return;
       }
 
-      std::vector<float> targets(joint_count_, 0.0f);
-      for (size_t joint_i = 0; joint_i < joint_count_; ++joint_i) {
+      std::vector<float> targets(joint_count, 0.0f);
+      for (size_t joint_i = 0; joint_i < joint_count; ++joint_i) {
         const auto msg_idx = static_cast<size_t>(indices[joint_i]);
         const double rad = point.positions[msg_idx];
 
@@ -189,9 +189,9 @@ private:
 
   bool build_index_map(const std::vector<std::string> & incoming, std::vector<int> & indices) const
   {
-    indices.assign(joint_count_, -1);
+    indices.assign(joint_count, -1);
 
-    for (size_t i = 0; i < joint_count_; ++i) {
+    for (size_t i = 0; i < joint_count; ++i) {
       const auto & desired = joint_names_[i];
       for (size_t j = 0; j < incoming.size(); ++j) {
         if (incoming[j] == desired) {
@@ -222,31 +222,32 @@ private:
       this->get_logger(),
       *this->get_clock(),
       2000,
-      "Servo TX [deg]: %.1f %.1f %.1f %.1f %.1f",
+      "Servo TX [deg]: %.1f %.1f %.1f %.1f",// %.1f",
       target_deg[0],
       target_deg[1],
       target_deg[2],
       target_deg[3],
-      target_deg[4]);
+      //target_deg[4]
+    );
   }
 
-  int bus_id_;
-  int addr_;
-  int bus_fd_;
-  size_t joint_count_;
-  double default_point_dt_sec_;
+  int bus_id_
+  int addr;
+  int bus_fd;
+  size_t joint_count;
+  double default_point_dt_sec;
 
-  std::string trajectory_topic_;
-  std::string direct_topic_;
+  std::string trajectory_topic;
+  std::string direct_topic;
 
-  std::vector<std::string> joint_names_;
-  std::vector<double> servo_offset_deg_;
-  std::vector<double> servo_min_deg_;
-  std::vector<double> servo_max_deg_;
-  std::vector<int> servo_direction_;
+  std::vector<std::string> joint_names;
+  std::vector<double> servo_offset_deg;
+  std::vector<double> servo_min_deg;
+  std::vector<double> servo_max_deg;
+  std::vector<int> servo_direction;
 
-  rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr traj_sub_;
-  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr direct_sub_;
+  rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr traj_sub;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr direct_sub;
 };
 
 int main(int argc, char ** argv)
