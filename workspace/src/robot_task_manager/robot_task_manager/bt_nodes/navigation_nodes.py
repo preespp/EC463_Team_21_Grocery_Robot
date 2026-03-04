@@ -5,105 +5,121 @@ import time
 import math
 
 from rclpy.action import ActionClient
+from rclpy.duration import Duration
 from geometry_msgs.msg import PoseStamped, Twist
 from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
+import py_trees
 
 class NavigateToGoalPose(py_trees.behaviour.Behaviour):
     """
-    Reusable navigation leaf.
-    Reads goal pose from bb.<goal_key>.
-
-    Later you will implement Nav2 action call here.
-    For now, it succeeds immediately if goal exists.
+    BT Leaf Node that sends a NavigateToPose goal to the nav2 action server.
     """
-    def __init__(self, goal_key: str):
+    def __init__(self, goal_key: str, yaw: float = 0.0, frame_id: str = "map"):
         super().__init__(f"NavigateToGoalPose[{goal_key}]")
         self.goal_key = goal_key
         self.bb = py_trees.blackboard.Blackboard()
-
-    def update(self):
         goal = getattr(self.bb, self.goal_key, None)
         if goal is None:
             return py_trees.common.Status.FAILURE
-
-        # TODO: replace with Nav2 action client call
-        return py_trees.common.Status.SUCCESS
-
-class SendNavGoal(py_trees.behaviour.Behaviour):
-
-    def __init__(self, node, name, x, y, yaw):
-        super().__init__(name)
-        self.node = node
-        self.x = x
-        self.y = y
+        
+        self.x = goal[0]
+        self.y = goal[1]
         self.yaw = yaw
+        self.frame_id = frame_id
+        self.action_name = "navigate_to_pose"
 
-        self.client = ActionClient(
-            self.node,
-            NavigateToPose,
-            "navigate_to_pose"
-        )
-
+        self.node = None
+        self.client = None
         self.goal_handle = None
         self.result_future = None
-        self.sent_goal = False
+        self.send_future = None
+        self.start_time = None
+        self.timeout_sec = 30.0
 
     def setup(self, **kwargs):
-        self.node.get_logger().info("Waiting for nav2 action server...")
-        self.client.wait_for_server()
-
+        if not rclpy.ok():
+            return False
+        node_name = f"bt_nav_goal_{id(self) & 0xFFFF:x}"
+        self.node = rclpy.create_node(node_name)
+        self.client = ActionClient(self.node, NavigateToPose, self.action_name)
+        return True
 
     def initialise(self):
-        self.node.get_logger().info("Sending navigation goal")
-
-        goal_msg = NavigateToPose.Goal()
-        goal_msg.pose = self.build_pose()
-
-        send_future = self.client.send_goal_async(goal_msg)
-        rclpy.spin_until_future_complete(self.node, send_future)
-
-        self.goal_handle = send_future.result()
-
-        if not self.goal_handle.accepted:
-            self.node.get_logger().error("Goal rejected")
-            self.sent_goal = False
+        if not self.client.wait_for_server(timeout_sec=self.timeout_sec):
+            self.feedback_message = f"Action server {self.action_name} not available"
             return
 
-        self.result_future = self.goal_handle.get_result_async()
-        self.sent_goal = True
-
-
-    def update(self):
-        if not self.sent_goal:
-            return py_trees.common.Status.FAILURE
-
-        if not self.result_future.done():
-            return py_trees.common.Status.RUNNING
-
-        result = self.result_future.result()
-
-        if result.status == GoalStatus.STATUS_SUCCEEDED:
-            return py_trees.common.Status.SUCCESS
-
-        return py_trees.common.Status.FAILURE
-
-    def build_pose(self):
+        goal_msg = NavigateToPose.Goal()
         pose = PoseStamped()
-        pose.header.frame_id = "map"
+        pose.header.frame_id = self.frame_id
         pose.header.stamp = self.node.get_clock().now().to_msg()
-
         pose.pose.position.x = self.x
         pose.pose.position.y = self.y
+        pose.pose.position.z = 0.0
+        # convert yaw to quaternion
+        qz = math.sin(self.yaw / 2.0)
+        qw = math.cos(self.yaw / 2.0)
+        pose.pose.orientation.z = qz
+        pose.pose.orientation.w = qw
+        goal_msg.pose = pose
 
-        half = self.yaw * 0.5
-        pose.pose.orientation.z = math.sin(half)
-        pose.pose.orientation.w = math.cos(half)
+        self.send_future = self.client.send_goal_async(goal_msg)
+        self.start_time = time.monotonic()
+        self.feedback_message = f"Goal sent to {self.action_name}"
+        self.goal_handle = None
+        self.result_future = None
 
-        return pose
+    def update(self):
+        if self.send_future is not None:
+            rclpy.spin_once(self.node, timeout_sec=0.1)
+            if self.send_future.done():
+                self.goal_handle = self.send_future.result()
+                self.send_future = None
+                if self.goal_handle is None or not self.goal_handle.accepted:
+                    self.feedback_message = "Goal rejected"
+                    return py_trees.common.Status.FAILURE
+                self.result_future = self.goal_handle.get_result_async()
+                self.feedback_message = "Goal accepted, waiting for result..."
+                return py_trees.common.Status.RUNNING
+            else:
+                return py_trees.common.Status.RUNNING
+
+        if self.result_future is not None:
+            rclpy.spin_once(self.node, timeout_sec=0.1)
+            if self.result_future.done():
+                result = self.result_future.result()
+                if result is None:
+                    self.feedback_message = "Result missing or timeout"
+                    return py_trees.common.Status.FAILURE
+                if result.status == GoalStatus.STATUS_SUCCEEDED:
+                    self.feedback_message = "Goal succeeded"
+                    return py_trees.common.Status.SUCCESS
+                else:
+                    self.feedback_message = f"Goal failed with status {result.status}"
+                    return py_trees.common.Status.FAILURE
+            else:
+                # optional timeout check
+                if time.monotonic() - self.start_time > self.timeout_sec:
+                    self.feedback_message = "Goal timed out"
+                    return py_trees.common.Status.FAILURE
+                return py_trees.common.Status.RUNNING
+
+        return py_trees.common.Status.RUNNING
+
+    def terminate(self, new_status):
+        if self.node is not None:
+            try:
+                self.node.destroy_node()
+            except Exception:
+                pass
+        self.client = None
+        self.send_future = None
+        self.result_future = None
+        self.goal_handle = None
 
 
-### Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)
+############## Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)
 class MoveDistanceForCurrentItem(py_trees.behaviour.Behaviour):
     """
     Demo leaf: move a fixed distance in fixed time by publishing /cmd_vel.
