@@ -36,7 +36,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "resolution",
-                default_value="0.05",
+                default_value="0.03",
                 description="Occupancy grid resolution",
             ),
             DeclareLaunchArgument(

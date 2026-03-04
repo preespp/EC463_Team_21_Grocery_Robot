@@ -742,7 +742,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export_parser.add_argument("--maps-dir", default=DEFAULT_MAPS_DIR)
     export_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
-    export_parser.add_argument("--resolution", type=float, default=0.05)
+    export_parser.add_argument("--resolution", type=float, default=0.03)
     export_parser.add_argument("--dry-run", action="store_true")
 
     goal_parser = subparsers.add_parser("goal", help="Send one Nav2 goal.")
