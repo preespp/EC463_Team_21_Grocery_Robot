@@ -51,6 +51,16 @@ REPO_ROOT = _find_repo_root()
 DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
 DEFAULT_MAP_NAME = "testmap1"
 DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
+DEFAULT_RUN_MODE = "normal"
+RUN_MODES = ("normal", "bench")
+MAPPING_CONFIG_BASENAME = {
+    "normal": "pico_2d.lua",
+    "bench": "pico_2d_bench.lua",
+}
+LOCALIZATION_CONFIG_BASENAME = {
+    "normal": "pico_2d_localization.lua",
+    "bench": "pico_2d_localization_bench.lua",
+}
 
 
 def yaw_to_quaternion(yaw: float) -> Tuple[float, float, float, float]:
@@ -100,6 +110,16 @@ def parse_segment(text: str) -> "MotionSegment":
 
 def bool_to_launch(value: bool) -> str:
     return "true" if value else "false"
+
+
+def bool_to_sick_flag(value: bool) -> str:
+    return "1" if value else "0"
+
+
+def resolve_use_ekf(run_mode: str, requested: bool | None) -> bool:
+    if requested is not None:
+        return requested
+    return run_mode != "bench"
 
 
 def render_command(command: Sequence[str]) -> str:
@@ -391,6 +411,9 @@ class NavAssistant(Node):
 
 
 def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
+    run_mode = args.run_mode
+    use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    carto_config = args.cartographer_config_basename or MAPPING_CONFIG_BASENAME[run_mode]
     command = [
         "ros2",
         "launch",
@@ -406,7 +429,16 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"right_switch:={args.right_switch}",
         f"odom_topic:={args.odom_topic}",
         f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
-        f"use_ekf:={bool_to_launch(args.use_ekf)}",
+        f"use_ekf:={bool_to_launch(use_ekf)}",
+        f"cartographer_config_basename:={carto_config}",
+        f"imu_topic:={args.imu_topic}",
+        f"sick_tf_publish_rate:={args.sick_tf_publish_rate}",
+        f"imu_udp_port:={args.imu_udp_port}",
+        f"scandataformat:={args.scandataformat}",
+        f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+        f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
+        f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
+        f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
         f"lidar_x:={args.lidar_x}",
         f"lidar_y:={args.lidar_y}",
         f"lidar_z:={args.lidar_z}",
@@ -422,6 +454,9 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
 
 
 def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
+    run_mode = args.run_mode
+    use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    carto_config = args.cartographer_config_basename or LOCALIZATION_CONFIG_BASENAME[run_mode]
     pbstream, _, map_yaml = map_paths(args.maps_dir, args.map_name)
     pbstream_path = Path(args.pbstream_file) if args.pbstream_file else pbstream
     yaml_path = Path(args.map_yaml) if args.map_yaml else map_yaml
@@ -440,7 +475,16 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"right_switch:={args.right_switch}",
         f"odom_topic:={args.odom_topic}",
         f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
-        f"use_ekf:={bool_to_launch(args.use_ekf)}",
+        f"use_ekf:={bool_to_launch(use_ekf)}",
+        f"cartographer_config_basename:={carto_config}",
+        f"imu_topic:={args.imu_topic}",
+        f"sick_tf_publish_rate:={args.sick_tf_publish_rate}",
+        f"imu_udp_port:={args.imu_udp_port}",
+        f"scandataformat:={args.scandataformat}",
+        f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+        f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
+        f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
+        f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
         f"lidar_x:={args.lidar_x}",
         f"lidar_y:={args.lidar_y}",
         f"lidar_z:={args.lidar_z}",
@@ -613,8 +657,23 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--right-switch", type=int, default=1)
     stack_common.add_argument("--odom-topic", default="/odom_raw")
     stack_common.add_argument("--fallback-odom", type=parse_bool, default=False)
-    stack_common.add_argument("--use-ekf", type=parse_bool, default=True)
+    stack_common.add_argument("--run-mode", choices=RUN_MODES, default=DEFAULT_RUN_MODE)
+    stack_common.add_argument(
+        "--use-ekf",
+        type=parse_bool,
+        default=None,
+        help="true/false. If omitted: true in normal mode, false in bench mode.",
+    )
+    stack_common.add_argument("--cartographer-config-basename", default="")
     stack_common.add_argument("--ekf-params-file", default="")
+    stack_common.add_argument("--imu-topic", default="/sick_scansegment_xd/imu")
+    stack_common.add_argument("--sick-tf-publish-rate", type=float, default=0.0)
+    stack_common.add_argument("--imu-udp-port", type=int, default=7503)
+    stack_common.add_argument("--scandataformat", type=int, default=2)
+    stack_common.add_argument("--send-sopas-start-stop-cmd", type=parse_bool, default=False)
+    stack_common.add_argument("--host-set-frecho-filter", type=parse_bool, default=False)
+    stack_common.add_argument("--host-set-lfp-angle-range-filter", type=parse_bool, default=False)
+    stack_common.add_argument("--host-set-lfp-interval-filter", type=parse_bool, default=False)
     stack_common.add_argument("--lidar-x", type=float, default=0.254)
     stack_common.add_argument("--lidar-y", type=float, default=0.0)
     stack_common.add_argument("--lidar-z", type=float, default=0.0)
@@ -626,7 +685,7 @@ def build_parser() -> argparse.ArgumentParser:
     mapping_parser = subparsers.add_parser(
         "mapping-stack",
         parents=[stack_common],
-        help="One-line mapping phase launch (LiDAR + Cartographer + bridge).",
+        help="One-line mapping phase launch (LiDAR + Cartographer + serial bridge).",
     )
     mapping_parser.add_argument("--with-collision", type=parse_bool, default=False)
     mapping_parser.add_argument("--with-rviz", type=parse_bool, default=False)

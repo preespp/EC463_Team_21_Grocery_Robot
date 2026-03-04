@@ -55,10 +55,23 @@ def generate_launch_description():
             ["udp_receiver_ip:=", LaunchConfiguration("udp_receiver_ip")],
             "publish_frame_id:=lidar_link",
             "publish_imu_frame_id:=lidar_link",
+            ["tf_publish_rate:=", LaunchConfiguration("sick_tf_publish_rate")],
+            ["imu_udp_port:=", LaunchConfiguration("imu_udp_port")],
+            ["scandataformat:=", LaunchConfiguration("scandataformat")],
+            ["send_sopas_start_stop_cmd:=", LaunchConfiguration("send_sopas_start_stop_cmd")],
+            ["host_set_FREchoFilter:=", LaunchConfiguration("host_set_frecho_filter")],
+            [
+                "host_set_LFPangleRangeFilter:=",
+                LaunchConfiguration("host_set_lfp_angle_range_filter"),
+            ],
+            [
+                "host_set_LFPintervalFilter:=",
+                LaunchConfiguration("host_set_lfp_interval_filter"),
+            ],
             "custom_pointclouds:=cloud_all_fields_fullframe",
             ["cloud_all_fields_fullframe:=", POINTCLOUD_CONFIG],
             "publish_laserscan_fullframe_topic:=/scan_fullframe",
-            "imu_topic:=/sick_scansegment_xd/imu",
+            ["imu_topic:=", LaunchConfiguration("imu_topic")],
         ],
     )
 
@@ -134,6 +147,7 @@ def generate_launch_description():
             )
         ),
         launch_arguments={
+            "configuration_basename": LaunchConfiguration("cartographer_config_basename"),
             "load_state_filename": LaunchConfiguration("pbstream_file"),
             "publish_occupancy_grid": "false",
         }.items(),
@@ -173,6 +187,7 @@ def generate_launch_description():
             )
         ),
         launch_arguments={
+            "namespace": LaunchConfiguration("nav2_namespace"),
             "use_sim_time": "false",
             "autostart": "true",
             "params_file": LaunchConfiguration("nav2_params_file"),
@@ -185,6 +200,10 @@ def generate_launch_description():
                 [FindPackageShare("nav2_bringup"), "launch", "rviz_launch.py"]
             )
         ),
+        launch_arguments={
+            "namespace": LaunchConfiguration("nav2_namespace"),
+            "use_namespace": "false",
+        }.items(),
         condition=IfCondition(LaunchConfiguration("with_nav2_rviz")),
     )
 
@@ -206,8 +225,21 @@ def generate_launch_description():
             DeclareLaunchArgument("pbstream_file", default_value=default_pbstream),
             DeclareLaunchArgument("map_yaml", default_value=default_map_yaml),
             DeclareLaunchArgument("nav2_params_file", default_value=default_nav2_params),
+            DeclareLaunchArgument("nav2_namespace", default_value=""),
             DeclareLaunchArgument("use_ekf", default_value="true"),
             DeclareLaunchArgument("ekf_params_file", default_value=default_ekf_params),
+            DeclareLaunchArgument(
+                "cartographer_config_basename", default_value="pico_2d_localization.lua"
+            ),
+            DeclareLaunchArgument("imu_topic", default_value="/sick_scansegment_xd/imu"),
+            DeclareLaunchArgument("sick_tf_publish_rate", default_value="0.0"),
+            DeclareLaunchArgument("imu_udp_port", default_value="7503"),
+            DeclareLaunchArgument("scandataformat", default_value="2"),
+            # sick_generic_caller parses bool launch overrides as numeric strings.
+            DeclareLaunchArgument("send_sopas_start_stop_cmd", default_value="0"),
+            DeclareLaunchArgument("host_set_frecho_filter", default_value="0"),
+            DeclareLaunchArgument("host_set_lfp_angle_range_filter", default_value="0"),
+            DeclareLaunchArgument("host_set_lfp_interval_filter", default_value="0"),
             DeclareLaunchArgument("lidar_x", default_value="0.254"),
             DeclareLaunchArgument("lidar_y", default_value="0.0"),
             DeclareLaunchArgument("lidar_z", default_value="0.0"),

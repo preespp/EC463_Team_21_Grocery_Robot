@@ -81,11 +81,14 @@ class Nav2SerialBridge(Node):
         self.declare_parameter("cmd_topic", "/cmd_vel")
         self.declare_parameter("cmd_topics", ["/cmd_vel", "/cmd_vel_nav", "/cmd_vel_smoothed"])
         self.declare_parameter("cmd_timeout", 0.2)
-        self.declare_parameter("max_linear_speed", 2.0)
-        self.declare_parameter("max_lateral_speed", 2.0)
-        self.declare_parameter("max_yaw_speed", 3.0)
+        # Match STM32 non-Shift control scaling:
+        # rocker -> 3.0 m/s linear, 4*pi rad/s yaw.
+        # Keep non-Shift by default so low cmd_vel values do not fall under firmware rocker dead-zone.
+        self.declare_parameter("max_linear_speed", 3.0)
+        self.declare_parameter("max_lateral_speed", 3.0)
+        self.declare_parameter("max_yaw_speed", 4.0 * math.pi)
         self.declare_parameter("axis_deadband", 0.05)
-        self.declare_parameter("force_shift", True)
+        self.declare_parameter("force_shift", False)
         self.declare_parameter("force_ctrl", False)
         self.declare_parameter("left_switch", 1)
         self.declare_parameter("right_switch", 1)
