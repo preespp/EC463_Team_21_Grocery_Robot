@@ -109,7 +109,7 @@ def generate_launch_description():
             {
                 "serial_port": LaunchConfiguration("serial_port"),
                 "baud_rate": ParameterValue(LaunchConfiguration("baud_rate"), value_type=int),
-                "cmd_topics": LaunchConfiguration("cmd_topics"),
+                "cmd_topics": LaunchConfiguration("output_cmd_topic"),
                 "telemetry_enabled": ParameterValue(
                     LaunchConfiguration("telemetry_enabled"), value_type=bool
                 ),
@@ -121,6 +121,32 @@ def generate_launch_description():
                 "publish_tf": False,
                 "fallback_odom": ParameterValue(
                     LaunchConfiguration("fallback_odom"), value_type=bool
+                ),
+            }
+        ],
+    )
+
+    cmd_vel_arbiter = Node(
+        package="robot_navigation",
+        executable="cmd_vel_arbiter",
+        output="screen",
+        parameters=[
+            {
+                "manual_cmd_topic": LaunchConfiguration("manual_cmd_topic"),
+                "auto_cmd_topics": LaunchConfiguration("cmd_topics"),
+                "output_cmd_topic": LaunchConfiguration("output_cmd_topic"),
+                "manual_override_topic": LaunchConfiguration("manual_override_topic"),
+                "publish_rate": ParameterValue(
+                    LaunchConfiguration("arbiter_publish_rate"), value_type=float
+                ),
+                "manual_cmd_timeout": ParameterValue(
+                    LaunchConfiguration("manual_cmd_timeout"), value_type=float
+                ),
+                "auto_cmd_timeout": ParameterValue(
+                    LaunchConfiguration("auto_cmd_timeout"), value_type=float
+                ),
+                "stop_on_source_switch": ParameterValue(
+                    LaunchConfiguration("arbiter_stop_on_source_switch"), value_type=bool
                 ),
             }
         ],
@@ -215,8 +241,15 @@ def generate_launch_description():
             DeclareLaunchArgument("baud_rate", default_value="115200"),
             DeclareLaunchArgument(
                 "cmd_topics",
-                default_value='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]',
+                default_value='["/cmd_vel_auto","/cmd_vel_nav","/cmd_vel_smoothed"]',
             ),
+            DeclareLaunchArgument("manual_cmd_topic", default_value="/cmd_vel_manual"),
+            DeclareLaunchArgument("output_cmd_topic", default_value="/cmd_vel"),
+            DeclareLaunchArgument("manual_override_topic", default_value="/manual_override"),
+            DeclareLaunchArgument("manual_cmd_timeout", default_value="0.35"),
+            DeclareLaunchArgument("auto_cmd_timeout", default_value="0.35"),
+            DeclareLaunchArgument("arbiter_publish_rate", default_value="50.0"),
+            DeclareLaunchArgument("arbiter_stop_on_source_switch", default_value="true"),
             DeclareLaunchArgument("telemetry_enabled", default_value="true"),
             DeclareLaunchArgument("left_switch", default_value="1"),
             DeclareLaunchArgument("right_switch", default_value="1"),
@@ -249,6 +282,7 @@ def generate_launch_description():
             DeclareLaunchArgument("with_nav2_rviz", default_value="false"),
             sick_driver,
             lidar_static_tf,
+            cmd_vel_arbiter,
             serial_bridge,
             ekf_node,
             cartographer_localization,

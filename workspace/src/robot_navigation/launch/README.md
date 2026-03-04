@@ -17,6 +17,13 @@ Localization + Nav2 phase:
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 ```
 
+P1 mission (fixed-loop auto mapping + return + save/export):
+
+```bash
+ros2 run robot_navigation nav_assistant mission-p1
+ros2 run robot_navigation nav_assistant mission-p1 --interactive-override true
+```
+
 For headless Jetson:
 
 ```bash
@@ -26,6 +33,7 @@ ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 -
 Both stacks now default to:
 
 - LiDAR frame `lidar_link` + static transform `base_link -> lidar_link`.
+- `cmd_vel_arbiter`: manual `/cmd_vel_manual` + auto `/cmd_vel_auto,/cmd_vel_nav,/cmd_vel_smoothed` -> `/cmd_vel`.
 - Raw bridge odom on `/odom_raw`.
 - EKF fusion (`robot_localization`) output on `/odom`.
 
@@ -43,6 +51,9 @@ ros2 launch robot_navigation nav2_localization_stack.launch.py \
 ```bash
 ros2 run robot_navigation nav_assistant teleop
 ros2 run robot_navigation nav_assistant teleop-collision
+ros2 topic pub --once /manual_override std_msgs/msg/Bool "{data: true}"
+ros2 topic pub --once /manual_override std_msgs/msg/Bool "{data: false}"
+ros2 service call /finish_mapping std_srvs/srv/Trigger "{}"
 ```
 
 ## Map save/export helpers
@@ -67,13 +78,13 @@ ros2 run robot_navigation nav_assistant waypoints \
 Run one preset:
 
 ```bash
-ros2 run robot_navigation nav_assistant motion --preset box_loop --topic /cmd_vel
+ros2 run robot_navigation nav_assistant motion --preset box_loop --topic /cmd_vel_manual
 ```
 
 One-key macro pad:
 
 ```bash
-ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel
+ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel_manual
 ```
 
 Keys: `1..4` run preset combos, `space` stop, `q` quit.

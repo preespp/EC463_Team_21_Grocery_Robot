@@ -31,6 +31,8 @@ setup(
             'teleop_ros = robot_navigation.teleop_ros:main',
             'wheel_motor = robot_navigation.wheel_motor:main',
             'nav2_serial_bridge = robot_navigation.nav2_serial_bridge:main',
+            'cmd_vel_arbiter = robot_navigation.cmd_vel_arbiter:main',
+            'mission_orchestrator = robot_navigation.mission_orchestrator:main',
             'teleop_cmd_vel = robot_navigation.teleop_cmd_vel:main',
             'teleop_cmd_vel_collision = robot_navigation.teleop_cmd_vel_collision:main',
             'nav_assistant = robot_navigation.nav_assistant:main',

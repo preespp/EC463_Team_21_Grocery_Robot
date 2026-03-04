@@ -41,8 +41,10 @@ def get_key(timeout: float) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Keyboard teleop publisher for /cmd_vel")
-    parser.add_argument("--topic", default="/cmd_vel", help="cmd_vel topic name")
+    parser = argparse.ArgumentParser(
+        description="Keyboard teleop publisher for manual cmd_vel input"
+    )
+    parser.add_argument("--topic", default="/cmd_vel_manual", help="manual cmd_vel topic name")
     parser.add_argument("--linear", type=float, default=0.5, help="Linear speed (m/s)")
     parser.add_argument("--angular", type=float, default=1.0, help="Angular speed (rad/s)")
     parser.add_argument("--rate", type=float, default=20.0, help="Publish rate (Hz)")

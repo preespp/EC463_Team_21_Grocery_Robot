@@ -30,6 +30,8 @@ from geometry_msgs.msg import PoseStamped, Twist
 from nav2_msgs.action import FollowWaypoints, NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from std_msgs.msg import Bool
+from std_srvs.srv import Trigger
 
 
 def _find_repo_root() -> Path:
@@ -50,7 +52,7 @@ def _find_repo_root() -> Path:
 REPO_ROOT = _find_repo_root()
 DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
 DEFAULT_MAP_NAME = "testmap1"
-DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
+DEFAULT_CMD_TOPICS = '["/cmd_vel_auto","/cmd_vel_nav","/cmd_vel_smoothed"]'
 DEFAULT_RUN_MODE = "normal"
 RUN_MODES = ("normal", "bench")
 MAPPING_CONFIG_BASENAME = {
@@ -424,6 +426,13 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"serial_port:={args.serial_port}",
         f"baud_rate:={args.baud_rate}",
         f"cmd_topics:={args.cmd_topics}",
+        f"manual_cmd_topic:={args.manual_cmd_topic}",
+        f"output_cmd_topic:={args.output_cmd_topic}",
+        f"manual_override_topic:={args.manual_override_topic}",
+        f"manual_cmd_timeout:={args.manual_cmd_timeout}",
+        f"auto_cmd_timeout:={args.auto_cmd_timeout}",
+        f"arbiter_publish_rate:={args.arbiter_publish_rate}",
+        f"arbiter_stop_on_source_switch:={bool_to_launch(args.arbiter_stop_on_source_switch)}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
@@ -470,6 +479,13 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"serial_port:={args.serial_port}",
         f"baud_rate:={args.baud_rate}",
         f"cmd_topics:={args.cmd_topics}",
+        f"manual_cmd_topic:={args.manual_cmd_topic}",
+        f"output_cmd_topic:={args.output_cmd_topic}",
+        f"manual_override_topic:={args.manual_override_topic}",
+        f"manual_cmd_timeout:={args.manual_cmd_timeout}",
+        f"auto_cmd_timeout:={args.auto_cmd_timeout}",
+        f"arbiter_publish_rate:={args.arbiter_publish_rate}",
+        f"arbiter_stop_on_source_switch:={bool_to_launch(args.arbiter_stop_on_source_switch)}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
@@ -494,6 +510,70 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"pbstream_file:={pbstream_path}",
         f"map_yaml:={yaml_path}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
+    ]
+    if args.ekf_params_file:
+        command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
+    if args.nav2_params_file:
+        command.append(f"nav2_params_file:={Path(args.nav2_params_file)}")
+    return command
+
+
+def build_mission_p1_launch_cmd(args: argparse.Namespace) -> List[str]:
+    run_mode = args.run_mode
+    use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    carto_config = args.cartographer_config_basename or MAPPING_CONFIG_BASENAME[run_mode]
+    command = [
+        "ros2",
+        "launch",
+        "robot_navigation",
+        "auto_map_mission_v1.launch.py",
+        f"hostname:={args.hostname}",
+        f"udp_receiver_ip:={args.udp_receiver_ip}",
+        f"serial_port:={args.serial_port}",
+        f"baud_rate:={args.baud_rate}",
+        f"cmd_topics:={args.cmd_topics}",
+        f"manual_cmd_topic:={args.manual_cmd_topic}",
+        f"output_cmd_topic:={args.output_cmd_topic}",
+        f"manual_override_topic:={args.manual_override_topic}",
+        f"manual_cmd_timeout:={args.manual_cmd_timeout}",
+        f"auto_cmd_timeout:={args.auto_cmd_timeout}",
+        f"arbiter_publish_rate:={args.arbiter_publish_rate}",
+        f"arbiter_stop_on_source_switch:={bool_to_launch(args.arbiter_stop_on_source_switch)}",
+        f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
+        f"left_switch:={args.left_switch}",
+        f"right_switch:={args.right_switch}",
+        f"odom_topic:={args.odom_topic}",
+        f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
+        f"use_ekf:={bool_to_launch(use_ekf)}",
+        f"cartographer_config_basename:={carto_config}",
+        f"imu_topic:={args.imu_topic}",
+        f"sick_tf_publish_rate:={args.sick_tf_publish_rate}",
+        f"imu_udp_port:={args.imu_udp_port}",
+        f"scandataformat:={args.scandataformat}",
+        f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+        f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
+        f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
+        f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
+        f"lidar_x:={args.lidar_x}",
+        f"lidar_y:={args.lidar_y}",
+        f"lidar_z:={args.lidar_z}",
+        f"lidar_roll:={args.lidar_roll}",
+        f"lidar_pitch:={args.lidar_pitch}",
+        f"lidar_yaw:={args.lidar_yaw}",
+        f"with_collision:={bool_to_launch(args.with_collision)}",
+        f"with_slam_rviz:={bool_to_launch(args.with_rviz)}",
+        f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
+        f"nav2_namespace:={args.nav2_namespace}",
+        f"autostart_mission:={bool_to_launch(args.autostart_mission)}",
+        f"boot_capture_delay_sec:={args.boot_capture_delay_sec}",
+        f"mapping_timeout_sec:={args.mapping_timeout_sec}",
+        f"mapping_max_distance_m:={args.mapping_max_distance_m}",
+        f"home_retry_limit:={args.home_retry_limit}",
+        f"map_output_dir:={Path(args.map_output_dir)}",
+        f"map_name:={args.map_name}",
+        f"map_name_prefix:={args.map_name_prefix}",
+        f"export_map:={bool_to_launch(args.export_map)}",
+        f"export_resolution:={args.export_resolution}",
     ]
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
@@ -548,9 +628,15 @@ def print_runbook(args: argparse.Namespace) -> None:
         "",
         "# Optional teleop (standard and collision-aware)",
         "ros2 run robot_navigation teleop_cmd_vel "
-        "--topic /cmd_vel --linear 0.6 --angular 1.2",
+        "--topic /cmd_vel_manual --linear 0.6 --angular 1.2",
         "ros2 run robot_navigation teleop_cmd_vel_collision "
-        "--topic /cmd_vel --linear 0.6 --angular 1.2",
+        "--topic /cmd_vel_manual --linear 0.6 --angular 1.2",
+        "ros2 topic pub --once /manual_override std_msgs/msg/Bool '{data: true}'",
+        "ros2 topic pub --once /manual_override std_msgs/msg/Bool '{data: false}'",
+        "",
+        "# P1 mission one-command launch",
+        "ros2 run robot_navigation nav_assistant mission-p1",
+        "ros2 run robot_navigation nav_assistant mission-p1 --interactive-override true",
         "",
         "# Save and export map",
         "ros2 run robot_navigation nav_assistant save-map "
@@ -569,7 +655,7 @@ def print_runbook(args: argparse.Namespace) -> None:
         "--pose 1.0,0.0,0.0 --pose 1.5,0.5,0.0 --pose 0.5,1.0,0.0",
         "",
         "# One-key motion macro pad (keys 1-4, space stop, q quit)",
-        "ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel",
+        "ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel_manual",
     ]
     print("\n".join(lines))
 
@@ -635,6 +721,94 @@ def run_motion_pad(node: NavAssistant, args: argparse.Namespace) -> None:
         node.publish_stop(args.topic, args.rate)
 
 
+def _terminate_process_tree(process: subprocess.Popen, timeout_sec: float = 5.0) -> int:
+    if process.poll() is not None:
+        return int(process.returncode)
+    process.terminate()
+    try:
+        process.wait(timeout=timeout_sec)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=2.0)
+    return int(process.returncode)
+
+
+def run_mission_p1_with_override_console(args: argparse.Namespace) -> int:
+    command = build_mission_p1_launch_cmd(args)
+    print(f"$ {render_command(command)}")
+    if args.dry_run:
+        return 0
+
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL)
+
+    rclpy.init(args=None)
+    node = rclpy.create_node("mission_p1_override_console")
+    override_pub = node.create_publisher(Bool, args.manual_override_topic, 10)
+    finish_client = node.create_client(Trigger, "/finish_mapping")
+
+    def publish_override(value: bool) -> None:
+        msg = Bool()
+        msg.data = value
+        # Publish a short burst to reduce command-loss risk on transient startup.
+        for _ in range(3):
+            override_pub.publish(msg)
+            rclpy.spin_once(node, timeout_sec=0.0)
+            time.sleep(0.03)
+        mode = "MANUAL_OVERRIDE" if value else "AUTONOMOUS_RESUME"
+        print(f"[override] {mode}")
+
+    def request_finish_mapping() -> None:
+        if not finish_client.wait_for_service(timeout_sec=0.5):
+            print("[override] /finish_mapping service not ready")
+            return
+        future = finish_client.call_async(Trigger.Request())
+        rclpy.spin_until_future_complete(node, future, timeout_sec=2.0)
+        response = future.result()
+        if response is None:
+            print("[override] /finish_mapping call timed out")
+            return
+        print(f"[override] finish_mapping: success={response.success} msg='{response.message}'")
+
+    print("Mission P1 override console:")
+    print("  m: manual override ON")
+    print("  a: manual override OFF (resume autonomous mission)")
+    print("  f: request finish_mapping")
+    print("  q: stop mission launch and quit")
+    print("Press keys directly (no Enter).")
+
+    settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        while True:
+            if process.poll() is not None:
+                return int(process.returncode)
+
+            key = read_key(0.1)
+            rclpy.spin_once(node, timeout_sec=0.0)
+            if not key:
+                continue
+
+            if key in ("m", "M"):
+                publish_override(True)
+                continue
+            if key in ("a", "A", "r", "R"):
+                publish_override(False)
+                continue
+            if key in ("f", "F"):
+                request_finish_mapping()
+                continue
+            if key in ("q", "Q", "\x03"):
+                print("Stopping mission launch...")
+                return _terminate_process_tree(process)
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+        if process.poll() is None:
+            _terminate_process_tree(process)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Workflow helper for Cartographer + Nav2 + serial bridge."
@@ -646,7 +820,18 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--udp-receiver-ip", default="192.168.8.249")
     stack_common.add_argument("--serial-port", default="/dev/ttyUSB0")
     stack_common.add_argument("--baud-rate", type=int, default=115200)
-    stack_common.add_argument("--cmd-topics", default=DEFAULT_CMD_TOPICS)
+    stack_common.add_argument(
+        "--cmd-topics",
+        default=DEFAULT_CMD_TOPICS,
+        help="Auto source topic list for cmd_vel arbiter.",
+    )
+    stack_common.add_argument("--manual-cmd-topic", default="/cmd_vel_manual")
+    stack_common.add_argument("--output-cmd-topic", default="/cmd_vel")
+    stack_common.add_argument("--manual-override-topic", default="/manual_override")
+    stack_common.add_argument("--manual-cmd-timeout", type=float, default=0.35)
+    stack_common.add_argument("--auto-cmd-timeout", type=float, default=0.35)
+    stack_common.add_argument("--arbiter-publish-rate", type=float, default=50.0)
+    stack_common.add_argument("--arbiter-stop-on-source-switch", type=parse_bool, default=True)
     stack_common.add_argument(
         "--telemetry-enabled",
         type=parse_bool,
@@ -702,8 +887,35 @@ def build_parser() -> argparse.ArgumentParser:
     localization_parser.add_argument("--nav2-params-file", default="")
     localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
 
+    mission_p1_parser = subparsers.add_parser(
+        "mission-p1",
+        parents=[stack_common],
+        help="Run P1 mission: fixed-loop mapping -> return home -> save/export.",
+    )
+    mission_p1_parser.add_argument("--with-collision", type=parse_bool, default=True)
+    mission_p1_parser.add_argument("--with-rviz", type=parse_bool, default=False)
+    mission_p1_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
+    mission_p1_parser.add_argument("--nav2-namespace", default="")
+    mission_p1_parser.add_argument("--nav2-params-file", default="")
+    mission_p1_parser.add_argument("--autostart-mission", type=parse_bool, default=True)
+    mission_p1_parser.add_argument("--boot-capture-delay-sec", type=float, default=2.0)
+    mission_p1_parser.add_argument("--mapping-timeout-sec", type=float, default=180.0)
+    mission_p1_parser.add_argument("--mapping-max-distance-m", type=float, default=80.0)
+    mission_p1_parser.add_argument("--home-retry-limit", type=int, default=2)
+    mission_p1_parser.add_argument("--map-output-dir", default=DEFAULT_MAPS_DIR)
+    mission_p1_parser.add_argument("--map-name", default="")
+    mission_p1_parser.add_argument("--map-name-prefix", default="run")
+    mission_p1_parser.add_argument("--export-map", type=parse_bool, default=True)
+    mission_p1_parser.add_argument("--export-resolution", type=float, default=0.03)
+    mission_p1_parser.add_argument(
+        "--interactive-override",
+        type=parse_bool,
+        default=False,
+        help="Keep this terminal as manual override console (m/a/f/q).",
+    )
+
     teleop_common = argparse.ArgumentParser(add_help=False)
-    teleop_common.add_argument("--topic", default="/cmd_vel")
+    teleop_common.add_argument("--topic", default="/cmd_vel_manual")
     teleop_common.add_argument("--linear", type=float, default=0.6)
     teleop_common.add_argument("--angular", type=float, default=1.2)
     teleop_common.add_argument("--rate", type=float, default=20.0)
@@ -774,7 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
         "motion",
         help="Execute preset/custom cmd_vel motion segments.",
     )
-    motion_parser.add_argument("--topic", default="/cmd_vel")
+    motion_parser.add_argument("--topic", default="/cmd_vel_manual")
     motion_parser.add_argument("--rate", type=float, default=20.0)
     motion_parser.add_argument(
         "--preset",
@@ -793,7 +1005,7 @@ def build_parser() -> argparse.ArgumentParser:
         "motion-pad",
         help="Interactive one-key motion macro pad.",
     )
-    motion_pad_parser.add_argument("--topic", default="/cmd_vel")
+    motion_pad_parser.add_argument("--topic", default="/cmd_vel_manual")
     motion_pad_parser.add_argument("--rate", type=float, default=20.0)
 
     runbook_parser = subparsers.add_parser(
@@ -822,6 +1034,12 @@ def main(argv: List[str] | None = None) -> int:
 
     if args.command == "localization-stack":
         command = build_localization_launch_cmd(args)
+        return run_foreground_command(command, dry_run=args.dry_run)
+
+    if args.command == "mission-p1":
+        if args.interactive_override:
+            return run_mission_p1_with_override_console(args)
+        command = build_mission_p1_launch_cmd(args)
         return run_foreground_command(command, dry_run=args.dry_run)
 
     if args.command == "teleop":
