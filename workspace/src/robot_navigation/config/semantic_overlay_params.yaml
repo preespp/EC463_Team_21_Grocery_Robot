@@ -2,31 +2,14 @@ semantic_overlay:
   ros__parameters:
     frame_id: "map"
     shelves_file: ""
-    map_topic: "/map"
     marker_topic: "/semantic_overlay/markers"
     query_service: "/semantic_overlay/query_shelf_pose"
     align_service: "/semantic_overlay/set_alignment"
-    auto_align_service: "/semantic_overlay/auto_align"
     reload_service: "/semantic_overlay/reload"
     publish_rate_hz: 1.0
-    auto_align_retry_sec: 2.0
     marker_scale_xy: 0.28
     marker_scale_z: 0.12
     marker_alpha: 0.85
     align_tx: 0.0
     align_ty: 0.0
     align_yaw: 0.0
-    reference_map_yaml: ""
-    auto_align_on_start: false
-    auto_align_min_score: 0.45
-    auto_align_yaw_search_deg: 12.0
-    auto_align_yaw_step_deg: 2.0
-    auto_align_translation_search_m: 1.5
-    auto_align_translation_step_m: 0.2
-    auto_align_sample_stride_cells: 4
-    auto_align_max_reference_points: 3000
-    auto_align_occupied_threshold: 60
-    auto_align_global_fallback: true
-    auto_align_global_yaw_step_deg: 15.0
-    auto_align_global_translation_step_m: 1.0
-    auto_align_global_translation_limit_m: 6.0

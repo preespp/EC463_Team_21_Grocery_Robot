@@ -200,52 +200,7 @@ def generate_launch_description():
             {
                 "frame_id": LaunchConfiguration("global_frame"),
                 "shelves_file": LaunchConfiguration("shelves_file"),
-                "map_topic": LaunchConfiguration("semantic_map_topic"),
                 "marker_topic": "/semantic_overlay/markers",
-                "auto_align_service": "/semantic_overlay/auto_align",
-                "reference_map_yaml": LaunchConfiguration("semantic_reference_map_yaml"),
-                "auto_align_on_start": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_on_start"), value_type=bool
-                ),
-                "auto_align_retry_sec": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_retry_sec"), value_type=float
-                ),
-                "auto_align_min_score": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_min_score"), value_type=float
-                ),
-                "auto_align_yaw_search_deg": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_yaw_search_deg"), value_type=float
-                ),
-                "auto_align_yaw_step_deg": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_yaw_step_deg"), value_type=float
-                ),
-                "auto_align_translation_search_m": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_translation_search_m"), value_type=float
-                ),
-                "auto_align_translation_step_m": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_translation_step_m"), value_type=float
-                ),
-                "auto_align_sample_stride_cells": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_sample_stride_cells"), value_type=int
-                ),
-                "auto_align_max_reference_points": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_max_reference_points"), value_type=int
-                ),
-                "auto_align_occupied_threshold": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_occupied_threshold"), value_type=int
-                ),
-                "auto_align_global_fallback": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_global_fallback"), value_type=bool
-                ),
-                "auto_align_global_yaw_step_deg": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_global_yaw_step_deg"), value_type=float
-                ),
-                "auto_align_global_translation_step_m": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_global_translation_step_m"), value_type=float
-                ),
-                "auto_align_global_translation_limit_m": ParameterValue(
-                    LaunchConfiguration("semantic_auto_align_global_translation_limit_m"), value_type=float
-                ),
             }
         ],
     )
@@ -330,22 +285,6 @@ def generate_launch_description():
             DeclareLaunchArgument("export_resolution", default_value="0.03"),
             DeclareLaunchArgument("with_semantic_overlay", default_value="false"),
             DeclareLaunchArgument("shelves_file", default_value=default_shelves_file),
-            DeclareLaunchArgument("semantic_map_topic", default_value="/map"),
-            DeclareLaunchArgument("semantic_reference_map_yaml", default_value=""),
-            DeclareLaunchArgument("semantic_auto_align_on_start", default_value="false"),
-            DeclareLaunchArgument("semantic_auto_align_retry_sec", default_value="2.0"),
-            DeclareLaunchArgument("semantic_auto_align_min_score", default_value="0.45"),
-            DeclareLaunchArgument("semantic_auto_align_yaw_search_deg", default_value="12.0"),
-            DeclareLaunchArgument("semantic_auto_align_yaw_step_deg", default_value="2.0"),
-            DeclareLaunchArgument("semantic_auto_align_translation_search_m", default_value="1.5"),
-            DeclareLaunchArgument("semantic_auto_align_translation_step_m", default_value="0.2"),
-            DeclareLaunchArgument("semantic_auto_align_sample_stride_cells", default_value="4"),
-            DeclareLaunchArgument("semantic_auto_align_max_reference_points", default_value="3000"),
-            DeclareLaunchArgument("semantic_auto_align_occupied_threshold", default_value="60"),
-            DeclareLaunchArgument("semantic_auto_align_global_fallback", default_value="true"),
-            DeclareLaunchArgument("semantic_auto_align_global_yaw_step_deg", default_value="15.0"),
-            DeclareLaunchArgument("semantic_auto_align_global_translation_step_m", default_value="1.0"),
-            DeclareLaunchArgument("semantic_auto_align_global_translation_limit_m", default_value="6.0"),
             slam_mapping_stack,
             TimerAction(period=2.0, actions=[nav2_bringup]),
             frontier_explorer,
