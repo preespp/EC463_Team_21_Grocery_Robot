@@ -301,20 +301,19 @@
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
-      <joint_name>/model/five_dof_arm/joint/joint4_wrist_roll/0/cmd_pos</joint_name>
+      <joint_name>joint4_wrist_roll</joint_name>
       <p_gain>5.0</p_gain>
-      <topic>/arm/joint4_cmd</topic>
+      <topic>/model/five_dof_arm/joint/joint4_wrist_roll/0/cmd_pos</topic>
     </plugin>
 
     <!-- Joint 5 -->
     <plugin
       filename="libignition-gazebo-joint-position-controller-system.so"
       name="ignition::gazebo::systems::JointPositionController">
-      <joint_name>/model/five_dof_arm/joint/joint5_gripper/0/cmd_pos</joint_name>
+      <joint_name>joint5_gripper</joint_name>
       <p_gain>3.0</p_gain>
-      <topic>/arm/joint5_cmd</topic>
+      <topic>/model/five_dof_arm/joint/joint5_gripper/0/cmd_pos</topic>
     </plugin>
   </gazebo>
 
 </robot>
-
