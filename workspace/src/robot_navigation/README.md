@@ -22,8 +22,6 @@ ros2 run robot_navigation nav_assistant <subcommand>
 ## Folder overview
 
 - `robot_navigation/nav_assistant.py`: unified CLI helper.
-- `robot_navigation/cmd_vel_arbiter.py`: manual-first cmd_vel arbiter with `/manual_override`.
-- `robot_navigation/mission_orchestrator.py`: P1 mission state machine (`BOOT->AUTO_MAP_V1->RETURN_HOME->SAVE_EXPORT->LOCALIZE_READY`).
 - `robot_navigation/nav2_serial_bridge.py`: `/cmd_vel` to STM32 UART bridge and raw odom publisher (`/odom_raw` by default).
 - `robot_navigation/teleop_cmd_vel.py`: manual keyboard teleop.
 - `robot_navigation/teleop_cmd_vel_collision.py`: teleop with collision stop input.
@@ -83,49 +81,10 @@ Optional:
 ros2 run robot_navigation nav_assistant mapping-stack --with-rviz true --with-collision true
 ```
 
-### 1.1 One-command P1 mission
-
-```bash
-ros2 run robot_navigation nav_assistant mission-p1
-```
-
-This launches mapping stack + Nav2 + mission orchestrator and runs:
-
-`BOOT -> AUTO_MAP_V1 -> RETURN_HOME -> SAVE_EXPORT -> LOCALIZE_READY`
-
-Same-terminal override console mode:
-
-```bash
-ros2 run robot_navigation nav_assistant mission-p1 --interactive-override true
-```
-
-Keys in console mode:
-
-- `m`: publish `/manual_override=true`
-- `a`: publish `/manual_override=false` (resume mission)
-- `f`: call `/finish_mapping`
-- `q`: stop mission launch and quit
-
 ### 2. Drive robot manually
 
 ```bash
 ros2 run robot_navigation nav_assistant teleop
-```
-
-Force manual takeover / release:
-
-```bash
-ros2 topic pub --once /manual_override std_msgs/msg/Bool "{data: true}"
-ros2 topic pub --once /manual_override std_msgs/msg/Bool "{data: false}"
-```
-
-Mission control services:
-
-```bash
-ros2 service call /start_mission std_srvs/srv/Trigger "{}"
-ros2 service call /pause_mission std_srvs/srv/Trigger "{}"
-ros2 service call /resume_mission std_srvs/srv/Trigger "{}"
-ros2 service call /finish_mapping std_srvs/srv/Trigger "{}"
 ```
 
 ### 3. Save and export map
@@ -145,7 +104,6 @@ Default behavior in both mapping/localization stacks:
 
 - LiDAR and IMU are published in `lidar_link`.
 - Static TF `base_link -> lidar_link` is published with default offset `(x=0.254, y=0, z=0, rpy=0,0,0)`.
-- `cmd_vel_arbiter` merges manual (`/cmd_vel_manual`) and auto (`/cmd_vel_auto,/cmd_vel_nav,/cmd_vel_smoothed`) into `/cmd_vel`.
 - Bridge publishes `/odom_raw`.
 - EKF (`robot_localization`) fuses `/odom_raw + /sick_scansegment_xd/imu` and publishes filtered `/odom`.
 
@@ -193,13 +151,13 @@ ros2 run robot_navigation nav_assistant export-map --maps-dir /tmp/maps --map-na
 Run one preset sequence:
 
 ```bash
-ros2 run robot_navigation nav_assistant motion --preset box_loop --topic /cmd_vel_manual
+ros2 run robot_navigation nav_assistant motion --preset box_loop --topic /cmd_vel
 ```
 
 Interactive one-key mode:
 
 ```bash
-ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel_manual
+ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel
 ```
 
 Keys:
@@ -228,9 +186,8 @@ ros2 run robot_navigation nav_assistant quick-check
 ## Notes
 
 - Default serial port is `/dev/ttyUSB0` and default baud is `115200`.
-- Default auto command topics consumed by arbiter are:
-  `[/cmd_vel_auto, /cmd_vel_nav, /cmd_vel_smoothed]`
-- Bridge consumes only arbiter output topic: `/cmd_vel`.
+- Default command topics bridged to STM32 are:
+  `[/cmd_vel, /cmd_vel_nav, /cmd_vel_smoothed]`
 - To disable EKF for troubleshooting, use:
   `--use-ekf false --odom-topic /odom` on `mapping-stack` or `localization-stack`.
 - For Linux deployment, use lowercase launch filename `my_carto_localization.launch.py` if you run Nav-level launch scripts directly.
