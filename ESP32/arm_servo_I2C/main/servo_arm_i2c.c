@@ -43,7 +43,7 @@ enum {
     SERVO_2,
     SERVO_3,
     SERVO_4,
-    SERVO_5,
+    // SERVO_5,
     SERVO_COUNT
 };
 
@@ -52,7 +52,7 @@ static const servo_channel_t s_servo_channels[SERVO_COUNT] = {
     [SERVO_2] = { SERVO_2_GPIO, LEDC_CHANNEL_1 },
     [SERVO_3] = { SERVO_3_GPIO, LEDC_CHANNEL_2 },
     [SERVO_4] = { SERVO_4_GPIO, LEDC_CHANNEL_3 },
-    [SERVO_5] = { SERVO_5_GPIO, LEDC_CHANNEL_4 },
+    // [SERVO_5] = { SERVO_5_GPIO, LEDC_CHANNEL_4 }, (if add the gripper rotation)
 };
 
 /* ------------------------------ I2C Slave ---------------------------------- */
@@ -68,9 +68,9 @@ static float s_servo_targets[SERVO_COUNT] = {0};
 static inline int angle_to_us(float angle)
 {
     if (angle < 0) angle = 0;
-    if (angle > 270) angle = 270;
+    if (angle > 180) angle = 180;
     return SERVO_MIN_US +
-           (int)(angle * (SERVO_MAX_US - SERVO_MIN_US) / 270.0f);
+           (int)(angle * (SERVO_MAX_US - SERVO_MIN_US) / 180.0f);
 }
 
 /* ---------------------- Utility: microseconds → duty ----------------------- */
@@ -162,7 +162,8 @@ static void i2c_task(void *arg)
                      s_servo_targets[1],
                      s_servo_targets[2],
                      s_servo_targets[3],
-                     s_servo_targets[4]);
+                     //s_servo_targets[4]
+                    );
 
             // Write servos
             for (int i = 0; i < SERVO_COUNT; i++)
