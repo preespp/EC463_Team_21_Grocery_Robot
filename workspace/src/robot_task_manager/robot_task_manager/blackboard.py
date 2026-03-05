@@ -7,6 +7,7 @@ def setup_blackboard():
     bb.mode = None
 
     bb.order: Order | None = None
+    bb.order_id_text = None
 
     bb.items = []
     bb.item_index = 0

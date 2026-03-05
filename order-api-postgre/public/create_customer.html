@@ -18,17 +18,10 @@
 
   <div class="container">
     <h1>Create Customer Account</h1>
+    <p class="muted">Member ID will be auto-generated (3 letters + 3 digits).</p>
 
     <div class="panel">
       <div class="grid2">
-        <label class="field">
-          <span class="muted">Username</span>
-          <input id="username" placeholder="" />
-        </label>
-        <label class="field">
-          <span class="muted">Password</span>
-          <input id="password" type="password" placeholder="" />
-        </label>
         <label class="field">
           <span class="muted">First name</span>
           <input id="first" placeholder="" />
@@ -55,14 +48,20 @@
       const msg = document.getElementById("msg");
       msg.textContent = "";
 
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
       const first_name = document.getElementById("first").value.trim();
       const last_name = document.getElementById("last").value.trim();
 
+      if (!first_name || !last_name) {
+        msg.textContent = "Please fill First name and Last name.";
+        return;
+      }
+
       try {
-        await apiPost("/api/account/create_customer", { username, password, first_name, last_name });
-        msg.textContent = "Created. You can login now.";
+        const resp = await apiPost("/api/account/create_customer", { first_name, last_name });
+        msg.textContent = `Created successfully. Your Member ID: ${resp.member_ID}. Redirecting to Home...`;
+        setTimeout(() => {
+          window.location.href = "idle.html";
+        }, 800);
       } catch (e) {
         msg.textContent = "Create failed: " + e.message;
       }

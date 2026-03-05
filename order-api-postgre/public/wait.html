@@ -28,7 +28,7 @@
   list.innerHTML = items.map(it =>
     `<div class="card">
         <div style="font-weight:900">${it.name} × ${it.qty}</div>
-        <div class="muted small">Aisle ${it.aisle}, Rack ${it.rack}, Shelf ${it.shelf_level}</div>
+        <div class="muted small">x: ${it.x}, y: ${it.y}, shelf(z): ${it.z}</div>
     </div>`
     ).join("");
 
