@@ -114,7 +114,6 @@ def generate_launch_description():
                 "autostart": ParameterValue(LaunchConfiguration("autostart_frontier"), value_type=bool),
                 "map_topic": LaunchConfiguration("map_topic"),
                 "manual_override_topic": LaunchConfiguration("manual_override_topic"),
-                "nav2_namespace": LaunchConfiguration("nav2_namespace"),
                 "navigate_to_pose_action": LaunchConfiguration("navigate_to_pose_action"),
                 "global_frame": LaunchConfiguration("global_frame"),
                 "base_frame": LaunchConfiguration("base_frame"),
@@ -165,7 +164,6 @@ def generate_launch_description():
             {
                 "autostart": ParameterValue(LaunchConfiguration("autostart_mission"), value_type=bool),
                 "mapping_mode": "frontier",
-                "nav2_namespace": LaunchConfiguration("nav2_namespace"),
                 "manual_override_topic": LaunchConfiguration("manual_override_topic"),
                 "odom_topic": "/odom",
                 "boot_capture_delay_sec": ParameterValue(

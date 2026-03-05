@@ -18,7 +18,6 @@ from typing import Iterable, List, Sequence, Tuple
 import rclpy
 from geometry_msgs.msg import TransformStamped, Twist
 from nav_msgs.msg import Odometry
-from rcl_interfaces.msg import ParameterDescriptor
 from std_msgs.msg import Bool
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
@@ -80,12 +79,7 @@ class Nav2SerialBridge(Node):
         self.declare_parameter("baud_rate", 115200)
         self.declare_parameter("send_rate", 50.0)
         self.declare_parameter("cmd_topic", "/cmd_vel")
-        # Accept string or string-array launch overrides for cmd_topics.
-        self.declare_parameter(
-            "cmd_topics",
-            None,
-            ParameterDescriptor(dynamic_typing=True),
-        )
+        self.declare_parameter("cmd_topics", ["/cmd_vel", "/cmd_vel_nav", "/cmd_vel_smoothed"])
         self.declare_parameter("cmd_timeout", 0.2)
         # Match STM32 non-Shift control scaling:
         # rocker -> 3.0 m/s linear, 4*pi rad/s yaw.
@@ -285,9 +279,7 @@ class Nav2SerialBridge(Node):
             result.append(0.0)
         return (float(result[0]), float(result[1]), float(result[2]))
 
-    def _resolve_cmd_topics(
-        self, values: Sequence[str] | str | None, fallback_topic: str
-    ) -> List[str]:
+    def _resolve_cmd_topics(self, values: Sequence[str], fallback_topic: str) -> List[str]:
         topics: List[str] = []
         if isinstance(values, (str, bytes)):
             raw = str(values).strip()

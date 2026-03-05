@@ -101,7 +101,7 @@ def generate_launch_description():
             {
                 "serial_port": LaunchConfiguration("serial_port"),
                 "baud_rate": ParameterValue(LaunchConfiguration("baud_rate"), value_type=int),
-                "cmd_topics": [LaunchConfiguration("output_cmd_topic")],
+                "cmd_topics": LaunchConfiguration("output_cmd_topic"),
                 "telemetry_enabled": ParameterValue(
                     LaunchConfiguration("telemetry_enabled"), value_type=bool
                 ),
