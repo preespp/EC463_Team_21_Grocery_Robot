@@ -262,13 +262,13 @@ hr{
 }
 
 .cart-toggle-arrow{
-  width: 62px;
-  height: 62px;
+  width: 50px;
+  height: 50px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,.14);
   background: rgba(255,255,255,.10);
   color: var(--text);
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
@@ -277,4 +277,13 @@ hr{
 .middle-toggle {
   align-self: center;
   justify-self: center;
+}
+
+/* Smaller +/- controls inside customer cart row */
+#cart button[data-a] {
+  height: 46px;
+  min-width: 46px;
+  padding: 0 10px;
+  font-size: 20px;
+  border-radius: 12px;
 }

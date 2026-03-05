@@ -1,11 +1,26 @@
 import py_trees
 
+
+def _to_float(v, default=0.0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _to_int(v, default=0):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return int(default)
+
+
 class SetCurrentItem(py_trees.behaviour.Behaviour):
     """
     Pops next item from bb.items using bb.item_index.
     Also sets typical per-item goals for reuse in other nodes:
-      - bb.rack_goal (from item.shelf_level)
-      - bb.nav_goal  (placeholder: should be computed from aisle/rack later)
+      - bb.rack_goal (from item z / shelf_level)
+      - bb.nav_goal  (from item x/y)
       - bb.shelf_pose (placeholder)
     """
     def __init__(self, bb):
@@ -32,9 +47,11 @@ class SetCurrentItem(py_trees.behaviour.Behaviour):
             f"{item_name} (qty={self.bb.num_current_item})"
         )
 
-        # TODO: Replace with real map look up from database
-        self.bb.nav_goal = getattr(self.bb, "nav_goal", None)
-        self.bb.rack_goal = int(getattr(item, "shelf_level", 0))
+        x = _to_float(getattr(item, "aisle", 0.0), 0.0)
+        y = _to_float(getattr(item, "rack", 0.0), 0.0)
+        z = _to_int(getattr(item, "shelf_level", 0), 0)
+        self.bb.nav_goal = (x, y)
+        self.bb.rack_goal = z
 
         return py_trees.common.Status.SUCCESS
 

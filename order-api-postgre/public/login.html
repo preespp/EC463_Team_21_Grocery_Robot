@@ -18,23 +18,19 @@
   </div>
 
   <div class="container">
-    <h1>Log in</h1>
-    <p class="muted">*Employees new accounts required authorization</p>
+    <h1>Customer Login</h1>
+    <p class="muted">Enter your Member ID, or continue as guest.</p>
 
     <div class="panel">
-      <div class="grid2">
+      <div class="grid2" style="grid-template-columns:1fr">
         <label class="field">
-          <span class="muted">Username</span>
-          <input id="username" placeholder="" />
-        </label>
-        <label class="field">
-          <span class="muted">Password</span>
-          <input id="password" type="password" placeholder="••••••" />
+          <span class="muted">Member ID</span>
+          <input id="memberID" placeholder="Ex: M1001" />
         </label>
       </div>
 
       <div class="row" style="margin-top:14px">
-        <button class="btn primary" id="btnLogin">Login</button>
+        <button class="btn primary" id="btnLogin">Continue as Member</button>
         <button class="btn" onclick="window.location.href='create_customer.html'">Create Customer Account</button>
         <button class="btn" id="guest">Continue as Guest</button>
       </div>
@@ -47,26 +43,38 @@
   <script>
     idleTimeout(60000);
 
+    function randomGuestId() {
+      const a = Math.random().toString(36).slice(2, 6).toUpperCase();
+      const b = Date.now().toString(36).slice(-5).toUpperCase();
+      return `G-${a}${b}`;
+    }
+
     document.getElementById("btnLogin").addEventListener("click", async () => {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
+      const member_ID = document.getElementById("memberID").value.trim();
       const msg = document.getElementById("msg");
       msg.textContent = "";
+      if (!member_ID) {
+        msg.textContent = "Please enter a Member ID.";
+        return;
+      }
 
       try {
-        const user = await apiPost("/api/auth/login", { username, password });
+        const user = await apiPost("/api/auth/login", { member_ID });
         setSession(user);
-
-        if (user.access_level === "customer") window.location.href = "customer.html";
-        else if (user.access_level === "employee") window.location.href = "employee.html";
-        else throw new Error("Unknown access level");
+        window.location.href = "customer.html";
       } catch (e) {
         msg.textContent = "Login failed: " + e.message;
       }
     });
 
     document.getElementById("guest").onclick = () => {
-      setSession({ username: `guest_${Date.now()}`, access_level: "customer", guest: true });
+      setSession({
+        member_ID: randomGuestId(),
+        first_name: "Guest",
+        last_name: "",
+        access_level: "customer",
+        guest: true
+      });
       window.location.href = "customer.html";
     };
   </script>
