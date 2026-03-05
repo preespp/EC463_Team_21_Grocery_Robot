@@ -115,6 +115,16 @@ ros2 run robot_navigation nav_assistant frontier-mission \
   --shelves-file <abs_path_to_shelves.yaml>
 ```
 
+Enable semantic overlay + automatic map-pattern alignment (P4 V2):
+
+```bash
+ros2 run robot_navigation nav_assistant frontier-mission \
+  --with-semantic-overlay true \
+  --shelves-file <abs_path_to_shelves.yaml> \
+  --semantic-reference-map-yaml <abs_path_to_reference_map_yaml> \
+  --semantic-auto-align-on-start true
+```
+
 Same-terminal override console mode:
 
 ```bash
@@ -264,6 +274,8 @@ ros2 run robot_navigation nav_assistant quick-check
   `/semantic_overlay/query_shelf_pose` (`robot_interfaces/srv/QueryShelfPose`).
 - Semantic overlay two-point alignment service:
   `/semantic_overlay/set_alignment` (`robot_interfaces/srv/SetSemanticAlignment`).
+- Semantic overlay auto alignment service (map pattern matching):
+  `/semantic_overlay/auto_align` (`std_srvs/srv/Trigger`).
 - P5 profile files:
   `config/nav2_params_explore_slow.yaml`, `config/nav2_params_task_run.yaml`.
 - Generate profile comparison markdown:

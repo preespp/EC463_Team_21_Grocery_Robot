@@ -676,6 +676,22 @@ def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"frontier_recovery_wait_sec:={args.frontier_recovery_wait_sec}",
         f"with_semantic_overlay:={bool_to_launch(args.with_semantic_overlay)}",
         f"shelves_file:={Path(args.shelves_file)}",
+        f"semantic_map_topic:={args.semantic_map_topic}",
+        f"semantic_reference_map_yaml:={Path(args.semantic_reference_map_yaml) if args.semantic_reference_map_yaml else ''}",
+        f"semantic_auto_align_on_start:={bool_to_launch(args.semantic_auto_align_on_start)}",
+        f"semantic_auto_align_retry_sec:={args.semantic_auto_align_retry_sec}",
+        f"semantic_auto_align_min_score:={args.semantic_auto_align_min_score}",
+        f"semantic_auto_align_yaw_search_deg:={args.semantic_auto_align_yaw_search_deg}",
+        f"semantic_auto_align_yaw_step_deg:={args.semantic_auto_align_yaw_step_deg}",
+        f"semantic_auto_align_translation_search_m:={args.semantic_auto_align_translation_search_m}",
+        f"semantic_auto_align_translation_step_m:={args.semantic_auto_align_translation_step_m}",
+        f"semantic_auto_align_sample_stride_cells:={args.semantic_auto_align_sample_stride_cells}",
+        f"semantic_auto_align_max_reference_points:={args.semantic_auto_align_max_reference_points}",
+        f"semantic_auto_align_occupied_threshold:={args.semantic_auto_align_occupied_threshold}",
+        f"semantic_auto_align_global_fallback:={bool_to_launch(args.semantic_auto_align_global_fallback)}",
+        f"semantic_auto_align_global_yaw_step_deg:={args.semantic_auto_align_global_yaw_step_deg}",
+        f"semantic_auto_align_global_translation_step_m:={args.semantic_auto_align_global_translation_step_m}",
+        f"semantic_auto_align_global_translation_limit_m:={args.semantic_auto_align_global_translation_limit_m}",
     ]
     nav2_namespace = str(args.nav2_namespace).strip()
     if nav2_namespace:
@@ -1063,6 +1079,41 @@ def build_parser() -> argparse.ArgumentParser:
     frontier_parser.add_argument("--frontier-recovery-failures-threshold", type=int, default=3)
     frontier_parser.add_argument("--frontier-recovery-wait-sec", type=float, default=3.0)
     frontier_parser.add_argument("--with-semantic-overlay", type=parse_bool, default=False)
+    frontier_parser.add_argument("--semantic-map-topic", default="/map")
+    frontier_parser.add_argument(
+        "--semantic-reference-map-yaml",
+        default="",
+        help="Reference map yaml used by semantic auto-alignment (P4 V2).",
+    )
+    frontier_parser.add_argument(
+        "--semantic-auto-align-on-start",
+        type=parse_bool,
+        default=False,
+        help="Auto-run semantic alignment when /map becomes available.",
+    )
+    frontier_parser.add_argument("--semantic-auto-align-retry-sec", type=float, default=2.0)
+    frontier_parser.add_argument("--semantic-auto-align-min-score", type=float, default=0.45)
+    frontier_parser.add_argument("--semantic-auto-align-yaw-search-deg", type=float, default=12.0)
+    frontier_parser.add_argument("--semantic-auto-align-yaw-step-deg", type=float, default=2.0)
+    frontier_parser.add_argument(
+        "--semantic-auto-align-translation-search-m", type=float, default=1.5
+    )
+    frontier_parser.add_argument(
+        "--semantic-auto-align-translation-step-m", type=float, default=0.2
+    )
+    frontier_parser.add_argument("--semantic-auto-align-sample-stride-cells", type=int, default=4)
+    frontier_parser.add_argument(
+        "--semantic-auto-align-max-reference-points", type=int, default=3000
+    )
+    frontier_parser.add_argument("--semantic-auto-align-occupied-threshold", type=int, default=60)
+    frontier_parser.add_argument("--semantic-auto-align-global-fallback", type=parse_bool, default=True)
+    frontier_parser.add_argument("--semantic-auto-align-global-yaw-step-deg", type=float, default=15.0)
+    frontier_parser.add_argument(
+        "--semantic-auto-align-global-translation-step-m", type=float, default=1.0
+    )
+    frontier_parser.add_argument(
+        "--semantic-auto-align-global-translation-limit-m", type=float, default=6.0
+    )
     frontier_parser.add_argument(
         "--interactive-override",
         type=parse_bool,
