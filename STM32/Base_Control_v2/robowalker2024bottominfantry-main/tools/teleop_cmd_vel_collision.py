@@ -52,6 +52,13 @@ def main() -> int:
     rclpy.init()
     node = rclpy.create_node("teleop_cmd_vel")
     pub = node.create_publisher(Twist, args.topic, 10)
+    right_alert = False
+
+    def on_right_alert(msg: Bool) -> None:
+        nonlocal right_alert
+        right_alert = bool(msg.data)
+
+    node.create_subscription(Bool, "right_alert", on_right_alert, 10)
 
     settings = termios.tcgetattr(sys.stdin)
     last_cmd_time = time.monotonic()
@@ -61,6 +68,7 @@ def main() -> int:
     print("Teleop ready: W/S/A/D/Q/E, Space/X to stop, Ctrl+C to quit.")
     print(f"Publishing to {args.topic} at {args.rate:.1f} Hz.")
     print(f"Speeds: linear={args.linear:.2f} m/s, angular={args.angular:.2f} rad/s.")
+    print("Collision stop topic: right_alert")
 
     try:
         tty.setraw(sys.stdin.fileno())
@@ -76,7 +84,12 @@ def main() -> int:
                 elif key == "\x03":
                     break
 
+            rclpy.spin_once(node, timeout_sec=0.0)
+
             if args.deadman > 0.0 and (time.monotonic() - last_cmd_time) > args.deadman:
+                current = (0.0, 0.0, 0.0)
+
+            if right_alert:
                 current = (0.0, 0.0, 0.0)
 
             twist = Twist()

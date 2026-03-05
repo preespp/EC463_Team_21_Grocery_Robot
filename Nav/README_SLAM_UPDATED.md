@@ -86,6 +86,22 @@ Notes:
 - For command-only debugging, you can temporarily set `telemetry_enabled:=false`.
 - For keyboard control, keep both switches in UP (`left_switch:=1`, `right_switch:=1`), otherwise chassis logic may stay disabled.
 
+### 3.5 Collision detection
+
+Open another terminal and change directory to workspace
+
+```bash
+source install/setup.bash
+ros2 launch robot_perception ultrasonic_launch.py
+```
+
+```bash
+python3 /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/STM32/Base_Control_v2/robowalker2024bottominfantry-main/tools/teleop_cmd_vel_collision.py \
+  --topic /cmd_vel \
+  --linear 0.6 \
+  --angular 1.2
+```
+
 ### 4. Manual keyboard teleop (publishes `/cmd_vel`)
 
 ```bash
@@ -179,6 +195,7 @@ ros2 launch nav2_bringup rviz_launch.py
 
 Now set a Nav2 goal in RViz and verify `/cmd_vel` is being published.
 
+### After this step, the content has not been verified yet.
 ### 6. Send Nav2 goal or waypoints
 
 Check Nav2 actions are available:

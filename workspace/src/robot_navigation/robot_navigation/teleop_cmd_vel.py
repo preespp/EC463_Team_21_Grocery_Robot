@@ -14,7 +14,6 @@ import tty
 
 import rclpy
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Bool
 
 
 KEY_BINDINGS = {
