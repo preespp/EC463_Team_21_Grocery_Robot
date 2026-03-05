@@ -34,7 +34,6 @@ class SetCurrentItem(py_trees.behaviour.Behaviour):
 
         # TODO: Replace with real map look up from database
         self.bb.nav_goal = getattr(self.bb, "nav_goal", None)
-        self.bb.shelf_pose = getattr(self.bb, "shelf_pose", None)
         self.bb.rack_goal = int(getattr(item, "shelf_level", 0))
 
         return py_trees.common.Status.SUCCESS
@@ -49,8 +48,7 @@ class SetHome(py_trees.behaviour.Behaviour):
         self.bb = bb
 
     def update(self):
-        home = getattr(self.bb, "home_pose", None)
-        if home is None:
-            return py_trees.common.Status.FAILURE
-        self.bb.nav_goal = home
+        self.bb.nav_goal = getattr(self.bb, "home_goal", None)
+        self.bb.rack_goal = getattr(self.bb, "home_pose", 1)
+        self.bb.pose = getattr(self.bb, "home_rack", 1)
         return py_trees.common.Status.SUCCESS

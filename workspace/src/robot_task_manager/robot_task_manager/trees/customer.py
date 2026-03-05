@@ -12,20 +12,18 @@ def create_customer_tree(bb):
 
             # bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
             # bt_nodes.RepositionRackToGoalLevel(goal_key="rack_goal"),
-            # bt_nodes.RepositionArmToGoalPose(goal_key="shelf_pose"),
-
-            # py_trees.composites.Selector("GrabWithRecovery", memory=True, children=[
-            #     py_trees.composites.Sequence("GrabSequence", memory=True, children=[
+            # bt_nodes.VerifyPosition(),
+            # py_trees.decorators.Retry(
+            #     name="AlignUntilReady",
+            #     num_failures=3,
+            #     child=py_trees.composites.Sequence("AlignStep", memory=True, children=[
+            #         bt_nodes.RepositionArmToGoalPose(goal_key="pose"),
             #         bt_nodes.VerifyPosition(),
-            #         bt_nodes.AdjustOrientation(),
-            #         bt_nodes.MoveGripper(command="close"),
             #     ]),
-            #     bt_nodes.RetryGrab(max_retries=3),
-            # ]),
-
-            # bt_nodes.RepositionArmToGoalPose(goal_key="home_pose"),
-            # bt_nodes.RepositionRackToGoalLevel(goal_key=1),
+            # ),
+            # bt_nodes.MoveGripper(command="close"),
             # bt_nodes.RepositionArmToGoalPose(goal_key="basket_pose"),
+            # bt_nodes.RepositionRackToGoalLevel(goal_key=1),
             # bt_nodes.MoveGripper(command="open"),
             # bt_nodes.RepositionArmToGoalPose(goal_key="home_pose"),
 
@@ -54,4 +52,3 @@ def create_customer_tree(bb):
     )
 
     return root
-

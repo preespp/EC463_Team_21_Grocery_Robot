@@ -35,19 +35,19 @@ class RepositionRackToGoalLevel(py_trees.behaviour.Behaviour):
 
     def update(self):
         # Resolve level
-        if isinstance(self.goal_key, str):
-            level = getattr(self.bb, self.goal_key, None)
-        else:
-            level = self.goal_key
+        level = getattr(self.bb, self.goal_key, None)
+        current_level = getattr(self.bb, "current_rack", None)
 
-        if level is None:
-            self.node.get_logger().error("Shelf level not found")
-            return py_trees.common.Status.FAILURE
+        diff_level = level - current_level
+
+        if diff_level == 0:
+            self.node.get_logger().info("Already at target rack level")
+            return py_trees.common.Status.SUCCESS
 
         # Send goal once
         if not self.sent_goal:
             goal_msg = MoveRack.Goal()
-            goal_msg.shelf_level = int(level)
+            goal_msg.shelf_level = int(diff_level)
 
             send_future = self.client.send_goal_async(
                 goal_msg,
@@ -71,6 +71,7 @@ class RepositionRackToGoalLevel(py_trees.behaviour.Behaviour):
             result = self.result_future.result().result
 
             if result.success:
+                self.bb.current_rack = level
                 self.node.get_logger().info("Rack motion finished")
                 return py_trees.common.Status.SUCCESS
             else:
