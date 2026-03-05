@@ -27,16 +27,22 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
 
     def update(self):
         # TODO: Vision Services
+
+        # Set the new pose on the blackboard for robotics arm
+        self.bb.pose = None # Pose to set after IK from camera frame
         return py_trees.common.Status.SUCCESS
 
-
-class AdjustOrientation(py_trees.behaviour.Behaviour):
+class MoveGripper(py_trees.behaviour.Behaviour):
     """
-    Placeholder for micro adjustment logic (service/action later).
+    command: "open" or "close"
     """
-    def __init__(self):
-        super().__init__("AdjustOrientation")
+    def __init__(self, command: str):
+        super().__init__(f"MoveGripper[{command}]")
+        self.command = command
 
     def update(self):
-        # TODO: Robotics Arm Actions
+        if self.command not in ("open", "close"):
+            return py_trees.common.Status.FAILURE
+
+        # TODO: call gripper service/action
         return py_trees.common.Status.SUCCESS
