@@ -317,7 +317,7 @@ def generate_launch_description():
             DeclareLaunchArgument("frontier_score_w_path", default_value="0.8"),
             DeclareLaunchArgument("frontier_score_w_risk", default_value="0.6"),
             DeclareLaunchArgument("frontier_max_candidate_path_len_m", default_value="0.0"),
-            DeclareLaunchArgument("frontier_risk_check_radius_cells", default_value="8"),
+            DeclareLaunchArgument("frontier_risk_check_radius_cells", default_value="2"),
             DeclareLaunchArgument("frontier_recovery_failures_threshold", default_value="3"),
             DeclareLaunchArgument("frontier_recovery_wait_sec", default_value="3.0"),
             DeclareLaunchArgument("autostart_mission", default_value="true"),

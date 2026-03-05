@@ -1,6 +1,0 @@
-image: /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/run_20260305_014131.pgm
-resolution: 0.030000
-origin: [-1.150000, -4.820000, 0.0]
-negate: 0
-occupied_thresh: 0.65
-free_thresh: 0.196

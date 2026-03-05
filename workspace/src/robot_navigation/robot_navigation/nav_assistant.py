@@ -593,6 +593,7 @@ def build_mission_p1_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"mapping_max_distance_m:={args.mapping_max_distance_m}",
         f"home_retry_limit:={args.home_retry_limit}",
         f"map_output_dir:={Path(args.map_output_dir)}",
+        f"map_name:={args.map_name}",
         f"map_name_prefix:={args.map_name_prefix}",
         f"export_map:={bool_to_launch(args.export_map)}",
         f"export_resolution:={args.export_resolution}",
@@ -600,9 +601,6 @@ def build_mission_p1_launch_cmd(args: argparse.Namespace) -> List[str]:
     nav2_namespace = str(args.nav2_namespace).strip()
     if nav2_namespace:
         command.append(f"nav2_namespace:={nav2_namespace}")
-    map_name = str(args.map_name).strip()
-    if map_name:
-        command.append(f"map_name:={map_name}")
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     if args.nav2_params_file:
@@ -661,6 +659,7 @@ def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"boot_capture_delay_sec:={args.boot_capture_delay_sec}",
         f"home_retry_limit:={args.home_retry_limit}",
         f"map_output_dir:={Path(args.map_output_dir)}",
+        f"map_name:={args.map_name}",
         f"map_name_prefix:={args.map_name_prefix}",
         f"export_map:={bool_to_launch(args.export_map)}",
         f"export_resolution:={args.export_resolution}",
@@ -678,6 +677,7 @@ def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"with_semantic_overlay:={bool_to_launch(args.with_semantic_overlay)}",
         f"shelves_file:={Path(args.shelves_file)}",
         f"semantic_map_topic:={args.semantic_map_topic}",
+        f"semantic_reference_map_yaml:={Path(args.semantic_reference_map_yaml) if args.semantic_reference_map_yaml else ''}",
         f"semantic_auto_align_on_start:={bool_to_launch(args.semantic_auto_align_on_start)}",
         f"semantic_auto_align_retry_sec:={args.semantic_auto_align_retry_sec}",
         f"semantic_auto_align_min_score:={args.semantic_auto_align_min_score}",
@@ -696,14 +696,6 @@ def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
     nav2_namespace = str(args.nav2_namespace).strip()
     if nav2_namespace:
         command.append(f"nav2_namespace:={nav2_namespace}")
-    map_name = str(args.map_name).strip()
-    if map_name:
-        command.append(f"map_name:={map_name}")
-    semantic_reference_map_yaml = str(args.semantic_reference_map_yaml).strip()
-    if semantic_reference_map_yaml:
-        command.append(
-            f"semantic_reference_map_yaml:={Path(semantic_reference_map_yaml)}"
-        )
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     return command
