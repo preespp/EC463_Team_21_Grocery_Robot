@@ -7,18 +7,25 @@ def setup_blackboard():
     bb.mode = None
 
     bb.order: Order | None = None
+    bb.order_id_text = None
 
     bb.items = []
     bb.item_index = 0
     bb.current_item = None
     bb.num_current_item = 0
 
-    bb.nav_goal = (0.0, 0.0)
-    bb.rack_goal = 1
-
-    # Fill out once we conclude the value of each pose for robotics arm
-    bb.shelf_pose = None # Depends on data from database
+    # For manipulation
+    bb.home_pose = None # Home Pose for Arm to see the shelf, assign Constant in here
     bb.basket_pose = None # Assign Constant in here
-    bb.home_pose = None # Assign Constant in here
+    bb.pose = None # Placeholder for current pose of the arm
+
+    # For rack levels
+    bb.current_rack = 1
+    bb.rack_goal = 1
+    bb.home_rack = 1
+
+    # For navigation
+    bb.nav_goal = (0.0, 0.0)
+    bb.home_goal = (0.0, 0.0)
 
     return bb

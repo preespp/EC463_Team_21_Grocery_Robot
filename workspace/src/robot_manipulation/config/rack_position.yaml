@@ -1,0 +1,8 @@
+rack_controller:
+  ros__parameters:
+    bus: 7
+    addr: 13
+
+    shelf1_mm: 0.0
+    shelf2_mm: 240.0
+    shelf3_mm: 480.0

@@ -51,7 +51,18 @@
   <script>
     const user = requireLogin();
     if (user.access_level !== "customer") window.location.href = "login.html";
-    document.getElementById("who").textContent = `${user.username}`;
+    const memberID = user.member_ID || user.id || user.username;
+    if (!memberID) window.location.href = "login.html";
+
+    const first = (user.first_name || "").trim();
+    const last = (user.last_name || "").trim();
+    const fullName = `${first} ${last}`.trim();
+    const who = user.guest
+      ? `Guest (${memberID})`
+      : fullName
+        ? `${fullName} (${memberID})`
+        : `${memberID}`;
+    document.getElementById("who").textContent = who;
 
     idleTimeoutWithWarnings({
         totalMs: 5 * 60 * 1000,      // 5 minutes
@@ -252,18 +263,22 @@ function renderInventory() {
         const it = entry.inv;
         items.push({
         	product_id: it.id,
-          aisle: it.aisle,
           name: it.name,
           price: it.price,
-          rack: it.rack,
-          shelf_level: it.shelf_level,
+          x: it.x,
+          y: it.y,
+          z: it.z,
           stock: it.stock,
           qty: entry.qty
         });
       }
 
       try {
-        const resp = await apiPost("/api/order/customer", { id: user.username, items });
+        const resp = await apiPost("/api/order/customer", {
+          member_ID: memberID,
+          guest: Boolean(user.guest),
+          items
+        });
         sessionStorage.setItem("last_order_id", String(resp.order_id || ""));
         sessionStorage.setItem("last_order_items", JSON.stringify(items));
         window.location.href = "wait.html";

@@ -28,6 +28,7 @@ setup(
         'console_scripts': [
             'camera_vision = robot_vision.camera_vision:main',
             'bar_code = robot_vision.bar_code:main',
+            'realsense_combination = robot_vision.realsense_combination_node:main',
         ],
     },
 )

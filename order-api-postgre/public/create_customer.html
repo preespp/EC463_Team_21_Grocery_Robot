@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Create Customer</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="row">
+      <span class="badge">CREATE CUSTOMER</span>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="window.location.href='login.html'">Back</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Create Customer Account</h1>
+    <p class="muted">Member ID will be auto-generated (3 letters + 3 digits).</p>
+
+    <div class="panel">
+      <div class="grid2">
+        <label class="field">
+          <span class="muted">First name</span>
+          <input id="first" placeholder="" />
+        </label>
+        <label class="field">
+          <span class="muted">Last name</span>
+          <input id="last" placeholder="" />
+        </label>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn primary" id="btnCreate">Create</button>
+      </div>
+
+      <div id="msg" class="muted" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    idleTimeout(60000);
+
+    document.getElementById("btnCreate").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      msg.textContent = "";
+
+      const first_name = document.getElementById("first").value.trim();
+      const last_name = document.getElementById("last").value.trim();
+
+      if (!first_name || !last_name) {
+        msg.textContent = "Please fill First name and Last name.";
+        return;
+      }
+
+      try {
+        const resp = await apiPost("/api/account/create_customer", { first_name, last_name });
+        msg.textContent = `Created successfully. Your Member ID: ${resp.member_ID}. Redirecting to Home...`;
+        setTimeout(() => {
+          window.location.href = "idle.html";
+        }, 800);
+      } catch (e) {
+        msg.textContent = "Create failed: " + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

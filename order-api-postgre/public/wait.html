@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wait</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="center">
+    <img class="logo small" src="logo.png" alt="Logo" />
+    <h1>Wait</h1>
+    <div class="muted" id="info">Order submitted.</div>
+
+    <div class="panel" style="max-width:720px;width:92%">
+      <div class="row" style="justify-content:space-between">
+        <div><b>Order ID:</b> <span id="oid">—</span></div>
+        <div><b>Status:</b> RECEIVED</div>
+      </div>
+    </div>
+    <div id="orderList" class="scroll-box" style="height:35vh"></div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+  const items = JSON.parse(sessionStorage.getItem("last_order_items") || "[]");
+  const list = document.getElementById("orderList");
+  list.innerHTML = items.map(it =>
+    `<div class="card">
+        <div style="font-weight:900">${it.name} × ${it.qty}</div>
+        <div class="muted small">x: ${it.x}, y: ${it.y}, shelf(z): ${it.z}</div>
+    </div>`
+    ).join("");
+
+  const user = getSession();
+  if (!user) window.location.href = "login.html";
+
+  const oid = sessionStorage.getItem("last_order_id") || "—";
+  document.getElementById("oid").textContent = oid;
+
+  const infoEl = document.getElementById("info");
+
+  function logoutAndGoHome() {
+      clearSession();
+      sessionStorage.removeItem("last_order_id");
+      sessionStorage.removeItem("last_order_items");
+      window.location.href = "idle.html";
+  }
+
+  function showDoneAndRedirect(text) {
+      // simple full-screen overlay for 5 seconds
+      const overlay = document.createElement("div");
+      overlay.style.cssText = `
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.65); z-index:9999; padding:22px; text-align:center;
+      `;
+      overlay.innerHTML = `
+      <div style="max-width:720px;width:92%;border-radius:18px;padding:18px;
+                  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);">
+          <div style="font-size:34px;font-weight:900;">${text}</div>
+          <div class="muted" style="margin-top:10px;">Logging out and returning home in 5 seconds…</div>
+      </div>
+      `;
+      document.body.appendChild(overlay);
+
+      setTimeout(logoutAndGoHome, 5000);
+  }
+
+  async function pollStatus() {
+      try {
+      // NEW endpoint we’ll add in server.js
+      const r = await apiGet(`/api/order/status/${encodeURIComponent(oid)}`);
+      // r = { order_id, status, result? }
+
+      if (r.status === "RECEIVED") {
+          infoEl.textContent = "Order received. Waiting for robot…";
+      } else if (r.status === "IN_PROGRESS") {
+          infoEl.textContent = "Robot is working on your order…";
+      } else if (r.status === "DONE") {
+          showDoneAndRedirect("Done!");
+          return true;
+      } else if (r.status === "FAILED") {
+          showDoneAndRedirect("Failed (check robot)");
+          return true;
+      }
+      } catch (e) {
+      // Node or endpoint not reachable
+      infoEl.textContent = "Waiting… (connection issue)";
+      }
+      return false;
+  }
+
+  // Poll every 1s
+  (async function loop() {
+      while (true) {
+      const finished = await pollStatus();
+      if (finished) break;
+      await new Promise((res) => setTimeout(res, 1000));
+      }
+  })();
+  </script>
+</body>
+</html>

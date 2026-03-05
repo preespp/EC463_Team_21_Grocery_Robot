@@ -53,9 +53,18 @@ class BTExecutor(Node):
 
             data = r.json()
             order_msg = self.convert_json_to_order(data)
+            self.bb.order_id_text = str(
+                data.get("order_id")
+                or data.get("restock_id")
+                or data.get("id", "")
+            )
             self.accept_order(order_msg)
 
-            requests.post(f"{SERVER}/api/order/ack", timeout=1.0)
+            requests.post(
+                f"{SERVER}/api/order/ack",
+                json={"order_id": self.bb.order_id_text},
+                timeout=1.0
+            )
 
         except requests.exceptions.RequestException as e:
             self.get_logger().warn(f"Node.js unreachable: {e}")
@@ -70,6 +79,8 @@ class BTExecutor(Node):
 
         # Put everything into blackboard
         self.bb.order = order
+        if not getattr(self.bb, "order_id_text", None):
+            self.bb.order_id_text = str(order.order_id)
         self.bb.mode = str(order.role).strip().lower()
         self.bb.items = list(order.items)
         self.bb.item_index = 0
@@ -88,6 +99,7 @@ class BTExecutor(Node):
         # Clear order data
         self.tree = None
         self.bb.order = None
+        self.bb.order_id_text = None
         self.bb.items = []
         self.bb.item_index = 0
         self.bb.current_item = None
@@ -96,6 +108,8 @@ class BTExecutor(Node):
         self.bb.nav_goal = (0.0, 0.0)
         self.bb.rack_goal = 1
         self.bb.shelf_pose = None
+        self.bb.current_rack = 1
+        self.bb.pose = None
 
         self.get_logger().info("Order cleared -> IDLE")
 
@@ -134,10 +148,15 @@ class BTExecutor(Node):
             self.get_logger().info(f"BT finished: {status}")
             try:
                 if self.bb.order is not None:
+                    order_id_to_report = (
+                        self.bb.order_id_text
+                        if getattr(self.bb, "order_id_text", None)
+                        else str(self.bb.order.order_id)
+                    )
                     requests.post(
                         f"{SERVER}/api/order/complete",
                         json={
-                            "order_id": int(self.bb.order.order_id),
+                            "order_id": order_id_to_report,
                             "result": str(status),
                         },
                         timeout=1.0,
@@ -149,23 +168,33 @@ class BTExecutor(Node):
 
     def convert_json_to_order(self, data: dict) -> Order:
         order = Order()
-        order.order_id = int(data["order_id"])
-        order.role = data["role"]
+        order_id_raw = str(data.get("order_id", "0"))
+        order.order_id = self._parse_order_numeric(order_id_raw)
+        order.role = data.get("role", "customer")
         order.requester_id = str(data.get("requester_id", data.get("id", "")))
 
-        for it in data["items"]:
+        for it in data.get("items", []):
             item = OrderItem()
-            item.product_id = it["product_id"]
-            item.name = it["name"]
-            item.aisle = it["aisle"]
-            item.rack = int(it["rack"])
-            item.shelf_level = int(it["shelf_level"])
-            item.qty = int(it["qty"])
-            item.price = float(it["price"])
-            item.stock = int(it["stock"])
+            x = it.get("x", it.get("aisle", 0))
+            y = it.get("y", it.get("rack", 0))
+            z = it.get("z", it.get("shelf_level", 0))
+            item.product_id = str(it.get("product_id", ""))
+            item.name = str(it.get("name", ""))
+            item.aisle = str(x)
+            item.rack = int(float(y))
+            item.shelf_level = int(float(z))
+            item.qty = int(it.get("qty", 0))
+            item.price = float(it.get("price", 0.0))
+            item.stock = int(it.get("stock", 0))
             order.items.append(item)
 
         return order
+
+    @staticmethod
+    def _parse_order_numeric(order_id_raw: str) -> int:
+        # ROS message field is int64; keep compatibility with string IDs like AAA001O12345.
+        digits = "".join(ch for ch in str(order_id_raw) if ch.isdigit())
+        return int(digits) if digits else 0
 
 
 def main():
@@ -178,4 +207,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

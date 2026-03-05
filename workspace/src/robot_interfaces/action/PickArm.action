@@ -1,0 +1,19 @@
+# Goal
+geometry_msgs/PoseStamped target_pose
+string planning_group
+string ee_link
+float32 pregrasp_offset_m
+float32 retreat_offset_m
+float32 gripper_close_position
+bool use_cartesian_approach
+
+---
+# Result
+bool success
+string message
+float32 final_position_error_m
+
+---
+# Feedback
+string stage
+float32 position_error_m
