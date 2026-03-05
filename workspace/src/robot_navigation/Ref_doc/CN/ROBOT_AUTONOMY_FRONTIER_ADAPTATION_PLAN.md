@@ -1,68 +1,67 @@
-# Robot Autonomy Frontier Adaptation Plan
+# Robot Autonomy Frontier Adaptation Plan（中文）
 
-## 0. 文档目标
+## 0. 目的
 
-本计划用于在当前代码基础上，落地“边建图边定位 + 自动探索 + 可随时人工接管”的完整技术路线，并给出：
+本计划用于将当前导航栈演进为完整的“在线建图 + 在线定位 + 自主探索 + 人工随时接管”工作流。
 
-1. 先后顺序与优先级（可执行的里程碑）。
-2. 当前代码中的 Nav2 参数基线、参数意义、现有效果预估、调整建议。
-3. 未完成模块的设计规划（Frontier、仲裁、任务编排、语义叠加）。
-4. 每个模块的验证方法与验收标准（DoD）。
+文档包含：
+1. 执行顺序与优先级。
+2. 基于代码现状的 Nav2 参数基线、设计理由与预期行为。
+3. 核心模块设计（frontier、速度仲裁、任务编排、语义货架叠加）。
+4. 模块级验证方法与验收标准。
 
 ---
 
-## 1. 现状基线（按代码核对）
+## 1. 当前基线（按代码核对）
 
-## 1.1 当前主链路（已具备）
+## 1.1 现有运行链路
 
-1. `robot_localization` EKF：
+1. `robot_localization` EKF：  
    `/odom_raw + /sick_scansegment_xd/imu -> /odom`
-2. `Cartographer`（在线 SLAM）：
-   `use_odometry=true`, `use_imu_data=false`，进行 scan matching + pose graph
-3. `Nav2`：
-   全局 `NavFnPlanner(use_astar=false)`，局部 `DWBLocalPlanner`
-4. 低层安全：
-   超声波 `/front_alert,/back_alert,/left_alert,/right_alert` 在串口桥直接限向
-5. 地图分辨率默认：
-   导出默认 `0.03`，Nav2 local/global costmap 默认 `0.03`
+2. `Cartographer`（在线 SLAM）：  
+   `use_odometry=true`，`use_imu_data=false`，执行 scan matching + pose graph。
+3. `Nav2`：  
+   全局规划器 `NavFnPlanner (use_astar=false)`，局部控制器 `DWBLocalPlanner`。
+4. 底层安全：  
+   串口桥中基于超声波告警（`/front_alert`, `/back_alert`, `/left_alert`, `/right_alert`）进行方向限速/限行。
+5. 分辨率默认值：  
+   地图导出默认 `0.03`，Nav2 本地/全局 costmap 默认 `0.03`。
 
-## 1.2 当前已知缺口（未完成）
+## 1.2 原始缺口（计划视角）
 
-1. 无 Frontier 节点实现（仓库内未发现 `frontier/explore` 代码）。
-2. 无 `cmd_vel` 优先级仲裁（当前为多 topic “最后到达覆盖”）。
-3. 无 mission orchestrator 状态机（自动探索 -> 回家 -> 保存 -> 语义叠加）。
-4. 无统一一键顶层 launch（目标 `auto_frontier_mission.launch.py` 尚未实现）。
-5. 语义货架层（`shelves.yaml/json` 及变换）尚未实现。
+1. 缺少 frontier 探索节点。
+2. 缺少严格的 `manual > auto` `/cmd_vel` 仲裁。
+3. 缺少端到端任务状态机（mission orchestrator）。
+4. 缺少一键全自动 mission 顶层 launch。
+5. 缺少语义货架叠加层（`shelves.yaml/json` + 变换对齐）。
 
 ---
 
-## 2. 总体架构（目标态）
+## 2. 目标架构
 
 ```text
-LiDAR + IMU + Wheel Odom Raw
-        |        |        |
-        +--------+--------+
-                 v
-           EKF (/odom)
-                 |
-                 v
-Cartographer (online SLAM, map<->odom, scan matching)
-                 |
-                 +--> /map (online occupancy grid)
-                 |
-                 v
-            Nav2 (NavFn + DWB)
-                 ^
-                 |
-     Frontier Explorer (auto goals)
-                 |
-           /cmd_vel_auto
+LiDAR + IMU + Raw wheel odom
+          |       |
+          +-------+-------> EKF (/odom)
+                           |
+                           v
+Cartographer online SLAM (scan matching + loop closure + map<->odom)
+                           |
+                           +--> /map (online occupancy grid)
+                           |
+                           v
+                        Nav2
+                           ^
+                           |
+                Frontier Explorer (NavigateToPose goals)
+                           |
+                      /cmd_vel_auto
 
-Teleop -> /cmd_vel_manual ----+
-                              v
-                     cmd_vel_arbiter -> /cmd_vel -> nav2_serial_bridge -> STM32
-                              ^
-                     /manual_override (抢占)
+Teleop --> /cmd_vel_manual ----+
+                               v
+                     cmd_vel_arbiter --> /cmd_vel --> nav2_serial_bridge --> STM32
+                               ^
+                     /manual_override (Bool)
 
 Mission Orchestrator:
 BOOT -> AUTO_EXPLORE -> RETURN_HOME -> SAVE_EXPORT -> LOAD_SEMANTIC -> READY_FOR_TASKS
@@ -72,287 +71,301 @@ BOOT -> AUTO_EXPLORE -> RETURN_HOME -> SAVE_EXPORT -> LOAD_SEMANTIC -> READY_FOR
 
 ## 3. 实施顺序与优先级
 
-## P0（最高优先级）控制权与安全闭环
+## P0（最高优先级）：控制权与安全闭环
 
-目标：保证“随时人工接管”是硬约束，不依赖人为时机。
+目标：  
+保证任何时刻都能立即人工接管。
 
 任务：
-1. 新增 `cmd_vel_arbiter`：
-   `/cmd_vel_manual` 高优先级、`/cmd_vel_auto` 低优先级、输出 `/cmd_vel`
-2. 新增 `/manual_override`（`std_msgs/Bool`）：
-   - `true`：立即切手动、发 zero-stop、取消自动目标
-   - `false`：允许恢复自动
-3. 统一将自动控制输出改到 `/cmd_vel_auto`，teleop 改到 `/cmd_vel_manual`
-4. 保留低层超声波限向逻辑（现有串口桥逻辑不改）
+1. 增加 `cmd_vel_arbiter`：  
+   `/cmd_vel_manual` 高优先级，`/cmd_vel_auto` 低优先级，输出 `/cmd_vel`。
+2. 增加 `/manual_override`（`std_msgs/Bool`）：  
+   - `true`：立即接管，零速刹停，取消自动导航目标。  
+   - `false`：允许自动流程恢复。
+3. 所有自治速度统一走 `/cmd_vel_auto`。
+4. 保留现有超声波底层限向策略。
 
 完成标准：
-1. 抢占延迟 <= 150 ms
-2. 抢占后停止距离 <= 0.20 m（低速 profile）
-3. 人工释放后可恢复自动任务（不中断状态机）
+1. 人工接管延迟 <= 150 ms。
+2. 探索速度下接管后制动距离 <= 0.20 m。
+3. 释放接管后自动流程可恢复，且无死锁。
 
 ---
 
-## P1 任务状态机骨架（无 Frontier，先可运行）
+## P1：任务状态机骨架（先不引入 frontier）
 
-目标：先把流程框架跑通，降低后续 Frontier 集成风险。
+目标：  
+在引入 frontier 复杂性之前，先让全链路稳定可运行。
 
 任务：
-1. 新增 `mission_orchestrator`（动作编排节点）
-2. 状态实现：
-   `BOOT -> AUTO_MAP_V1 -> RETURN_HOME -> SAVE_EXPORT -> LOCALIZE_READY`
-3. `AUTO_MAP_V1` 先用闭环固定扫图轨迹（map frame 闭环，不用开环速度）
-4. 建图结束条件（并行）：
-   - 时间阈值
-   - 路程阈值
-   - `finish_mapping` 手动服务
+1. 增加 `mission_orchestrator`。
+2. 状态流：  
+   `BOOT -> AUTO_MAP_V1 -> RETURN_HOME -> SAVE_EXPORT -> LOCALIZE_READY`。
+3. `AUTO_MAP_V1` 使用地图坐标系下闭环固定轨迹。
+4. 建图完成条件：  
+   - 达到最大时间阈值  
+   - 达到最大行驶距离阈值  
+   - 手动触发 `finish_mapping` 服务
 
 完成标准：
-1. 一键启动后无需手工切流程即可完成“扫图+回家+保存导图”
-2. 中途任意时刻可 `manual_override` 抢占并恢复
+1. 一条命令可完成建图 + 回家 + 保存/导出。
+2. 任意状态可人工接管，并支持恢复。
 
 ---
 
-## P2 Frontier Explorer（自动探图核心）
+## P2：集成 Frontier Explorer
 
-目标：从固定轨迹过渡到真实 frontier 探索。
+目标：  
+用真正的 frontier 探索替代固定轨迹建图。
 
 任务：
-1. 新增 `frontier_explorer` 节点：
-   - 订阅 `/map`
-   - Frontier 提取（未知-自由边界）
-   - 聚类（BFS 连通域）
-   - 候选点生成（簇重心或最近可达点）
-   - 可达性检查（`ComputePathToPose` 或规划服务）
-   - 打分选择（信息增益 - 路径代价 - 风险代价）
-2. 失败恢复策略：
-   - 超时/无进展：取消目标 + 黑名单
-   - 连续失败：触发 wait/spin/replan，必要时人工接管
-3. 终止条件：
-   - 连续 N 轮无有效 frontier
-   - 地图新增面积低于阈值
-   - 达到最大探索时长
+1. 增加 `frontier_explorer` 节点：  
+   - 订阅 `/map`  
+   - frontier 提取：未知格邻接自由格  
+   - 聚类：BFS 连通域  
+   - 候选点生成：质心或最近可达点  
+   - 可达性检查：规划服务或 `ComputePathToPose`  
+   - 打分：信息增益 - 路径代价 - 风险代价
+2. 失败处理：  
+   - 超时/无进展：取消目标并拉黑候选  
+   - 连续失败：恢复链（等待/旋转/重规划）后再回退
+3. 停止条件：  
+   - 连续 `N` 轮无 frontier  
+   - 地图增长低于阈值  
+   - 达到最大探索时间
 
 完成标准：
-1. 能在未知环境持续自主生成并执行目标
-2. 不出现重复陷入同一区域循环
-3. 结束条件可稳定触发并进入 `RETURN_HOME`
+1. 机器人持续生成并执行自主探索目标。
+2. 不在同一区域持续死循环。
+3. 停止条件触发后能正确转入 `RETURN_HOME`。
 
 ---
 
-## P3 回家、保存、导图自动化
+## P3：回家与保存导出自动化
 
-目标：探索结束后稳定回到起点并沉淀地图产物。
+目标：  
+可靠回到起点并持久化地图产物。
 
 任务：
-1. 在 `BOOT` 后静止窗口记录 `home_pose`（`map->base_link`）
-2. `RETURN_HOME` 调用 `NavigateToPose(home_pose)`
-3. `SAVE_EXPORT`：
-   - `/write_state` 保存 `.pbstream`
-   - 调 `cartographer_pbstream_to_ros_map` 导出 `.yaml/.pgm`
-   - 文件名带时间戳避免覆盖
+1. 启动稳定窗口后记录 `home_pose`（`map->base_link`）。
+2. `RETURN_HOME` 阶段发送 `NavigateToPose(home_pose)`。
+3. `SAVE_EXPORT` 阶段：  
+   - 通过 `/write_state` 保存 `.pbstream`  
+   - 用 `cartographer_pbstream_to_ros_map` 导出 `.yaml/.pgm`  
+   - 时间戳命名，避免覆盖
 
 完成标准：
-1. 回家成功率 >= 95%（10 次测试）
-2. 回家误差：`xy <= 0.15m`, `yaw <= 10deg`
-3. 地图文件完整产出且可直接被 localization stack 加载
+1. 10 次运行回家成功率 >= 95%。
+2. 回家误差：`xy <= 0.15 m`，`yaw <= 10 deg`。
+3. 导出的地图可被定位栈加载。
 
 ---
 
-## P4 语义货架层叠加
+## P4：语义货架叠加层
 
-目标：不改 occupancy grid 像素，仅叠加业务语义坐标。
+目标：  
+在不修改占据栅格像素的前提下叠加语义货架坐标。
 
 任务：
-1. 设计 `shelves.yaml/json`（`shelf_id -> pose`）
-2. 实现 `semantic_overlay` 节点：
-   - 读取参考语义图层
-   - 计算 `T_ref_map_to_new_map`
-   - 发布变换后货架坐标（Marker + 查询服务）
-3. V1：同起点同朝向 + 2 点人工校准
-4. V2：自动配准（ICP/特征点）
+1. 定义 `shelves.yaml/json`（`shelf_id -> pose`）格式。
+2. 增加 `semantic_overlay` 节点：  
+   - 加载参考语义地图  
+   - 估计 `T_ref_map_to_new_map`  
+   - 发布对齐后的 marker + 查询服务
+3. V1 对齐：  
+   同起点假设 + 手工两点标定。
+4. V2 对齐：  
+   自动配准（ICP 或特征匹配类方案）。
 
 完成标准：
-1. 货架点叠加误差 <= 0.20 m（V1）
-2. 可通过 `shelf_id` 查询目标位姿并成功发 Nav2 goal
+1. V1 叠加误差 <= 0.20 m。
+2. 任务层可按 `shelf_id` 查询目标并下发 Nav2 导航。
 
 ---
 
-## P5 参数稳态调优与回归
+## P5：参数稳定化与回归
 
-目标：在 `0.03` 分辨率下兼顾稳定性、负载、动态避障表现。
+目标：  
+在 `0.03` 分辨率下稳定导航质量和计算负载。
 
 任务：
-1. 构建“慢速探索 profile”和“任务运行 profile”
-2. 每轮只改 1~2 个参数，记录前后指标
-3. 回归四类核心指标：
-   - CPU/内存负载
-   - 规划与控制频率稳定性
-   - 动态避障成功率
-   - 人工接管响应性能
+1. 维护两套参数档位：  
+   - 慢速探索档  
+   - 任务执行档
+2. 渐进式调参（每次改 1-2 个参数并记录日志）。
+3. 跟踪关键指标：  
+   - CPU/内存负载  
+   - 规划/控制时序稳定性  
+   - 动态障碍通过成功率  
+   - 手动接管响应
 
 完成标准：
-1. `controller_frequency` 实测接近目标且无长时掉频
-2. 动态障碍场景下显著减少振荡/卡住
-3. 关键指标有对比记录并形成调参基线
+1. 控制环频率稳定，无持续跌频。
+2. 动态障碍场景下振荡/卡滞事件下降。
+3. 两套档位具备可复现实验报告。
 
 ---
 
-## 4. Nav2 参数基线与调整建议（当前代码对照）
+## 4. Nav2 参数基线与调参建议
 
-说明：下表“当前考量/效果预估”为基于参数值和现有链路的工程推断，用于调参优先级判断。
+说明：  
+“当前理由/预期效果”来自当前参数与栈行为的工程推断。
 
-## 4.1 全局/局部代价地图
+## 4.1 Costmap 参数
 
-| 参数路径 | 当前值 | 参数意义 | 当前考量/效果预估 | 调整建议（自动探索慢速） |
+| 参数路径 | 当前值 | 含义 | 当前理由 / 预期效果 | 探索慢速档建议 |
 |---|---:|---|---|---|
-| `local_costmap.update_frequency` | `5.0` | 局部地图更新频率 | 中等频率，动态障碍响应可用但非高刷新 | 可尝试 `8~10`（CPU 允许时） |
-| `local_costmap.publish_frequency` | `2.0` | 局部地图发布频率 | RViz 可视化偏低，但控制不直接依赖发布频率 | 可维持 |
-| `local_costmap.width/height` | `3/3` | 局部窗口范围（m） | 近场避障为主，前瞻距离偏短 | 探索可升到 `4~5` |
-| `local_costmap.resolution` | `0.03` | 栅格分辨率 | 精度提升，CPU负载增加 | 维持 `0.03` |
-| `local_costmap.robot_radius` | `0.40` | 碰撞包络 | 对底盘外廓较保守，利于安全 | 如盲区风险高可增至 `0.42~0.45` |
-| `inflation_radius` | `0.55` | 障碍膨胀半径 | 偏保守，过道可能更难通行 | 探索场景建议维持或小幅上调到 `0.60` |
-| `cost_scaling_factor` | `3.0` | 膨胀代价衰减 | 中等偏平衡 | 卡边时下调；过保守时上调 |
-| `voxel_layer.z_resolution/z_voxels` | `0.05 / 16` | 3D 体素高度离散 | 对 2D 移动底盘足够 | 保持 |
-| `cloud.obstacle_max_range` | `2.5` | 障碍有效距离 | 近中距反应为主 | 场地大可升到 `3.0` |
-| `cloud.raytrace_max_range` | `3.0` | 清除射线最大范围 | 支持中距清障 | 保持或跟随激光有效范围 |
-| `global_costmap.resolution` | `0.03` | 全局规划分辨率 | 精细路径，负载高于 `0.05` | 资源紧张可回到 `0.05` 做对比 |
-| `global_costmap.update_frequency` | `1.0` | 全局更新频率 | 适合静态图+缓慢变化 | 探索中一般可保持 |
-| `track_unknown_space` | `true` | 追踪未知区域 | 对 frontier 与未知区域规划必要 | 必须保持 `true` |
+| `local_costmap.update_frequency` | `5.0` | 本地地图更新频率 | 动态响应与负载平衡 | CPU 允许时测 `8~10` |
+| `local_costmap.publish_frequency` | `2.0` | 本地地图发布频率 | 主要影响可视化，不是控制主环 | 保持 |
+| `local_costmap.width/height` | `3/3` | 本地窗口大小（m） | 近场聚焦、前视较短 | 可增至 `4~5` |
+| `local_costmap.resolution` | `0.03` | 本地栅格分辨率 | 精度高、负载也高 | 保持 `0.03` |
+| `local_costmap.robot_radius` | `0.40` | 机器人碰撞包络 | 偏保守、更安全 | 风险高时试 `0.42~0.45` |
+| `inflation_radius` | `0.55` | 膨胀半径 | 路径更保守 | 保持或增至 `0.60` |
+| `cost_scaling_factor` | `3.0` | 膨胀衰减斜率 | 折中 | 擦边则降、过保守则升 |
+| `voxel_layer.z_resolution/z_voxels` | `0.05 / 16` | 体素化配置 | 对当前平台够用 | 保持 |
+| `cloud.obstacle_max_range` | `2.5` | 障碍观测距离 | 近中距离优先 | 空旷环境可试 `3.0` |
+| `cloud.raytrace_max_range` | `3.0` | 清障射线距离 | 中距离清障能力 | 保持 |
+| `global_costmap.resolution` | `0.03` | 全局分辨率 | 全局规划精细但更耗算力 | 算力不足再退 `0.05` |
+| `global_costmap.update_frequency` | `1.0` | 全局地图更新频率 | 适合较静态场景 | 保持 |
+| `track_unknown_space` | `true` | 是否跟踪未知区 | frontier 必需 | 必须保持 `true` |
 
-## 4.2 规划器与控制器
+## 4.2 规划器与控制器参数
 
-| 参数路径 | 当前值 | 参数意义 | 当前考量/效果预估 | 调整建议（自动探索慢速） |
+| 参数路径 | 当前值 | 含义 | 当前理由 / 预期效果 | 探索慢速档建议 |
 |---|---:|---|---|---|
-| `planner_server.GridBased.plugin` | `NavfnPlanner` | 全局规划器 | 成熟稳定 | 保持 |
-| `GridBased.use_astar` | `false` | Dijkstra/A* 切换 | 当前是 Dijkstra 风格，稳定但可能更保守 | 可维持 `false`，后续对比 `true` |
-| `GridBased.tolerance` | `0.5` | 目标容差 | 允许在拥挤环境更易收敛 | 高精定位任务可降到 `0.2~0.3` |
-| `controller_frequency` | `20.0` | 控制循环频率 | 标准值，需保证掉频少 | 若 CPU 紧张可降到 `15` |
-| `FollowPath.max_vel_x` | `0.26` | 前进最大速度 | 中速偏稳 | 探索先降到 `0.15~0.20` |
-| `FollowPath.max_vel_y` | `0.20` | 横移最大速度 | 已启用全向能力 | 探索先降到 `0.08~0.15` |
-| `FollowPath.max_vel_theta` | `1.0` | 角速度上限 | 转向较积极 | 探索先降到 `0.6~0.8` |
-| `acc_lim_x/y/theta` | `2.5/1.5/3.2` | 加速度上限 | 响应较快 | 探索下调，减少急动与振荡 |
-| `decel_lim_x/y/theta` | `-2.5/-1.5/-3.2` | 减速度上限 | 急停能力强 | 与加速度成对慢化 |
-| `vx/vy/vtheta_samples` | `20/15/20` | 轨迹采样密度 | 质量较好但算力占用高 | 探索可先降到 `15/10/15` |
-| `sim_time` | `1.7` | 前瞻时域 | 中等前瞻 | 拥挤场景可 `1.5~2.0` 调优 |
-| `BaseObstacle.scale` | `0.02` | 障碍代价权重 | 数值偏低，可能过于追路径 | 探索建议先提高到 `0.05~0.1` |
-| `PathAlign/PathDist` | `32/32` | 贴路径倾向 | 容易“守路径” | 人流环境可适度下调 |
-| `GoalDist.scale` | `24` | 逼近目标倾向 | 收敛性好 | 过冲时下调 |
+| `GridBased.plugin` | `NavFnPlanner` | 全局规划器 | 稳定基线 | 保持 |
+| `GridBased.use_astar` | `false` | Dijkstra/A* 切换 | 行为稳健可预期 | 先保持，后续可基准对比 |
+| `GridBased.tolerance` | `0.5` | 规划终点容差 | 拥挤环境更易收敛 | 可降至 `0.2~0.3` |
+| `controller_frequency` | `20.0` | 控制循环频率 | 标准值 | 仅在负载高时降至 `15` |
+| `FollowPath.max_vel_x` | `0.26` | 最大前进速度 | 中速 | 探索可降至 `0.15~0.20` |
+| `FollowPath.max_vel_y` | `0.20` | 最大横移速度 | 全向底盘开启 | 探索可降至 `0.08~0.15` |
+| `FollowPath.max_vel_theta` | `1.0` | 最大角速度 | 转向偏激进 | 探索可降至 `0.6~0.8` |
+| `acc_lim_x/y/theta` | `2.5/1.5/3.2` | 加速度限幅 | 响应快但可能生硬 | 降低可更平滑 |
+| `decel_lim_x/y/theta` | `-2.5/-1.5/-3.2` | 减速度限幅 | 制动强 | 与加速度联调 |
+| `vx/vy/vtheta_samples` | `20/15/20` | 采样密度 | 质量高、计算重 | 可先试 `15/10/15` |
+| `sim_time` | `1.7` | 轨迹前瞻时间 | 中等前瞻 | 在 `1.5~2.0` 调整 |
+| `BaseObstacle.scale` | `0.02` | 障碍代价权重 | 可能偏低 | 先升到 `0.05~0.10` |
+| `PathAlign/PathDist` | `32/32` | 路径贴合权重 | 可能过于贴路径 | 人群动态场景可略降 |
+| `GoalDist.scale` | `24` | 目标靠近权重 | 收敛较好 | 过冲时可下调 |
 
-## 4.3 进度检查、恢复、平滑器
+## 4.3 进度检查、恢复与平滑器
 
-| 参数路径 | 当前值 | 参数意义 | 当前考量/效果预估 | 调整建议（自动探索慢速） |
+| 参数路径 | 当前值 | 含义 | 当前理由 / 预期效果 | 探索慢速档建议 |
 |---|---:|---|---|---|
-| `progress_checker.required_movement_radius` | `0.5` | 判定“有进展”的位移阈值 | 阈值较大，窄空间可能误判卡住 | 探索建议 `0.2~0.3` |
-| `progress_checker.movement_time_allowance` | `10.0` | 进展时间窗口 | 中等容忍 | 行人密集可增到 `12~15` |
-| `goal_checker.xy/yaw_goal_tolerance` | `0.25/0.25` | 到位容差 | 对导航稳定友好 | 可保持 |
-| `behavior_plugins` | `spin/backup/drive_on_heading/wait/assisted_teleop` | 恢复动作集合 | 已具备标准恢复链 | 盲区风险下优先 `wait+spin+replan` |
-| `velocity_smoother.feedback` | `OPEN_LOOP` | 平滑反馈模式 | 简单稳定，不依赖闭环速度反馈 | 可保持，后续评估 `CLOSED_LOOP` |
-| `velocity_smoother.max_velocity` | `[0.26,0.20,1.0]` | 平滑速度上限 | 与 DWB 一致 | 探索 profile 同步下调 |
+| `progress_checker.required_movement_radius` | `0.5` | 判定“有进展”所需位移 | 狭窄区域可能偏大 | 可降至 `0.2~0.3` |
+| `progress_checker.movement_time_allowance` | `10.0` | 进展超时窗口 | 中等 | 拥挤场景可增至 `12~15` |
+| `goal_checker.xy/yaw_goal_tolerance` | `0.25/0.25` | 终点位姿容差 | 实用折中 | 保持 |
+| `behavior_plugins` | `spin/backup/drive_on_heading/wait/assisted_teleop` | 恢复行为集合 | 基线完整 | 优先使用 `wait + spin + replan` |
+| `velocity_smoother.feedback` | `OPEN_LOOP` | 平滑反馈模式 | 简单稳定 | 先保持 |
+| `velocity_smoother.max_velocity` | `[0.26,0.20,1.0]` | 平滑器速度上限 | 与 DWB 对齐 | 探索档可同步下调 |
 
-## 4.4 AMCL 相关（当前非主定位）
+## 4.4 AMCL 状态
 
 | 参数路径 | 当前值 | 说明 |
 |---|---:|---|
-| `amcl.tf_broadcast` | `false` | 避免与 Cartographer 冲突发布 `map->odom` |
-| `amcl.scan_topic` | `/scan_fullframe` | 配置存在，但当前主定位链路为 Cartographer |
+| `amcl.tf_broadcast` | `false` | 避免与 Cartographer 的 `map->odom` 冲突 |
+| `amcl.scan_topic` | `/scan_fullframe` | 参数存在，但当前定位主导仍是 Cartographer |
 
 ---
 
-## 5. EKF + Cartographer 融合链路检查点
+## 5. EKF + Cartographer 融合链
 
-## 5.1 当前配置结论
+## 5.1 当前配置概述
 
-1. EKF 已融合：`/odom_raw + IMU -> /odom`
-2. Cartographer 使用 odom 先验：`use_odometry=true`
-3. Cartographer 当前不直接用 IMU：`use_imu_data=false`
+1. EKF 融合 `/odom_raw` 与 IMU，输出 `/odom`。
+2. Cartographer 使用里程计先验（`use_odometry=true`）。
+3. Cartographer 不直接使用 IMU（`use_imu_data=false`）。
 
-## 5.2 调整建议
+## 5.2 建议
 
-1. 先保持当前分层融合，不立即给 Cartographer 直连 IMU。
-2. 优先调好 EKF covariance、时间同步、TF 稳定性。
-3. 仅在出现明显航向漂移场景时，再评估 Cartographer `use_imu_data=true` 的收益与副作用。
+1. 先保持当前分层融合方案不变。
+2. 优先保证时间戳一致性、TF 完整性、协方差合理性。
+3. 仅在基线稳定且漂移问题明确时，再评估 `use_imu_data=true`。
 
 ---
 
-## 6. 未完成模块设计规划（详细）
+## 6. 未完成模块设计
 
 ## 6.1 `cmd_vel_arbiter`（新增）
 
 职责：
-1. 输入：`/cmd_vel_manual`, `/cmd_vel_auto`, `/manual_override`
-2. 输出：`/cmd_vel`
-3. 逻辑：
-   - `manual_override=true`：仅放行 manual
-   - `manual_override=false`：manual 有效时仍优先，超时回退 auto
+1. 输入：`/cmd_vel_manual`、`/cmd_vel_auto`、`/manual_override`。
+2. 输出：`/cmd_vel`。
+3. 仲裁：
+   - `manual_override=true`：只放行手动。
+   - `manual_override=false`：手动活动时仍优先；超时回落到自动。
 4. 安全：
-   - 源超时自动发 stop
-   - 切换源时发一帧 stop 防突变
+   - 源超时时发停止帧
+   - 源切换时注入一帧零速，抑制指令突变
 
 ## 6.2 `mission_orchestrator`（新增）
 
 职责：
-1. 管理任务状态机与跨节点动作调用。
-2. 统一处理抢占：
-   - 收到 manual override -> 暂停/取消当前自动动作
-   - 释放后从可恢复状态继续
+1. 管理任务状态迁移与跨节点动作编排。
+2. 处理抢占：
+   - 手动接管时暂停/取消自动动作
+   - 释放后从合法状态恢复
 
 核心接口：
-1. `start_mission`, `pause_mission`, `resume_mission`, `finish_mapping`
-2. action client：`navigate_to_pose`, `follow_waypoints`
-3. service client：`/write_state`
+1. 服务/动作：  
+   `start_mission`、`pause_mission`、`resume_mission`、`finish_mapping`
+2. 动作客户端：  
+   `navigate_to_pose`、`follow_waypoints`
+3. 服务客户端：  
+   `/write_state`
 
 ## 6.3 `frontier_explorer`（新增）
 
-算法建议：
-1. Frontier 提取：`unknown(-1)` 且邻接 `free(0)`
-2. 聚类：BFS 连通域
-3. 候选点：簇重心 + 最近可达点回退
-4. 打分：
+算法规划：
+1. frontier 提取：`unknown(-1)` 邻接 `free(0)`。
+2. 聚类：BFS 连通域。
+3. 目标候选：质心 + 最近可达点回退。
+4. 打分：  
    `score = w_gain * info_gain - w_path * path_len - w_risk * risk`
-5. 失败处理：
-   - 短期黑名单（TTL）
-   - 连续失败触发 recovery 链
+5. 失败策略：  
+   - 短期 TTL 拉黑  
+   - 连续失败触发恢复链
 
-终止条件（建议默认）：
+默认停止条件：
 1. `no_frontier_rounds >= 5`
 2. `new_area_ratio < 1%` 持续 `60s`
-3. `max_explore_time`（如 20 分钟）
+3. `max_explore_time`（例如 20 分钟）
 
-## 6.4 顶层启动 `auto_frontier_mission.launch.py`（新增）
+## 6.4 `auto_frontier_mission.launch.py`（新增）
 
-内部拉起：
-1. `slam_mapping_stack.launch.py`（`with_collision:=true` 默认）
-2. Nav2 bringup（探索可用）
+内部组合：
+1. `slam_mapping_stack.launch.py`（默认 `with_collision:=true`）
+2. Nav2 bringup（探索参数）
 3. `cmd_vel_arbiter`
 4. `frontier_explorer`（可开关）
 5. `mission_orchestrator`
 
-推荐参数：
+推荐 launch 参数：
 1. `map_name:=run_<timestamp>`
 2. `with_rviz:=true/false`
 3. `explore_profile:=slow`
 
-## 6.5 语义叠加 `semantic_overlay`（新增）
+## 6.5 `semantic_overlay`（新增）
 
 职责：
 1. 加载 `shelves.yaml/json`
-2. 计算 `T_ref_map_to_new_map`
+2. 估计 `T_ref_map_to_new_map`
 3. 发布货架 marker + 查询服务
 
 V1：
-1. 同起点同朝向 + 2 点人工校准
-2. 目标误差控制在 `<=0.20m`
+1. 同起点假设 + 手工两点标定
+2. 目标叠加误差 `<= 0.20m`
 
 ---
 
-## 7. 模块验证计划与验收标准
+## 7. 验证计划与验收标准
 
-## 7.1 感知与基础定位链路
+## 7.1 感知与定位链路
 
 检查项：
-1. `/cloud_all_fields_fullframe`、`/sick_scansegment_xd/imu` 有效
-2. `/odom_raw`、`/odom` 连续
-3. `map -> odom -> base_link -> lidar_link` TF 完整
+1. `/cloud_all_fields_fullframe`、`/sick_scansegment_xd/imu` 在线。
+2. `/odom_raw`、`/odom` 连续发布。
+3. TF 链完整：`map -> odom -> base_link -> lidar_link`。
 
 命令：
 ```bash
@@ -364,97 +377,98 @@ ros2 run tf2_tools view_frames
 ```
 
 通过标准：
-1. 无持续 TF 冲突/超时
-2. `/odom` 频率稳定接近 EKF 频率目标
+1. 不出现持续 TF 冲突/超时。
+2. `/odom` 频率接近 EKF 目标频率并稳定。
 
-## 7.2 `cmd_vel_arbiter`（抢占验证）
+## 7.2 `cmd_vel_arbiter`（人工接管）
 
 检查项：
-1. 自动运动中发布 `manual_override=true`，机器人快速停止自动指令
-2. 仅 manual topic 生效
-3. 释放后自动继续
+1. 自动运动中触发 `manual_override=true`。
+2. 机器人快速停止自动控制。
+3. 手动速度控制可生效。
+4. 释放接管后自动流程可恢复。
 
 通过标准：
-1. 抢占延迟 <= 150 ms
-2. 停止距离 <= 0.20 m（慢速）
-3. 无“抢占后自动又抢回控制”抖动
+1. 接管延迟 <= 150 ms。
+2. 制动距离 <= 0.20 m（慢速探索档）。
+3. 不出现控制权来回抖动。
 
 ## 7.3 Frontier 探索
 
 检查项：
-1. 能持续生成新目标
-2. 失败目标会被黑名单抑制
-3. 终止条件能正确触发
+1. 持续生成新探索目标。
+2. 失败目标进入临时黑名单。
+3. 停止条件按设计触发。
 
 通过标准：
-1. 连续 10 分钟无死循环
-2. 地图覆盖率持续上升直至收敛
+1. 连续 10 分钟以上无明显死循环。
+2. 地图覆盖率先增长后收敛。
 
-## 7.4 回家与建图产出
+## 7.4 回家与地图产物
 
 检查项：
-1. `home_pose` 记录有效
-2. 终止探索后回家成功
-3. 产出 `.pbstream + .yaml + .pgm`
+1. `home_pose` 记录正确。
+2. 回家执行成功。
+3. 产出 `.pbstream + .yaml + .pgm`。
 
 通过标准：
-1. 回家成功率 >= 95%（10 次）
-2. 误差 `xy <= 0.15m`, `yaw <= 10deg`
+1. 10 次运行回家成功率 >= 95%。
+2. 终点误差 `xy <= 0.15 m`、`yaw <= 10 deg`。
 
 ## 7.5 动态障碍与恢复行为
 
 检查项：
-1. 行人/移动障碍出现时减速、绕行或等待
-2. 超声波告警方向速度被正确限制
-3. Recovery 不出现高风险倒车
+1. 行人干扰时机器人能够减速/绕行/等待。
+2. 超声波方向限向持续有效。
+3. 恢复策略不触发不安全倒车。
 
 通过标准：
-1. 无碰撞事件
-2. 卡住后恢复成功率 >= 90%
+1. 测试中零碰撞。
+2. 卡住恢复成功率 >= 90%。
 
-## 7.6 性能回归（0.03 分辨率）
+## 7.6 `0.03` 分辨率下性能回归
 
 检查项：
-1. CPU 占用与内存稳定
-2. 控制循环不明显掉频
-3. 局部规划无大面积超时
+1. 长时运行 CPU/内存稳定。
+2. 控制/规划频率稳定。
+3. 无持续规划超时风暴。
 
 通过标准：
-1. 长时运行（30 分钟）无失稳
-2. 轨迹跟踪无明显高频振荡
+1. 连续 30 分钟运行无失稳。
+2. 无持续高频振荡。
 
 ---
 
-## 8. 推荐里程碑输出（建议提交节奏）
+## 8. 里程碑交付建议
 
-1. `M1`：`cmd_vel_arbiter + manual_override + 验证脚本`
-2. `M2`：`mission_orchestrator`（固定轨迹 V1）+ 回家 + 导图自动化
-3. `M3`：`frontier_explorer` + 失败恢复 + 终止条件
+1. `M1`：`cmd_vel_arbiter + manual_override + 接管测试脚本`
+2. `M2`：`mission_orchestrator` V1（固定轨迹）+ 回家 + 自动保存/导出
+3. `M3`：`frontier_explorer` + 失败回退 + 停止条件
 4. `M4`：`auto_frontier_mission.launch.py` 一键启动
-5. `M5`：`semantic_overlay`（V1）
-6. `M6`：参数回归报告（探索 profile / 运行 profile）
+5. `M5`：`semantic_overlay` V1
+6. `M6`：调参与回归报告（探索档 vs 任务档）
 
 ---
 
-## 9. 风险清单与缓解
+## 9. 风险与缓解
 
-1. LiDAR 盲区（后部遮挡）导致动态障碍漏检：
-   - 保留超声波低层限向
-   - 探索策略优先前向与原地转向
-2. 抢占控制抖动：
-   - 仲裁器加入源锁定与超时机制
-3. 分辨率提高导致负载上升：
-   - 先慢速 profile，逐步加速
-4. Frontier 循环卡点：
-   - 引入黑名单与失败退避
-5. 回家失败：
-   - 增加中间点回退策略与重规划次数上限
+1. 物理遮挡导致 LiDAR 盲区：  
+   保留超声波底层限向，优先前进与旋转复观测。
+2. 控制权切换不稳定：  
+   在仲裁器内强制源锁与超时机制。
+3. `0.03` 分辨率算力压力：  
+   先用慢速档，稳定后再提速。
+4. Frontier 死循环：  
+   使用 TTL 黑名单 + 失败回退策略。
+5. 回家失败：  
+   有界重试 + 中间点回退策略。
 
 ---
 
-## 10. 当前结论
+## 10. 结论
 
-在现有代码基础上，继续走 `EKF + Cartographer + Nav2 + Frontier + Safety + Orchestrator` 是最小改动且最稳的路线。
+在当前代码基线上，风险最低、收益最高的路线仍然是：
 
-最关键的第一步不是 Frontier 本身，而是先完成控制权架构（`cmd_vel` 仲裁 + `manual_override`），否则无法保证自动化阶段的工程可控性与安全性。
+`EKF + Cartographer + Nav2 + Frontier + Safety + Mission Orchestrator`
 
+必须先做的不是 frontier 本身，而是控制权架构（`cmd_vel` 仲裁 + 手动接管），因为它是所有自治行为的安全基础。
