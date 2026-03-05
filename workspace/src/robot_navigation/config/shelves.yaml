@@ -1,0 +1,17 @@
+shelves:
+  - shelf_id: shelf_A1
+    x: 1.20
+    y: 0.40
+    yaw: 0.00
+  - shelf_id: shelf_A2
+    x: 1.20
+    y: 1.10
+    yaw: 0.00
+  - shelf_id: shelf_B1
+    x: 2.40
+    y: 0.40
+    yaw: 1.57
+  - shelf_id: shelf_B2
+    x: 2.40
+    y: 1.10
+    yaw: 1.57

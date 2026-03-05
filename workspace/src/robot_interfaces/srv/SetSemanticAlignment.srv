@@ -1,0 +1,11 @@
+float64 ref_x1
+float64 ref_y1
+float64 ref_x2
+float64 ref_y2
+float64 new_x1
+float64 new_y1
+float64 new_x2
+float64 new_y2
+---
+bool success
+string message

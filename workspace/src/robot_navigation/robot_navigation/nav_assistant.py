@@ -55,6 +55,22 @@ DEFAULT_MAP_NAME = "testmap1"
 DEFAULT_CMD_TOPICS = '["/cmd_vel_auto","/cmd_vel_nav","/cmd_vel_smoothed"]'
 DEFAULT_RUN_MODE = "normal"
 RUN_MODES = ("normal", "bench")
+DEFAULT_FRONTIER_PROFILE = "slow"
+FRONTIER_PROFILES = ("slow", "task")
+FRONTIER_PROFILE_TO_NAV2_PARAMS = {
+    "slow": REPO_ROOT
+    / "workspace"
+    / "src"
+    / "robot_navigation"
+    / "config"
+    / "nav2_params_explore_slow.yaml",
+    "task": REPO_ROOT
+    / "workspace"
+    / "src"
+    / "robot_navigation"
+    / "config"
+    / "nav2_params_task_run.yaml",
+}
 MAPPING_CONFIG_BASENAME = {
     "normal": "pico_2d.lua",
     "bench": "pico_2d_bench.lua",
@@ -122,6 +138,14 @@ def resolve_use_ekf(run_mode: str, requested: bool | None) -> bool:
     if requested is not None:
         return requested
     return run_mode != "bench"
+
+
+def resolve_frontier_nav2_params(profile: str, explicit_path: str) -> Path:
+    if explicit_path:
+        return Path(explicit_path)
+    return FRONTIER_PROFILE_TO_NAV2_PARAMS.get(
+        profile, FRONTIER_PROFILE_TO_NAV2_PARAMS[DEFAULT_FRONTIER_PROFILE]
+    )
 
 
 def render_command(command: Sequence[str]) -> str:
@@ -582,6 +606,81 @@ def build_mission_p1_launch_cmd(args: argparse.Namespace) -> List[str]:
     return command
 
 
+def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
+    run_mode = args.run_mode
+    use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    carto_config = args.cartographer_config_basename or MAPPING_CONFIG_BASENAME[run_mode]
+    nav2_params = resolve_frontier_nav2_params(args.explore_profile, args.nav2_params_file)
+    command = [
+        "ros2",
+        "launch",
+        "robot_navigation",
+        "auto_frontier_mission.launch.py",
+        f"hostname:={args.hostname}",
+        f"udp_receiver_ip:={args.udp_receiver_ip}",
+        f"serial_port:={args.serial_port}",
+        f"baud_rate:={args.baud_rate}",
+        f"cmd_topics:={args.cmd_topics}",
+        f"manual_cmd_topic:={args.manual_cmd_topic}",
+        f"output_cmd_topic:={args.output_cmd_topic}",
+        f"manual_override_topic:={args.manual_override_topic}",
+        f"manual_cmd_timeout:={args.manual_cmd_timeout}",
+        f"auto_cmd_timeout:={args.auto_cmd_timeout}",
+        f"arbiter_publish_rate:={args.arbiter_publish_rate}",
+        f"arbiter_stop_on_source_switch:={bool_to_launch(args.arbiter_stop_on_source_switch)}",
+        f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
+        f"left_switch:={args.left_switch}",
+        f"right_switch:={args.right_switch}",
+        f"odom_topic:={args.odom_topic}",
+        f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
+        f"use_ekf:={bool_to_launch(use_ekf)}",
+        f"cartographer_config_basename:={carto_config}",
+        f"imu_topic:={args.imu_topic}",
+        f"sick_tf_publish_rate:={args.sick_tf_publish_rate}",
+        f"imu_udp_port:={args.imu_udp_port}",
+        f"scandataformat:={args.scandataformat}",
+        f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+        f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
+        f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
+        f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
+        f"lidar_x:={args.lidar_x}",
+        f"lidar_y:={args.lidar_y}",
+        f"lidar_z:={args.lidar_z}",
+        f"lidar_roll:={args.lidar_roll}",
+        f"lidar_pitch:={args.lidar_pitch}",
+        f"lidar_yaw:={args.lidar_yaw}",
+        f"with_collision:={bool_to_launch(args.with_collision)}",
+        f"with_slam_rviz:={bool_to_launch(args.with_rviz)}",
+        f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
+        f"nav2_namespace:={args.nav2_namespace}",
+        f"nav2_params_file:={nav2_params}",
+        f"autostart_mission:={bool_to_launch(args.autostart_mission)}",
+        f"boot_capture_delay_sec:={args.boot_capture_delay_sec}",
+        f"home_retry_limit:={args.home_retry_limit}",
+        f"map_output_dir:={Path(args.map_output_dir)}",
+        f"map_name:={args.map_name}",
+        f"map_name_prefix:={args.map_name_prefix}",
+        f"export_map:={bool_to_launch(args.export_map)}",
+        f"export_resolution:={args.export_resolution}",
+        f"autostart_frontier:={bool_to_launch(args.autostart_frontier)}",
+        f"max_explore_time_sec:={args.max_explore_time_sec}",
+        f"frontier_no_frontier_rounds_limit:={args.frontier_no_frontier_rounds_limit}",
+        f"frontier_new_area_ratio_threshold:={args.frontier_new_area_ratio_threshold}",
+        f"frontier_new_area_window_sec:={args.frontier_new_area_window_sec}",
+        f"frontier_goal_timeout_sec:={args.frontier_goal_timeout_sec}",
+        f"frontier_blacklist_ttl_sec:={args.frontier_blacklist_ttl_sec}",
+        f"frontier_blacklist_radius_m:={args.frontier_blacklist_radius_m}",
+        f"frontier_max_candidate_path_len_m:={args.frontier_max_candidate_path_len_m}",
+        f"frontier_recovery_failures_threshold:={args.frontier_recovery_failures_threshold}",
+        f"frontier_recovery_wait_sec:={args.frontier_recovery_wait_sec}",
+        f"with_semantic_overlay:={bool_to_launch(args.with_semantic_overlay)}",
+        f"shelves_file:={Path(args.shelves_file)}",
+    ]
+    if args.ekf_params_file:
+        command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
+    return command
+
+
 def build_teleop_cmd(args: argparse.Namespace) -> List[str]:
     return [
         "ros2",
@@ -637,6 +736,8 @@ def print_runbook(args: argparse.Namespace) -> None:
         "# P1 mission one-command launch",
         "ros2 run robot_navigation nav_assistant mission-p1",
         "ros2 run robot_navigation nav_assistant mission-p1 --interactive-override true",
+        "ros2 run robot_navigation nav_assistant frontier-mission",
+        "ros2 run robot_navigation nav_assistant frontier-mission --interactive-override true",
         "",
         "# Save and export map",
         "ros2 run robot_navigation nav_assistant save-map "
@@ -733,8 +834,11 @@ def _terminate_process_tree(process: subprocess.Popen, timeout_sec: float = 5.0)
     return int(process.returncode)
 
 
-def run_mission_p1_with_override_console(args: argparse.Namespace) -> int:
-    command = build_mission_p1_launch_cmd(args)
+def run_mission_with_override_console(
+    args: argparse.Namespace,
+    launch_builder,
+) -> int:
+    command = launch_builder(args)
     print(f"$ {render_command(command)}")
     if args.dry_run:
         return 0
@@ -769,7 +873,7 @@ def run_mission_p1_with_override_console(args: argparse.Namespace) -> int:
             return
         print(f"[override] finish_mapping: success={response.success} msg='{response.message}'")
 
-    print("Mission P1 override console:")
+    print("Mission override console:")
     print("  m: manual override ON")
     print("  a: manual override OFF (resume autonomous mission)")
     print("  f: request finish_mapping")
@@ -914,6 +1018,58 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep this terminal as manual override console (m/a/f/q).",
     )
 
+    frontier_parser = subparsers.add_parser(
+        "frontier-mission",
+        parents=[stack_common],
+        help="Run full frontier mission (P2-P4): auto explore -> return -> save/export.",
+    )
+    frontier_parser.add_argument("--with-collision", type=parse_bool, default=True)
+    frontier_parser.add_argument("--with-rviz", type=parse_bool, default=False)
+    frontier_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
+    frontier_parser.add_argument("--nav2-namespace", default="")
+    frontier_parser.add_argument(
+        "--explore-profile",
+        choices=FRONTIER_PROFILES,
+        default=DEFAULT_FRONTIER_PROFILE,
+        help="Preset Nav2 profile when --nav2-params-file is not specified.",
+    )
+    frontier_parser.add_argument("--nav2-params-file", default="")
+    frontier_parser.add_argument("--autostart-mission", type=parse_bool, default=True)
+    frontier_parser.add_argument("--autostart-frontier", type=parse_bool, default=False)
+    frontier_parser.add_argument("--boot-capture-delay-sec", type=float, default=2.0)
+    frontier_parser.add_argument("--home-retry-limit", type=int, default=2)
+    frontier_parser.add_argument("--map-output-dir", default=DEFAULT_MAPS_DIR)
+    frontier_parser.add_argument("--map-name", default="")
+    frontier_parser.add_argument("--map-name-prefix", default="run")
+    frontier_parser.add_argument("--export-map", type=parse_bool, default=True)
+    frontier_parser.add_argument("--export-resolution", type=float, default=0.03)
+    frontier_parser.add_argument("--max-explore-time-sec", type=float, default=20.0 * 60.0)
+    frontier_parser.add_argument("--frontier-no-frontier-rounds-limit", type=int, default=5)
+    frontier_parser.add_argument("--frontier-new-area-ratio-threshold", type=float, default=0.01)
+    frontier_parser.add_argument("--frontier-new-area-window-sec", type=float, default=60.0)
+    frontier_parser.add_argument("--frontier-goal-timeout-sec", type=float, default=35.0)
+    frontier_parser.add_argument("--frontier-blacklist-ttl-sec", type=float, default=45.0)
+    frontier_parser.add_argument("--frontier-blacklist-radius-m", type=float, default=0.35)
+    frontier_parser.add_argument(
+        "--frontier-max-candidate-path-len-m",
+        type=float,
+        default=0.0,
+        help="0 disables cap; >0 drops frontier goals whose grid path length exceeds this value.",
+    )
+    frontier_parser.add_argument("--frontier-recovery-failures-threshold", type=int, default=3)
+    frontier_parser.add_argument("--frontier-recovery-wait-sec", type=float, default=3.0)
+    frontier_parser.add_argument("--with-semantic-overlay", type=parse_bool, default=False)
+    frontier_parser.add_argument(
+        "--interactive-override",
+        type=parse_bool,
+        default=False,
+        help="Keep this terminal as manual override console (m/a/f/q).",
+    )
+    frontier_parser.add_argument(
+        "--shelves-file",
+        default=str(REPO_ROOT / "workspace" / "src" / "robot_navigation" / "config" / "shelves.yaml"),
+    )
+
     teleop_common = argparse.ArgumentParser(add_help=False)
     teleop_common.add_argument("--topic", default="/cmd_vel_manual")
     teleop_common.add_argument("--linear", type=float, default=0.6)
@@ -1038,8 +1194,14 @@ def main(argv: List[str] | None = None) -> int:
 
     if args.command == "mission-p1":
         if args.interactive_override:
-            return run_mission_p1_with_override_console(args)
+            return run_mission_with_override_console(args, build_mission_p1_launch_cmd)
         command = build_mission_p1_launch_cmd(args)
+        return run_foreground_command(command, dry_run=args.dry_run)
+
+    if args.command == "frontier-mission":
+        if args.interactive_override:
+            return run_mission_with_override_console(args, build_frontier_mission_launch_cmd)
+        command = build_frontier_mission_launch_cmd(args)
         return run_foreground_command(command, dry_run=args.dry_run)
 
     if args.command == "teleop":

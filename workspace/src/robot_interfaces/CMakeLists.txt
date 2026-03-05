@@ -29,6 +29,8 @@ find_package(cv_bridge REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/NewOrder.srv"
+  "srv/QueryShelfPose.srv"
+  "srv/SetSemanticAlignment.srv"
   "msg/Order.msg"
   "msg/OrderItem.msg"
   #"action/"

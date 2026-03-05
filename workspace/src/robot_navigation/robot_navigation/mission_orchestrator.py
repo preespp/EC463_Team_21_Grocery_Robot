@@ -77,6 +77,7 @@ class MissionOrchestrator(Node):
     STATE_IDLE = "IDLE"
     STATE_BOOT = "BOOT"
     STATE_AUTO_MAP_V1 = "AUTO_MAP_V1"
+    STATE_AUTO_EXPLORE = "AUTO_EXPLORE"
     STATE_RETURN_HOME = "RETURN_HOME"
     STATE_SAVE_EXPORT = "SAVE_EXPORT"
     STATE_LOCALIZE_READY = "LOCALIZE_READY"
@@ -99,6 +100,7 @@ class MissionOrchestrator(Node):
         self.declare_parameter("write_state_service", "/write_state")
         self.declare_parameter("state_topic", "/mission_state")
         self.declare_parameter("loop_rate_hz", 10.0)
+        self.declare_parameter("mapping_mode", "fixed")  # fixed | frontier
 
         self.declare_parameter("boot_capture_delay_sec", 2.0)
         self.declare_parameter("mapping_timeout_sec", 180.0)
@@ -106,6 +108,11 @@ class MissionOrchestrator(Node):
         self.declare_parameter("mapping_loop_pause_sec", 0.4)
         self.declare_parameter("mapping_retry_wait_sec", 1.0)
         self.declare_parameter("mapping_max_failures", 3)
+        self.declare_parameter("explore_timeout_sec", 20.0 * 60.0)
+
+        self.declare_parameter("frontier_done_topic", "/frontier_explorer/done")
+        self.declare_parameter("frontier_start_service", "/frontier_explorer/start")
+        self.declare_parameter("frontier_stop_service", "/frontier_explorer/stop")
 
         self.declare_parameter("home_retry_limit", 2)
         self.declare_parameter("action_server_timeout_sec", 0.3)
@@ -146,6 +153,12 @@ class MissionOrchestrator(Node):
         self.write_state_service = str(self.get_parameter("write_state_service").value)
         self.state_topic = str(self.get_parameter("state_topic").value)
         self.loop_rate_hz = max(1e-3, float(self.get_parameter("loop_rate_hz").value))
+        self.mapping_mode = str(self.get_parameter("mapping_mode").value).strip().lower()
+        if self.mapping_mode not in ("fixed", "frontier"):
+            self.get_logger().warning(
+                f"Unknown mapping_mode='{self.mapping_mode}', fallback to 'fixed'"
+            )
+            self.mapping_mode = "fixed"
 
         self.boot_capture_delay_sec = max(
             0.0, float(self.get_parameter("boot_capture_delay_sec").value)
@@ -165,10 +178,16 @@ class MissionOrchestrator(Node):
         self.mapping_max_failures = max(
             1, int(self.get_parameter("mapping_max_failures").value)
         )
+        self.explore_timeout_sec = max(
+            10.0, float(self.get_parameter("explore_timeout_sec").value)
+        )
         self.home_retry_limit = max(0, int(self.get_parameter("home_retry_limit").value))
         self.action_server_timeout_sec = max(
             0.05, float(self.get_parameter("action_server_timeout_sec").value)
         )
+        self.frontier_done_topic = str(self.get_parameter("frontier_done_topic").value)
+        self.frontier_start_service = str(self.get_parameter("frontier_start_service").value)
+        self.frontier_stop_service = str(self.get_parameter("frontier_stop_service").value)
 
         self.map_output_dir = Path(str(self.get_parameter("map_output_dir").value))
         self.map_name_fixed = str(self.get_parameter("map_name").value).strip()
@@ -197,6 +216,12 @@ class MissionOrchestrator(Node):
             self._on_odom,
             qos,
         )
+        self.frontier_done_sub = self.create_subscription(
+            Bool,
+            self.frontier_done_topic,
+            self._on_frontier_done,
+            qos,
+        )
 
         self.start_srv = self.create_service(Trigger, "start_mission", self._on_start_mission)
         self.pause_srv = self.create_service(Trigger, "pause_mission", self._on_pause_mission)
@@ -216,6 +241,8 @@ class MissionOrchestrator(Node):
             self.navigate_to_pose_action,
         )
         self.write_state_client = self.create_client(WriteState, self.write_state_service)
+        self.frontier_start_client = self.create_client(Trigger, self.frontier_start_service)
+        self.frontier_stop_client = self.create_client(Trigger, self.frontier_stop_service)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -236,6 +263,9 @@ class MissionOrchestrator(Node):
         self.map_failures = 0
         self.next_map_dispatch_at = 0.0
         self.last_odom_xy: tuple[float, float] | None = None
+        self.explore_started_at: float | None = None
+        self.frontier_started = False
+        self.frontier_done = False
 
         self.return_home_attempts = 0
 
@@ -262,7 +292,8 @@ class MissionOrchestrator(Node):
 
         self.get_logger().info(
             "mission_orchestrator ready "
-            f"(autostart={self.autostart}, manual_override_topic={self.manual_override_topic}, "
+            f"(autostart={self.autostart}, mapping_mode={self.mapping_mode}, "
+            f"manual_override_topic={self.manual_override_topic}, "
             f"follow_waypoints={self.follow_waypoints_action}, navigate_to_pose={self.navigate_to_pose_action}, "
             f"write_state={self.write_state_service})"
         )
@@ -323,15 +354,21 @@ class MissionOrchestrator(Node):
         return response
 
     def _on_finish_mapping(self, _request, response: Trigger.Response) -> Trigger.Response:
-        if self.state == self.STATE_AUTO_MAP_V1 or (
-            self.state == self.STATE_PAUSED and self.resume_state == self.STATE_AUTO_MAP_V1
-        ):
+        valid_state = self.state in (self.STATE_AUTO_MAP_V1, self.STATE_AUTO_EXPLORE)
+        valid_paused_state = self.state == self.STATE_PAUSED and self.resume_state in (
+            self.STATE_AUTO_MAP_V1,
+            self.STATE_AUTO_EXPLORE,
+        )
+        if valid_state or valid_paused_state:
             self.finish_mapping_requested = True
             response.success = True
             response.message = "Mapping finish requested"
             return response
         response.success = False
-        response.message = f"finish_mapping is valid only during AUTO_MAP_V1 (state={self.state})"
+        response.message = (
+            "finish_mapping is valid only during AUTO_MAP_V1/AUTO_EXPLORE "
+            f"(state={self.state})"
+        )
         return response
 
     def _on_manual_override(self, msg: Bool) -> None:
@@ -369,6 +406,9 @@ class MissionOrchestrator(Node):
             self.mapping_distance_m += math.hypot(dx, dy)
         self.last_odom_xy = (x, y)
 
+    def _on_frontier_done(self, msg: Bool) -> None:
+        self.frontier_done = bool(msg.data)
+
     def _set_state(self, new_state: str) -> None:
         if new_state == self.state:
             return
@@ -385,6 +425,7 @@ class MissionOrchestrator(Node):
     def _start_new_mission(self) -> None:
         self._cancel_active_action("new_mission")
         self._stop_export_process()
+        self._request_frontier_stop()
 
         self.home_pose = None
         self.map_name_current = self._resolve_map_name()
@@ -396,6 +437,9 @@ class MissionOrchestrator(Node):
         self.next_map_dispatch_at = 0.0
         self.return_home_attempts = 0
         self.last_odom_xy = None
+        self.explore_started_at = None
+        self.frontier_started = False
+        self.frontier_done = False
 
         self.save_stage = "idle"
         self.write_future = None
@@ -409,9 +453,42 @@ class MissionOrchestrator(Node):
 
     def _resolve_map_name(self) -> str:
         if self.map_name_fixed:
-            return self.map_name_fixed
+            return self._resolve_unique_map_name(self.map_name_fixed)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"{self.map_name_prefix}_{stamp}"
+        return self._resolve_unique_map_name(f"{self.map_name_prefix}_{stamp}")
+
+    def _map_artifacts_exist(self, map_name: str) -> bool:
+        base = self.map_output_dir / map_name
+        return any(
+            [
+                (base.with_suffix(".pbstream")).exists(),
+                (base.with_suffix(".yaml")).exists(),
+                (base.with_suffix(".pgm")).exists(),
+            ]
+        )
+
+    def _resolve_unique_map_name(self, map_name: str) -> str:
+        candidate = map_name
+        if not self._map_artifacts_exist(candidate):
+            return candidate
+
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        candidate = f"{map_name}_{stamp}"
+        if not self._map_artifacts_exist(candidate):
+            self.get_logger().warning(
+                f"map_name '{map_name}' already exists, using '{candidate}'"
+            )
+            return candidate
+
+        index = 1
+        while True:
+            candidate_with_index = f"{candidate}_{index}"
+            if not self._map_artifacts_exist(candidate_with_index):
+                self.get_logger().warning(
+                    f"map_name '{map_name}' already exists, using '{candidate_with_index}'"
+                )
+                return candidate_with_index
+            index += 1
 
     def _pause_mission(self, reason: str) -> None:
         if self.state == self.STATE_PAUSED:
@@ -419,6 +496,9 @@ class MissionOrchestrator(Node):
         self.resume_state = self.state
         self.pause_reason = reason
         self._cancel_active_action(f"pause:{reason}")
+        if self.resume_state == self.STATE_AUTO_EXPLORE:
+            self._request_frontier_stop()
+            self.frontier_started = False
         self._set_state(self.STATE_PAUSED)
 
     def _resume_mission(self) -> None:
@@ -427,6 +507,9 @@ class MissionOrchestrator(Node):
         target = self.resume_state or self.STATE_BOOT
         self.pause_reason = ""
         self.resume_state = self.STATE_IDLE
+        if target == self.STATE_AUTO_EXPLORE:
+            self.frontier_started = False
+            self.frontier_done = False
         self._set_state(target)
 
     def _tick(self) -> None:
@@ -445,6 +528,10 @@ class MissionOrchestrator(Node):
 
         if self.state == self.STATE_AUTO_MAP_V1:
             self._tick_auto_map_v1()
+            return
+
+        if self.state == self.STATE_AUTO_EXPLORE:
+            self._tick_auto_explore()
             return
 
         if self.state == self.STATE_RETURN_HOME:
@@ -480,7 +567,13 @@ class MissionOrchestrator(Node):
         self.get_logger().info(
             f"Home pose captured: x={pose.x:.3f}, y={pose.y:.3f}, yaw={pose.yaw:.3f}"
         )
-        self._set_state(self.STATE_AUTO_MAP_V1)
+        if self.mapping_mode == "frontier":
+            self.explore_started_at = time.monotonic()
+            self.frontier_started = False
+            self.frontier_done = False
+            self._set_state(self.STATE_AUTO_EXPLORE)
+        else:
+            self._set_state(self.STATE_AUTO_MAP_V1)
 
     def _tick_auto_map_v1(self) -> None:
         if self.home_pose is None:
@@ -554,6 +647,42 @@ class MissionOrchestrator(Node):
             return
         if not self._dispatch_follow_waypoints(poses, "auto_map_waypoints"):
             self.next_map_dispatch_at = now + 0.5
+
+    def _tick_auto_explore(self) -> None:
+        if self.home_pose is None:
+            self._set_error("home_pose missing in AUTO_EXPLORE")
+            return
+
+        if self.explore_started_at is None:
+            self.explore_started_at = time.monotonic()
+
+        if self.finish_mapping_requested:
+            self._request_frontier_stop()
+            self.return_home_attempts = 0
+            self.get_logger().info("AUTO_EXPLORE completed by finish_mapping service")
+            self._set_state(self.STATE_RETURN_HOME)
+            return
+
+        elapsed = time.monotonic() - self.explore_started_at
+        if self.explore_timeout_sec > 0.0 and elapsed >= self.explore_timeout_sec:
+            self._request_frontier_stop()
+            self.return_home_attempts = 0
+            self.get_logger().warning("AUTO_EXPLORE reached explore_timeout_sec")
+            self._set_state(self.STATE_RETURN_HOME)
+            return
+
+        if not self.frontier_started:
+            if self._request_frontier_start():
+                self.frontier_started = True
+                self.frontier_done = False
+            return
+
+        if self.frontier_done:
+            self._request_frontier_stop()
+            self.return_home_attempts = 0
+            self.get_logger().info("AUTO_EXPLORE finished by frontier explorer done signal")
+            self._set_state(self.STATE_RETURN_HOME)
+            return
 
     def _tick_return_home(self) -> None:
         if self.home_pose is None:
@@ -719,6 +848,40 @@ class MissionOrchestrator(Node):
             self.get_logger().warning(f"Waiting for action server: {name}")
             self.last_server_warn_at = now
 
+    def _call_trigger_client(self, client, name: str, timeout_sec: float = 0.5) -> bool:
+        if not client.wait_for_service(timeout_sec=timeout_sec):
+            now = time.monotonic()
+            if now - self.last_server_warn_at > 2.0:
+                self.get_logger().warning(f"Waiting service: {name}")
+                self.last_server_warn_at = now
+            return False
+
+        future = client.call_async(Trigger.Request())
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
+        response = future.result()
+        if response is None:
+            return False
+        if not response.success:
+            self.get_logger().warning(f"Service {name} failed: {response.message}")
+            return False
+        return True
+
+    def _request_frontier_start(self) -> bool:
+        if self.mapping_mode != "frontier":
+            return False
+        return self._call_trigger_client(self.frontier_start_client, self.frontier_start_service)
+
+    def _request_frontier_stop(self) -> bool:
+        if self.mapping_mode != "frontier":
+            return False
+        # Stop is best-effort during transitions/shutdown.
+        try:
+            return self._call_trigger_client(
+                self.frontier_stop_client, self.frontier_stop_service, timeout_sec=0.3
+            )
+        except Exception:
+            return False
+
     def _dispatch_action(self, client: ActionClient, goal_msg, label: str) -> bool:
         if self.action_inflight:
             return False
@@ -848,11 +1011,13 @@ class MissionOrchestrator(Node):
     def _set_error(self, message: str) -> None:
         self.get_logger().error(message)
         self._cancel_active_action("error")
+        self._request_frontier_stop()
         self._stop_export_process()
         self._set_state(self.STATE_ERROR)
 
     def destroy_node(self) -> bool:
         self._cancel_active_action("shutdown")
+        self._request_frontier_stop()
         self._stop_export_process()
         return super().destroy_node()
 
