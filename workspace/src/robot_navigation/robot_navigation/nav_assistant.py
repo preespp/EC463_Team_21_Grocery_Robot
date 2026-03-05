@@ -587,7 +587,6 @@ def build_mission_p1_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"with_collision:={bool_to_launch(args.with_collision)}",
         f"with_slam_rviz:={bool_to_launch(args.with_rviz)}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
-        f"nav2_namespace:={args.nav2_namespace}",
         f"autostart_mission:={bool_to_launch(args.autostart_mission)}",
         f"boot_capture_delay_sec:={args.boot_capture_delay_sec}",
         f"mapping_timeout_sec:={args.mapping_timeout_sec}",
@@ -599,6 +598,9 @@ def build_mission_p1_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"export_map:={bool_to_launch(args.export_map)}",
         f"export_resolution:={args.export_resolution}",
     ]
+    nav2_namespace = str(args.nav2_namespace).strip()
+    if nav2_namespace:
+        command.append(f"nav2_namespace:={nav2_namespace}")
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     if args.nav2_params_file:
@@ -652,7 +654,6 @@ def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"with_collision:={bool_to_launch(args.with_collision)}",
         f"with_slam_rviz:={bool_to_launch(args.with_rviz)}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
-        f"nav2_namespace:={args.nav2_namespace}",
         f"nav2_params_file:={nav2_params}",
         f"autostart_mission:={bool_to_launch(args.autostart_mission)}",
         f"boot_capture_delay_sec:={args.boot_capture_delay_sec}",
@@ -676,6 +677,9 @@ def build_frontier_mission_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"with_semantic_overlay:={bool_to_launch(args.with_semantic_overlay)}",
         f"shelves_file:={Path(args.shelves_file)}",
     ]
+    nav2_namespace = str(args.nav2_namespace).strip()
+    if nav2_namespace:
+        command.append(f"nav2_namespace:={nav2_namespace}")
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     return command

@@ -64,6 +64,15 @@ def _norm_angle(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
+def _normalize_namespace(namespace: str) -> str:
+    cleaned = namespace.strip()
+    if not cleaned:
+        return ""
+    if not cleaned.startswith("/"):
+        cleaned = "/" + cleaned
+    return cleaned.rstrip("/")
+
+
 @dataclass
 class Pose2D:
     x: float
@@ -94,6 +103,7 @@ class MissionOrchestrator(Node):
         self.declare_parameter("map_frame", "map")
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("odom_topic", "/odom")
+        self.declare_parameter("nav2_namespace", "")
         self.declare_parameter("manual_override_topic", "/manual_override")
         self.declare_parameter("follow_waypoints_action", "/follow_waypoints")
         self.declare_parameter("navigate_to_pose_action", "/navigate_to_pose")
@@ -147,9 +157,16 @@ class MissionOrchestrator(Node):
         self.map_frame = str(self.get_parameter("map_frame").value)
         self.base_frame = str(self.get_parameter("base_frame").value)
         self.odom_topic = str(self.get_parameter("odom_topic").value)
+        self.nav2_namespace = _normalize_namespace(
+            str(self.get_parameter("nav2_namespace").value)
+        )
         self.manual_override_topic = str(self.get_parameter("manual_override_topic").value)
-        self.follow_waypoints_action = str(self.get_parameter("follow_waypoints_action").value)
-        self.navigate_to_pose_action = str(self.get_parameter("navigate_to_pose_action").value)
+        self.follow_waypoints_action = self._resolve_nav2_action_name(
+            str(self.get_parameter("follow_waypoints_action").value)
+        )
+        self.navigate_to_pose_action = self._resolve_nav2_action_name(
+            str(self.get_parameter("navigate_to_pose_action").value)
+        )
         self.write_state_service = str(self.get_parameter("write_state_service").value)
         self.state_topic = str(self.get_parameter("state_topic").value)
         self.loop_rate_hz = max(1e-3, float(self.get_parameter("loop_rate_hz").value))
@@ -293,10 +310,51 @@ class MissionOrchestrator(Node):
         self.get_logger().info(
             "mission_orchestrator ready "
             f"(autostart={self.autostart}, mapping_mode={self.mapping_mode}, "
+            f"nav2_namespace={self.nav2_namespace or '/'}"
+            f", "
             f"manual_override_topic={self.manual_override_topic}, "
             f"follow_waypoints={self.follow_waypoints_action}, navigate_to_pose={self.navigate_to_pose_action}, "
             f"write_state={self.write_state_service})"
         )
+
+    def _resolve_nav2_action_name(self, action_name: str) -> str:
+        cleaned = action_name.strip()
+        if not cleaned:
+            return cleaned
+        if not self.nav2_namespace:
+            return cleaned
+
+        if cleaned.startswith("/") and cleaned not in (
+            "/follow_waypoints",
+            "/navigate_to_pose",
+        ):
+            return cleaned
+
+        return f"{self.nav2_namespace}/{cleaned.lstrip('/')}"
+
+    def _summarize_action_result(self, result_msg: object) -> str:
+        if result_msg is None:
+            return ""
+
+        missed = getattr(result_msg, "missed_waypoints", None)
+        if missed:
+            return f"missed_waypoints={list(missed)}"
+
+        for attr in ("error_msg", "message"):
+            value = getattr(result_msg, attr, "")
+            if value:
+                return f"{attr}={value}"
+
+        error_code = getattr(result_msg, "error_code", None)
+        if error_code not in (None, 0):
+            return f"error_code={error_code}"
+
+        text = repr(result_msg)
+        if text.startswith("<") and " object at " in text:
+            return ""
+        if len(text) > 180:
+            return text[:177] + "..."
+        return text
 
     def _parse_waypoint_offsets(self, raw: Sequence[float]) -> List[Pose2D]:
         values = [float(v) for v in raw]
@@ -938,7 +996,8 @@ class MissionOrchestrator(Node):
 
         status = int(wrapped.status)
         success = status == GoalStatus.STATUS_SUCCEEDED
-        self.action_result = (label, success, status, "")
+        detail = self._summarize_action_result(wrapped.result)
+        self.action_result = (label, success, status, detail)
 
     def _cancel_active_action(self, reason: str) -> None:
         if not self.action_inflight and self.active_goal_handle is None:
@@ -1037,4 +1096,3 @@ def main(args: List[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

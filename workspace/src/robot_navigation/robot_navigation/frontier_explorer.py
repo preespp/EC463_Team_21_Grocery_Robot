@@ -49,6 +49,15 @@ def _norm_angle(angle: float) -> float:
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
+def _normalize_namespace(namespace: str) -> str:
+    cleaned = namespace.strip()
+    if not cleaned:
+        return ""
+    if not cleaned.startswith("/"):
+        cleaned = "/" + cleaned
+    return cleaned.rstrip("/")
+
+
 @dataclass
 class Candidate:
     mx: int
@@ -76,6 +85,7 @@ class FrontierExplorer(Node):
         self.declare_parameter("autostart", False)
         self.declare_parameter("map_topic", "/map")
         self.declare_parameter("manual_override_topic", "/manual_override")
+        self.declare_parameter("nav2_namespace", "")
         self.declare_parameter("navigate_to_pose_action", "/navigate_to_pose")
         self.declare_parameter("global_frame", "map")
         self.declare_parameter("base_frame", "base_link")
@@ -106,7 +116,12 @@ class FrontierExplorer(Node):
         self.autostart = bool(self.get_parameter("autostart").value)
         self.map_topic = str(self.get_parameter("map_topic").value)
         self.manual_override_topic = str(self.get_parameter("manual_override_topic").value)
-        self.navigate_to_pose_action = str(self.get_parameter("navigate_to_pose_action").value)
+        self.nav2_namespace = _normalize_namespace(
+            str(self.get_parameter("nav2_namespace").value)
+        )
+        self.navigate_to_pose_action = self._resolve_nav2_action_name(
+            str(self.get_parameter("navigate_to_pose_action").value)
+        )
         self.global_frame = str(self.get_parameter("global_frame").value)
         self.base_frame = str(self.get_parameter("base_frame").value)
         self.state_topic = str(self.get_parameter("state_topic").value)
@@ -212,8 +227,41 @@ class FrontierExplorer(Node):
         self.get_logger().info(
             "frontier_explorer ready "
             f"(autostart={self.autostart}, map_topic={self.map_topic}, "
+            f"nav2_namespace={self.nav2_namespace or '/'}, "
             f"navigate_action={self.navigate_to_pose_action})"
         )
+
+    def _resolve_nav2_action_name(self, action_name: str) -> str:
+        cleaned = action_name.strip()
+        if not cleaned:
+            return cleaned
+        if not self.nav2_namespace:
+            return cleaned
+
+        if cleaned.startswith("/") and cleaned != "/navigate_to_pose":
+            return cleaned
+
+        return f"{self.nav2_namespace}/{cleaned.lstrip('/')}"
+
+    def _summarize_nav_result(self, result_msg: object) -> str:
+        if result_msg is None:
+            return ""
+
+        for attr in ("error_msg", "message"):
+            value = getattr(result_msg, attr, "")
+            if value:
+                return f"{attr}={value}"
+
+        error_code = getattr(result_msg, "error_code", None)
+        if error_code not in (None, 0):
+            return f"error_code={error_code}"
+
+        text = repr(result_msg)
+        if text.startswith("<") and " object at " in text:
+            return ""
+        if len(text) > 180:
+            return text[:177] + "..."
+        return text
 
     def _on_map(self, msg: OccupancyGrid) -> None:
         self.map_msg = msg
@@ -680,10 +728,11 @@ class FrontierExplorer(Node):
             return
 
         status = int(wrapped.status)
+        detail = self._summarize_nav_result(wrapped.result)
         if status == GoalStatus.STATUS_SUCCEEDED:
-            self.goal_result = (True, status, "")
+            self.goal_result = (True, status, detail)
         else:
-            self.goal_result = (False, status, "")
+            self.goal_result = (False, status, detail)
 
     def _cancel_goal(self, reason: str) -> None:
         had_active_goal = self.goal_inflight or self.goal_handle is not None

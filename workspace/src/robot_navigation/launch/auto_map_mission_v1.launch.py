@@ -111,6 +111,7 @@ def generate_launch_description():
         parameters=[
             {
                 "autostart": ParameterValue(LaunchConfiguration("autostart_mission"), value_type=bool),
+                "nav2_namespace": LaunchConfiguration("nav2_namespace"),
                 "manual_override_topic": LaunchConfiguration("manual_override_topic"),
                 "odom_topic": "/odom",
                 "boot_capture_delay_sec": ParameterValue(
