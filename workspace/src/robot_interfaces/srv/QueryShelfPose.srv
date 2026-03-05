@@ -1,5 +1,0 @@
-string shelf_id
----
-bool found
-geometry_msgs/PoseStamped pose
-string message

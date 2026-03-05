@@ -24,13 +24,6 @@ ros2 run robot_navigation nav_assistant mission-p1
 ros2 run robot_navigation nav_assistant mission-p1 --interactive-override true
 ```
 
-Frontier mission (auto explore + return + save/export):
-
-```bash
-ros2 run robot_navigation nav_assistant frontier-mission
-ros2 run robot_navigation nav_assistant frontier-mission --interactive-override true
-```
-
 For headless Jetson:
 
 ```bash
@@ -61,8 +54,6 @@ ros2 run robot_navigation nav_assistant teleop-collision
 ros2 topic pub --once /manual_override std_msgs/msg/Bool "{data: true}"
 ros2 topic pub --once /manual_override std_msgs/msg/Bool "{data: false}"
 ros2 service call /finish_mapping std_srvs/srv/Trigger "{}"
-ros2 service call /frontier_explorer/start std_srvs/srv/Trigger "{}"
-ros2 service call /frontier_explorer/stop std_srvs/srv/Trigger "{}"
 ```
 
 ## Map save/export helpers

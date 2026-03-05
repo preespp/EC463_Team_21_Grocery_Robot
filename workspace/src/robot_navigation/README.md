@@ -24,9 +24,6 @@ ros2 run robot_navigation nav_assistant <subcommand>
 - `robot_navigation/nav_assistant.py`: unified CLI helper.
 - `robot_navigation/cmd_vel_arbiter.py`: manual-first cmd_vel arbiter with `/manual_override`.
 - `robot_navigation/mission_orchestrator.py`: P1 mission state machine (`BOOT->AUTO_MAP_V1->RETURN_HOME->SAVE_EXPORT->LOCALIZE_READY`).
-- `robot_navigation/frontier_explorer.py`: P2 frontier exploration core.
-- `robot_navigation/semantic_overlay.py`: P4 semantic shelf overlay and query services.
-- `robot_navigation/nav_profile_report.py`: P5 profile comparison report tool.
 - `robot_navigation/nav2_serial_bridge.py`: `/cmd_vel` to STM32 UART bridge and raw odom publisher (`/odom_raw` by default).
 - `robot_navigation/teleop_cmd_vel.py`: manual keyboard teleop.
 - `robot_navigation/teleop_cmd_vel_collision.py`: teleop with collision stop input.
@@ -96,25 +93,6 @@ This launches mapping stack + Nav2 + mission orchestrator and runs:
 
 `BOOT -> AUTO_MAP_V1 -> RETURN_HOME -> SAVE_EXPORT -> LOCALIZE_READY`
 
-### 1.2 One-command frontier mission (P2-P4)
-
-```bash
-ros2 run robot_navigation nav_assistant frontier-mission
-ros2 run robot_navigation nav_assistant frontier-mission --interactive-override true
-```
-
-This launches:
-
-`slam_mapping_stack + nav2 + frontier_explorer + mission_orchestrator(frontier mode) [+ semantic_overlay optional]`
-
-Enable semantic overlay:
-
-```bash
-ros2 run robot_navigation nav_assistant frontier-mission \
-  --with-semantic-overlay true \
-  --shelves-file <abs_path_to_shelves.yaml>
-```
-
 Same-terminal override console mode:
 
 ```bash
@@ -148,13 +126,6 @@ ros2 service call /start_mission std_srvs/srv/Trigger "{}"
 ros2 service call /pause_mission std_srvs/srv/Trigger "{}"
 ros2 service call /resume_mission std_srvs/srv/Trigger "{}"
 ros2 service call /finish_mapping std_srvs/srv/Trigger "{}"
-```
-
-Frontier explorer services:
-
-```bash
-ros2 service call /frontier_explorer/start std_srvs/srv/Trigger "{}"
-ros2 service call /frontier_explorer/stop std_srvs/srv/Trigger "{}"
 ```
 
 ### 3. Save and export map
@@ -260,14 +231,6 @@ ros2 run robot_navigation nav_assistant quick-check
 - Default auto command topics consumed by arbiter are:
   `[/cmd_vel_auto, /cmd_vel_nav, /cmd_vel_smoothed]`
 - Bridge consumes only arbiter output topic: `/cmd_vel`.
-- Semantic overlay query service:
-  `/semantic_overlay/query_shelf_pose` (`robot_interfaces/srv/QueryShelfPose`).
-- Semantic overlay two-point alignment service:
-  `/semantic_overlay/set_alignment` (`robot_interfaces/srv/SetSemanticAlignment`).
-- P5 profile files:
-  `config/nav2_params_explore_slow.yaml`, `config/nav2_params_task_run.yaml`.
-- Generate profile comparison markdown:
-  `ros2 run robot_navigation nav_profile_report --base <base.yaml> --target <target.yaml> --output <report.md>`.
 - To disable EKF for troubleshooting, use:
   `--use-ekf false --odom-topic /odom` on `mapping-stack` or `localization-stack`.
 - For Linux deployment, use lowercase launch filename `my_carto_localization.launch.py` if you run Nav-level launch scripts directly.
