@@ -109,6 +109,7 @@ class FrontierExplorer(Node):
         self.declare_parameter("max_candidate_path_len_m", 0.0)
         self.declare_parameter("risk_check_radius_cells", 2)
         self.declare_parameter("robot_cell_search_radius_cells", 3)
+        self.declare_parameter("free_space_max_value", 50)
         self.declare_parameter("recovery_failures_threshold", 3)
         self.declare_parameter("recovery_wait_sec", 3.0)
         self.declare_parameter("action_server_timeout_sec", 0.3)
@@ -160,6 +161,9 @@ class FrontierExplorer(Node):
         )
         self.robot_cell_search_radius_cells = max(
             0, int(self.get_parameter("robot_cell_search_radius_cells").value)
+        )
+        self.free_space_max_value = max(
+            0, min(100, int(self.get_parameter("free_space_max_value").value))
         )
         self.recovery_failures_threshold = max(
             1, int(self.get_parameter("recovery_failures_threshold").value)
@@ -284,6 +288,10 @@ class FrontierExplorer(Node):
             self._set_state(self.STATE_RUNNING)
 
     def _on_start(self, _request, response: Trigger.Response) -> Trigger.Response:
+        if self.running:
+            response.success = True
+            response.message = "frontier exploration already running"
+            return response
         self._start_exploration()
         response.success = True
         response.message = "frontier exploration started"
@@ -426,7 +434,10 @@ class FrontierExplorer(Node):
         return False
 
     def _count_free_cells(self) -> int:
-        return sum(1 for value in self.map_data if value == 0)
+        return sum(1 for value in self.map_data if self._is_free(value))
+
+    def _is_free(self, value: int) -> bool:
+        return value >= 0 and value <= self.free_space_max_value
 
     def _lookup_robot_pose(self) -> Tuple[float, float, float] | None:
         try:
@@ -549,7 +560,7 @@ class FrontierExplorer(Node):
             for nx, ny in self._neighbors4(mx, my):
                 nidx = ny * self.map_w + nx
                 value = self.map_data[nidx]
-                if value == 0:
+                if self._is_free(value):
                     free_neighbors_set[nidx] = None
                 if frontier_flags[nidx] and (not visited[nidx]):
                     visited[nidx] = True
@@ -572,7 +583,7 @@ class FrontierExplorer(Node):
     def _has_free_neighbor(self, x: int, y: int) -> bool:
         for nx, ny in self._neighbors4(x, y):
             nidx = ny * self.map_w + nx
-            if self.map_data[nidx] == 0:
+            if self._is_free(self.map_data[nidx]):
                 return True
         return False
 
@@ -584,7 +595,7 @@ class FrontierExplorer(Node):
             for xx in range(max(0, mx - r), min(self.map_w - 1, mx + r) + 1):
                 total += 1
                 idx = yy * self.map_w + xx
-                if self.map_data[idx] > 50:
+                if not self._is_free(self.map_data[idx]):
                     occ += 1
         if total == 0:
             return 1.0
@@ -608,7 +619,7 @@ class FrontierExplorer(Node):
         if robot_mx < 0 or robot_my < 0 or robot_mx >= self.map_w or robot_my >= self.map_h:
             return None
         origin_idx = robot_my * self.map_w + robot_mx
-        if self.map_data[origin_idx] == 0:
+        if self._is_free(self.map_data[origin_idx]):
             return origin_idx
 
         radius = self.robot_cell_search_radius_cells
@@ -617,7 +628,7 @@ class FrontierExplorer(Node):
         for yy in range(max(0, robot_my - radius), min(self.map_h - 1, robot_my + radius) + 1):
             for xx in range(max(0, robot_mx - radius), min(self.map_w - 1, robot_mx + radius) + 1):
                 idx = yy * self.map_w + xx
-                if self.map_data[idx] != 0:
+                if not self._is_free(self.map_data[idx]):
                     continue
                 dist2 = float((xx - robot_mx) ** 2 + (yy - robot_my) ** 2)
                 if dist2 < best_dist2:
@@ -639,7 +650,7 @@ class FrontierExplorer(Node):
                 nidx = ny * self.map_w + nx
                 if distances[nidx] >= 0:
                     continue
-                if self.map_data[nidx] != 0:
+                if not self._is_free(self.map_data[nidx]):
                     continue
                 distances[nidx] = next_dist
                 queue.append(nidx)

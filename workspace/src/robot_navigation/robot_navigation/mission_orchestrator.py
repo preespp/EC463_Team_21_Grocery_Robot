@@ -906,6 +906,18 @@ class MissionOrchestrator(Node):
             self.get_logger().warning(f"Waiting for action server: {name}")
             self.last_server_warn_at = now
 
+    def _on_trigger_response(self, future, name: str) -> None:
+        try:
+            response = future.result()
+        except Exception as exc:
+            self.get_logger().warning(f"Service {name} call error: {exc}")
+            return
+        if response is None:
+            self.get_logger().warning(f"Service {name} returned empty response")
+            return
+        if not response.success:
+            self.get_logger().warning(f"Service {name} failed: {response.message}")
+
     def _call_trigger_client(self, client, name: str, timeout_sec: float = 0.5) -> bool:
         if not client.wait_for_service(timeout_sec=timeout_sec):
             now = time.monotonic()
@@ -914,20 +926,23 @@ class MissionOrchestrator(Node):
                 self.last_server_warn_at = now
             return False
 
+        # Fire-and-forget avoids blocking/spin recursion from timer callbacks.
         future = client.call_async(Trigger.Request())
-        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
-        response = future.result()
-        if response is None:
-            return False
-        if not response.success:
-            self.get_logger().warning(f"Service {name} failed: {response.message}")
-            return False
+        future.add_done_callback(
+            lambda done_future, service_name=name: self._on_trigger_response(
+                done_future, service_name
+            )
+        )
         return True
 
     def _request_frontier_start(self) -> bool:
         if self.mapping_mode != "frontier":
             return False
-        return self._call_trigger_client(self.frontier_start_client, self.frontier_start_service)
+        return self._call_trigger_client(
+            self.frontier_start_client,
+            self.frontier_start_service,
+            timeout_sec=1.5,
+        )
 
     def _request_frontier_stop(self) -> bool:
         if self.mapping_mode != "frontier":
