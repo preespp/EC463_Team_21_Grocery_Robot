@@ -95,8 +95,8 @@ def get_item(product_name):
 
 
 def run_samples():
-    member_id = "AAA000"
-    employee_id = "000AAA"
+    member_id = "AAA100"
+    employee_id = "100AAA"
     first_name = "Pree"
     last_name = "Simphliphan"
     product_name = "Apple"

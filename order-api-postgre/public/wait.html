@@ -40,9 +40,11 @@
 
   const infoEl = document.getElementById("info");
 
-  function goBackByRole() {
-      if (user.access_level === "customer") window.location.href = "customer.html";
-      else window.location.href = "employee.html";
+  function logoutAndGoHome() {
+      clearSession();
+      sessionStorage.removeItem("last_order_id");
+      sessionStorage.removeItem("last_order_items");
+      window.location.href = "idle.html";
   }
 
   function showDoneAndRedirect(text) {
@@ -56,12 +58,12 @@
       <div style="max-width:720px;width:92%;border-radius:18px;padding:18px;
                   background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);">
           <div style="font-size:34px;font-weight:900;">${text}</div>
-          <div class="muted" style="margin-top:10px;">Returning in 5 seconds…</div>
+          <div class="muted" style="margin-top:10px;">Logging out and returning home in 5 seconds…</div>
       </div>
       `;
       document.body.appendChild(overlay);
 
-      setTimeout(goBackByRole, 5000);
+      setTimeout(logoutAndGoHome, 5000);
   }
 
   async function pollStatus() {
