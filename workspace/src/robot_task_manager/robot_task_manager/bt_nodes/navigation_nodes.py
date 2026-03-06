@@ -15,17 +15,16 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
     """
     BT Leaf Node that sends a NavigateToPose goal to the nav2 action server.
     """
-    def __init__(self, goal_key: str, yaw: float = 0.0, frame_id: str = "map"):
+    def __init__(self, goal_key: str, bb=None, yaw: float = 0.0, frame_id: str = "map"):
         super().__init__(f"NavigateToGoalPose[{goal_key}]")
         self.goal_key = goal_key
-        self.bb = py_trees.blackboard.Blackboard()
-        goal = getattr(self.bb, self.goal_key, None)
-        
-        self.x = goal[0]
-        self.y = goal[1]
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
+        self.x = 0.0
+        self.y = 0.0
         self.yaw = yaw
         self.frame_id = frame_id
         self.action_name = "navigate_to_pose"
+        self.initialise_error = False
 
         self.node = None
         self.client = None
@@ -35,17 +34,44 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         self.start_time = None
         self.timeout_sec = 30.0
 
+    def _dbg(self, msg: str):
+        print(f"[NavigateToGoalPose] {msg}", flush=True)
+
     def setup(self, **kwargs):
         if not rclpy.ok():
+            self._dbg("setup failed: rclpy not ok")
             return False
         node_name = f"bt_nav_goal_{id(self) & 0xFFFF:x}"
         self.node = rclpy.create_node(node_name)
         self.client = ActionClient(self.node, NavigateToPose, self.action_name)
+        self._dbg(f"setup ok: node={node_name}, action={self.action_name}, goal_key={self.goal_key}")
         return True
 
     def initialise(self):
+        self.initialise_error = False
+
+        goal = getattr(self.bb, self.goal_key, None)
+        self._dbg(f"initialise: bb.{self.goal_key} raw={goal}")
+        if not isinstance(goal, (list, tuple)) or len(goal) < 2:
+            self.feedback_message = f"Invalid goal in bb.{self.goal_key}: {goal}"
+            self.initialise_error = True
+            self._dbg(f"FAIL: {self.feedback_message}")
+            return
+
+        try:
+            self.x = 2.0#float(goal[0])
+            self.y = 0.0#float(goal[1])
+            self._dbg(f"parsed goal: x={self.x}, y={self.y}, yaw={self.yaw}")
+        except (TypeError, ValueError):
+            self.feedback_message = f"Non-numeric goal in bb.{self.goal_key}: {goal}"
+            self.initialise_error = True
+            self._dbg(f"FAIL: {self.feedback_message}")
+            return
+
         if not self.client.wait_for_server(timeout_sec=self.timeout_sec):
             self.feedback_message = f"Action server {self.action_name} not available"
+            self.initialise_error = True
+            self._dbg(f"FAIL: {self.feedback_message}")
             return
 
         goal_msg = NavigateToPose.Goal()
@@ -65,10 +91,17 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         self.send_future = self.client.send_goal_async(goal_msg)
         self.start_time = time.monotonic()
         self.feedback_message = f"Goal sent to {self.action_name}"
+        self._dbg(
+            f"goal sent: frame={self.frame_id} x={self.x:.3f} y={self.y:.3f} yaw={self.yaw:.3f}"
+        )
         self.goal_handle = None
         self.result_future = None
 
     def update(self):
+        if self.initialise_error:
+            self._dbg(f"update -> FAILURE (initialise_error): {self.feedback_message}")
+            return py_trees.common.Status.FAILURE
+
         if self.send_future is not None:
             rclpy.spin_once(self.node, timeout_sec=0.1)
             if self.send_future.done():
@@ -76,9 +109,11 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
                 self.send_future = None
                 if self.goal_handle is None or not self.goal_handle.accepted:
                     self.feedback_message = "Goal rejected"
+                    self._dbg("update -> FAILURE: goal rejected")
                     return py_trees.common.Status.FAILURE
                 self.result_future = self.goal_handle.get_result_async()
                 self.feedback_message = "Goal accepted, waiting for result..."
+                self._dbg("goal accepted, waiting for result")
                 return py_trees.common.Status.RUNNING
             else:
                 return py_trees.common.Status.RUNNING
@@ -89,17 +124,21 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
                 result = self.result_future.result()
                 if result is None:
                     self.feedback_message = "Result missing or timeout"
+                    self._dbg("update -> FAILURE: result missing/timeout")
                     return py_trees.common.Status.FAILURE
                 if result.status == GoalStatus.STATUS_SUCCEEDED:
                     self.feedback_message = "Goal succeeded"
+                    self._dbg("update -> SUCCESS: goal succeeded")
                     return py_trees.common.Status.SUCCESS
                 else:
                     self.feedback_message = f"Goal failed with status {result.status}"
+                    self._dbg(f"update -> FAILURE: {self.feedback_message}")
                     return py_trees.common.Status.FAILURE
             else:
                 # optional timeout check
                 if time.monotonic() - self.start_time > self.timeout_sec:
                     self.feedback_message = "Goal timed out"
+                    self._dbg("update -> FAILURE: goal timed out")
                     return py_trees.common.Status.FAILURE
                 return py_trees.common.Status.RUNNING
 

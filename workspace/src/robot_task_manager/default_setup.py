@@ -175,9 +175,9 @@ def main():
     cur = conn.cursor()
 
     try:
-        load_data(cur, DATA_TO_INSERT)
-        conn.commit()
-        print("Data insert complete.")
+        # load_data(cur, DATA_TO_INSERT)
+        # conn.commit()
+        # print("Data insert complete.")
         for table in TABLES:
             print_table(cur, table)
     except Exception:
