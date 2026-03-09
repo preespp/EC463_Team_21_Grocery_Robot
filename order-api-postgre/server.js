@@ -121,6 +121,45 @@ function ordinalToMemberId(ordinal) {
   return `${letters}${String(digitsPart).padStart(3, "0")}`;
 }
 
+const employeeSessions = new Map();
+const EMPLOYEE_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+function makeEmployeeToken(employeeId) {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `emp_${employeeId}_${Date.now()}_${rand}`;
+}
+
+function cleanExpiredEmployeeSessions() {
+  const now = Date.now();
+  for (const [token, session] of employeeSessions.entries()) {
+    if (!session?.expiresAt || session.expiresAt <= now) {
+      employeeSessions.delete(token);
+    }
+  }
+}
+
+function getEmployeeTokenFromRequest(req) {
+  const auth = String(req.headers.authorization || "");
+  if (auth.startsWith("Bearer ")) return auth.slice(7).trim();
+  const fallback = String(req.headers["x-employee-token"] || "");
+  return fallback.trim();
+}
+
+function requireEmployeeAuth(req, res, next) {
+  cleanExpiredEmployeeSessions();
+  const token = getEmployeeTokenFromRequest(req);
+  if (!token) return res.status(401).json({ error: "Employee auth token required" });
+
+  const session = employeeSessions.get(token);
+  if (!session || session.expiresAt <= Date.now()) {
+    employeeSessions.delete(token);
+    return res.status(401).json({ error: "Employee session expired" });
+  }
+
+  req.employeeSession = session;
+  next();
+}
+
 // CUSTOMER LOGIN (member only, no password)
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -151,6 +190,281 @@ app.post("/api/auth/login", async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// EMPLOYEE LOGIN (password required, no guest mode)
+app.post("/api/employee/auth/login", async (req, res) => {
+  try {
+    const employee_ID = String(req.body?.employee_ID || "").trim().toUpperCase();
+    const password = String(req.body?.password || "");
+    if (!employee_ID || !password) {
+      return res.status(400).json({ error: "employee_ID and password are required" });
+    }
+
+    const result = await pool.query(
+      `SELECT employee_ID, first_name, last_name, password
+       FROM employee
+       WHERE employee_ID = $1
+       LIMIT 1`,
+      [employee_ID]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Employee ID not found" });
+    }
+
+    const employeePassword = String(result.rows[0]?.password ?? "");
+    if (!employeePassword || password !== employeePassword) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
+    const employee = result.rows[0];
+    const token = makeEmployeeToken(employee_ID);
+    employeeSessions.set(token, {
+      token,
+      employee_ID,
+      first_name: employee.first_name ?? "",
+      last_name: employee.last_name ?? "",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + EMPLOYEE_SESSION_TTL_MS
+    });
+
+    res.json({
+      ok: true,
+      token,
+      employee: {
+        employee_ID: employee.employee_id ?? employee_ID,
+        first_name: employee.first_name ?? "",
+        last_name: employee.last_name ?? ""
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// EMPLOYEE ACCOUNTS LIST
+app.get("/api/employee/accounts", requireEmployeeAuth, async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT employee_ID, first_name, last_name
+       FROM employee
+       ORDER BY employee_ID`
+    );
+    res.json({
+      items: result.rows.map((r) => ({
+        employee_ID: r.employee_id ?? "",
+        first_name: r.first_name ?? "",
+        last_name: r.last_name ?? ""
+      }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// EMPLOYEE ACCOUNT CREATE
+app.post("/api/employee/accounts/create", requireEmployeeAuth, async (req, res) => {
+  try {
+    const employee_ID = String(req.body?.employee_ID || "").trim().toUpperCase();
+    const first_name = String(req.body?.first_name || "").trim();
+    const last_name = String(req.body?.last_name || "").trim();
+    const password = String(req.body?.password || "");
+
+    if (!employee_ID || !first_name || !last_name || !password) {
+      return res.status(400).json({ error: "employee_ID, first_name, last_name, password are required" });
+    }
+
+    if (!/^[0-9]{3}[A-Z]{3}$/.test(employee_ID)) {
+      return res.status(400).json({ error: "employee_ID must match format 000AAA" });
+    }
+
+    await pool.query(
+      `INSERT INTO employee (employee_ID, first_name, last_name, password)
+       VALUES ($1, $2, $3, $4)`,
+      [employee_ID, first_name, last_name, password]
+    );
+
+    res.json({
+      ok: true,
+      employee_ID,
+      first_name,
+      last_name
+    });
+  } catch (e) {
+    if (String(e.message || "").toLowerCase().includes("duplicate")) {
+      return res.status(409).json({ error: "Employee ID already exists" });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// EMPLOYEE INVENTORY REPORT
+app.get("/api/employee/inventory/report", requireEmployeeAuth, async (_req, res) => {
+  try {
+    const invResult = await pool.query(
+      `SELECT product_id, product_name, category_name, stock, x, y, z
+       FROM inventory
+       ORDER BY product_name`
+    );
+    const items = invResult.rows.map((r) => ({
+      product_id: r.product_id,
+      product_name: r.product_name ?? "",
+      category_name: r.category_name ?? "Uncategorized",
+      stock: Number(r.stock ?? 0),
+      x: r.x ?? null,
+      y: r.y ?? null,
+      z: r.z ?? null
+    }));
+
+    let unitsInStock = 0;
+    let occupiedProducts = 0;
+    let lowStockProducts = 0;
+    const categoryMap = new Map();
+
+    for (const it of items) {
+      unitsInStock += it.stock;
+      if (it.stock > 0) occupiedProducts += 1;
+      if (it.stock <= 5) lowStockProducts += 1;
+
+      const key = it.category_name || "Uncategorized";
+      const agg = categoryMap.get(key) || { category: key, products: 0, units: 0 };
+      agg.products += 1;
+      agg.units += it.stock;
+      categoryMap.set(key, agg);
+    }
+
+    const restockTodayResult = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM restock_id
+       WHERE DATE(timestamp) = CURRENT_DATE`
+    );
+    const restockRequestsToday = Number(restockTodayResult.rows[0]?.count ?? 0);
+
+    res.json({
+      summary: {
+        total_products: items.length,
+        occupied_products: occupiedProducts,
+        empty_products: items.length - occupiedProducts,
+        units_in_stock: unitsInStock,
+        low_stock_products: lowStockProducts,
+        restock_requests_today: restockRequestsToday
+      },
+      category_summary: [...categoryMap.values()].sort((a, b) => a.category.localeCompare(b.category)),
+      items
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// EMPLOYEE INVENTORY OPTIONS (for restock dropdown)
+app.get("/api/employee/inventory/options", requireEmployeeAuth, async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT product_id, product_name, category_name, stock
+       FROM inventory
+       ORDER BY product_name`
+    );
+    res.json({
+      items: result.rows.map((r) => ({
+        product_id: r.product_id,
+        product_name: r.product_name ?? "",
+        category_name: r.category_name ?? "Uncategorized",
+        stock: Number(r.stock ?? 0)
+      }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// EMPLOYEE ROBOT STATUS (placeholder source for dashboard UI)
+app.get("/api/employee/robot/status", requireEmployeeAuth, async (_req, res) => {
+  const now = new Date().toISOString();
+  res.json({
+    robots: [
+      {
+        robot_number: "RB-01",
+        battery_level: 86,
+        status_key: "customer",
+        status_text: "Operate for Customer",
+        updated_at: now
+      },
+      {
+        robot_number: "RB-02",
+        battery_level: 62,
+        status_key: "restock",
+        status_text: "Operate for Restock",
+        updated_at: now
+      },
+      {
+        robot_number: "RB-03",
+        battery_level: 100,
+        status_key: "charged",
+        status_text: "Charged",
+        updated_at: now
+      }
+    ]
+  });
+});
+
+// EMPLOYEE RESTOCK SUBMIT (dashboard endpoint)
+app.post("/api/employee/restock/submit", requireEmployeeAuth, async (req, res) => {
+  let client = null;
+  try {
+    const employee_ID = req.employeeSession.employee_ID;
+    const inputItems = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (inputItems.length === 0) {
+      return res.status(400).json({ error: "items is required" });
+    }
+
+    const normalizedItems = inputItems.map((it) => ({
+      product_id: Number(it.product_id),
+      qty: Number(it.qty)
+    })).filter((it) => Number.isInteger(it.product_id) && it.qty > 0);
+
+    if (normalizedItems.length === 0) {
+      return res.status(400).json({ error: "items must contain valid product_id and qty>0" });
+    }
+
+    const ids = normalizedItems.map((it) => it.product_id);
+    const invResult = await pool.query(
+      `SELECT product_id, product_name FROM inventory WHERE product_id = ANY($1::int[])`,
+      [ids]
+    );
+    const namesById = new Map(invResult.rows.map((r) => [Number(r.product_id), r.product_name ?? ""]));
+
+    const items = normalizedItems.map((it) => ({
+      product_id: it.product_id,
+      name: namesById.get(it.product_id) ?? "",
+      qty: it.qty
+    }));
+
+    const restock_ID = `${employee_ID}R${Date.now()}`;
+
+    client = await pool.connect();
+    await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO restock_id (restock_ID, employee_ID, items, timestamp, status)
+       VALUES ($1, $2, $3, $4, 'RECEIVED')`,
+      [restock_ID, employee_ID, JSON.stringify(items), new Date().toISOString()]
+    );
+    await client.query(
+      `UPDATE employee SET restock_ID=$1 WHERE employee_ID=$2`,
+      [restock_ID, employee_ID]
+    );
+    await client.query("COMMIT");
+
+    res.json({ status: "RECEIVED", restock_ID });
+  } catch (e) {
+    if (client) {
+      try { await client.query("ROLLBACK"); } catch (_) {}
+    }
+    res.status(500).json({ error: e.message });
+  } finally {
+    if (client) client.release();
   }
 });
 
