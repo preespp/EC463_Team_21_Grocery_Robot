@@ -1,0 +1,7 @@
+digraph G {
+"map" -> "lidar_link"[label=" Broadcaster: default_authority\nAverage rate: 10.149\nBuffer length: 5.025\nMost recent transform: 1772582527.968216\nOldest transform: 1772582522.942876\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1772582527.9796522"[ shape=plaintext ] ;
+}->"map";
+}

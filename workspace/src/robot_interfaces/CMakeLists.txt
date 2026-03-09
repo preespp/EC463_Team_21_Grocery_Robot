@@ -18,20 +18,20 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(rclpy REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
-find_package(cv_bridge REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/NewOrder.srv"
+  "srv/ProductRequest.srv"
   "msg/Order.msg"
   "msg/OrderItem.msg"
-  #"action/"
+  "action/MoveRack.action"
+  "action/PickArm.action"
   DEPENDENCIES 
   builtin_interfaces 
   geometry_msgs 

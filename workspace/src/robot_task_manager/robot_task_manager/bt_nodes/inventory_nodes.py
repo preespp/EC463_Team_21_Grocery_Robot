@@ -8,9 +8,10 @@ class ChangeInventory(py_trees.behaviour.Behaviour):
     """
     Uses bb.current_item and decrements inventory in PostgreSQL API.
     """
-    def __init__(self, bb):
+    def __init__(self, bb, mode):
         super().__init__("ChangeInventory")
         self.bb = bb
+        self.mode = mode
 
     def update(self):
         item = getattr(self.bb, "current_item", None)

@@ -6,7 +6,7 @@ def generate_launch_description():
     common = {
         "bus": 7,
         "rate": 100.0,
-        "threshold_m": 0.10,
+        "threshold_m": 0.20,
     }
 
     return LaunchDescription([
