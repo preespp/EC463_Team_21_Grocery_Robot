@@ -4,35 +4,35 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="icon" type="image/png" href="images/GroceryBot_FirstLogo.png" />
-  <title>Customer</title>
+  <title>顾客</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
   <div class="topbar">
     <div class="row">
-      <span class="badge">CUSTOMER</span>
+      <span class="badge">顾客</span>
       <span class="muted" id="who"></span>
-      <div class="lang-switch" aria-label="Language">
-        <a class="lang-btn active" href="customer.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
+      <div class="lang-switch" aria-label="语言">
+        <a class="lang-btn" href="customer.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
         <a class="lang-btn" href="customer_es.html" title="Español"><img class="flag-icon" src="images/Spanish.png" alt="Español" /></a>
-        <a class="lang-btn" href="customer_zh.html" title="中文"><img class="flag-icon" src="images/Mandarin.png" alt="中文" /></a>
+        <a class="lang-btn active" href="customer_zh.html" title="中文"><img class="flag-icon" src="images/Mandarin.png" alt="中文" /></a>
       </div>
     </div>
     <div class="row">
-      <button class="btn danger" id="logout">Logout</button>
+      <button class="btn danger" id="logout">退出</button>
     </div>
   </div>
 
   <div class="container">
-    <h1>Shop</h1>
-    <p class="muted">Select quantity from inventory.</p>
+    <h1>购物</h1>
+    <p class="muted">请选择库存数量。</p>
 
     <div class="grid2 customer-grid" id="shopGrid">
       <div class="panel">
         <div class="row" style="justify-content:space-between">
-          <b>Inventory</b>
+          <b>库存</b>
           <label class="row muted" for="categoryFilter" style="gap:8px">
-            Category
+            分类
             <select id="categoryFilter" style="min-width:160px"></select>
           </label>
         </div>
@@ -40,18 +40,18 @@
         <div id="inv" class="scroll-box"></div>
       </div>
 
-      <button class="cart-toggle-arrow middle-toggle" id="toggleCart" aria-label="Hide cart" title="Hide cart">▶</button>
+      <button class="cart-toggle-arrow middle-toggle" id="toggleCart" aria-label="隐藏购物车" title="隐藏购物车">▶</button>
 
       <div class="panel" id="cartPanel">
         <div class="row" style="justify-content:space-between">
-          <b>Cart</b>
-          <button class="btn" id="clear">Clear</button>
+          <b>购物车</b>
+          <button class="btn" id="clear">清空</button>
         </div>
         <div id="cart" class="scroll-box"></div>
         <hr/>
         <div class="row" style="justify-content:space-between">
           <div class="muted" id="msg"></div>
-          <button class="btn primary" id="submit">Submit Order</button>
+          <button class="btn primary" id="submit">提交订单</button>
         </div>
       </div>
     </div>
@@ -59,16 +59,20 @@
 
   <script src="common.js"></script>
   <script>
-    const user = requireLogin();
-    if (user.access_level !== "customer") window.location.href = "login.html";
+    const user = getSession();
+    if (!user) {
+      window.location.href = "login_zh.html";
+      throw new Error("No active session");
+    }
+    if (user.access_level !== "customer") window.location.href = "login_zh.html";
     const memberID = user.member_ID || user.id || user.username;
-    if (!memberID) window.location.href = "login.html";
+    if (!memberID) window.location.href = "login_zh.html";
 
     const first = (user.first_name || "").trim();
     const last = (user.last_name || "").trim();
     const fullName = `${first} ${last}`.trim();
     const who = user.guest
-      ? `Guest (${memberID})`
+      ? `访客 (${memberID})`
       : fullName
         ? `${fullName} (${memberID})`
         : `${memberID}`;
@@ -77,8 +81,8 @@
     idleTimeoutWithWarnings({
         totalMs: 5 * 60 * 1000,      // 5 minutes
         warnMs: 4 * 60 * 1000,       // 4 minutes
-        warnText: "No activity detected Logging out in 1 minute...",
-        finalText: "Timeout reached. Logging out in 5 seconds...",
+        warnText: "检测到无操作，1 分钟后将退出登录...",
+        finalText: "会话超时，5 秒后退出登录...",
         finalPopupMs: 5000,
         onTimeout: () => {
             clearSession();
@@ -114,11 +118,11 @@
       shopGrid.classList.toggle("cart-hidden", !visible);
       invEl.classList.toggle("inv-expanded", !visible);
       toggleCartBtn.textContent = visible ? "▶" : "◀";
-      toggleCartBtn.title = visible ? "Hide cart" : "Show cart";
-      toggleCartBtn.setAttribute("aria-label", visible ? "Hide cart" : "Show cart");
+      toggleCartBtn.title = visible ? "隐藏购物车" : "显示购物车";
+      toggleCartBtn.setAttribute("aria-label", visible ? "隐藏购物车" : "显示购物车");
     }
 
-    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="login.html"; };
+    document.getElementById("logout").onclick = () => { clearSession(); window.location.href="login_zh.html"; };
     toggleCartBtn.onclick = () => setCartVisible(!cartVisible);
     categoryFilterEl.onchange = () => {
       selectedCategoryKey = categoryFilterEl.value || "ALL";
@@ -131,16 +135,16 @@ function categoryKeyForItem(it) {
     return `id:${String(it.category_id)}`;
   }
   const name = String(it.category_name || "").trim();
-  return `name:${name || "Uncategorized"}`;
+  return `name:${name || "未分类"}`;
 }
 
 function categoryLabelForItem(it) {
   const byName = String(it.category_name || "").trim();
   if (byName) return byName;
   if (it.category_id !== null && it.category_id !== undefined && it.category_id !== "") {
-    return `Category ${it.category_id}`;
+    return `分类 ${it.category_id}`;
   }
-  return "Uncategorized";
+  return "未分类";
 }
 
 function updateCategoryFilterOptions() {
@@ -159,7 +163,7 @@ function updateCategoryFilterOptions() {
 
   const allOpt = document.createElement("option");
   allOpt.value = "ALL";
-  allOpt.textContent = "All categories";
+  allOpt.textContent = "全部分类";
   categoryFilterEl.appendChild(allOpt);
 
   for (const [key, label] of options) {
@@ -179,14 +183,14 @@ function renderInventory() {
     : inventory.filter((it) => categoryKeyForItem(it) === selectedCategoryKey);
 
   if (visibleInventory.length === 0) {
-    invEl.innerHTML = `<div class="muted">No inventory in selected category.</div>`;
+    invEl.innerHTML = `<div class="muted">所选分类暂无库存。</div>`;
     return;
   }
 
   const table = document.createElement("table");
   table.innerHTML = `
     <thead><tr>
-      <th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Qty</th>
+      <th>名称</th><th>分类</th><th>价格</th><th>库存</th><th>数量</th>
     </tr></thead>
     <tbody></tbody>
   `;
@@ -245,14 +249,14 @@ function renderInventory() {
     function renderCart() {
       cartEl.innerHTML = "";
       if (cart.size === 0) {
-        cartEl.innerHTML = `<div class="muted">Cart is empty</div>`;
+        cartEl.innerHTML = `<div class="muted">购物车为空</div>`;
         return;
       }
 
       const table = document.createElement("table");
       table.innerHTML = `
         <thead><tr>
-          <th>Name</th><th>Qty</th><th></th>
+          <th>名称</th><th>数量</th><th></th>
         </tr></thead>
         <tbody></tbody>
       `;
@@ -272,7 +276,7 @@ function renderInventory() {
             <span style="min-width:40px;display:inline-block;text-align:center">${entry.qty}</span>
             <button class="btn" data-a="+">+</button>
           </td>
-          <td><button class="btn danger">Remove</button></td>
+          <td><button class="btn danger">移除</button></td>
         `;
         const [minus, plus] = tr.querySelectorAll("button[data-a]");
         minus.onclick = () => {
@@ -285,7 +289,7 @@ function renderInventory() {
         plus.onclick = () => {
         const dbStock = Number(entry.inv.stock || 0);
         if (entry.qty >= dbStock) {
-            showMsg("Cannot add more: not enough stock.", 3000);
+            showMsg("无法继续添加：库存不足。", 3000);
             return;
         }
         entry.qty += 1;
@@ -307,7 +311,7 @@ function renderInventory() {
 
     async function loadInventory() {
       msgEl.textContent = "";
-      const data = await apiGet("/api/inventory/list?lang=en");
+      const data = await apiGet("/api/inventory/list?lang=zh-cn");
       inventory = data.items;
       updateCategoryFilterOptions();
       renderInventory();
@@ -328,7 +332,7 @@ function renderInventory() {
 
     document.getElementById("submit").onclick = async () => {
       msgEl.textContent = "";
-      if (cart.size === 0) { msgEl.textContent = "Cart is empty"; return; }
+      if (cart.size === 0) { msgEl.textContent = "购物车为空"; return; }
 
       // Build payload to match server.js required fields
       const items = [];
@@ -356,7 +360,7 @@ function renderInventory() {
         sessionStorage.setItem("last_order_items", JSON.stringify(items));
         window.location.href = "wait.html";
       } catch (e) {
-        msgEl.textContent = "Submit failed: " + e.message;
+        msgEl.textContent = "提交失败: " + e.message;
       }
     };
 

@@ -4,41 +4,41 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="icon" type="image/png" href="images/GroceryBot_FirstLogo.png" />
-  <title>Login</title>
+  <title>登录</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
   <div class="topbar">
     <div class="row">
-      <span class="badge">LOGIN</span>
+      <span class="badge">登录</span>
       <span class="muted">GroceryBot</span>
-      <div class="lang-switch" aria-label="Language">
+      <div class="lang-switch" aria-label="语言">
         <a class="lang-btn active" href="login.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
         <a class="lang-btn" href="login_es.html" title="Español"><img class="flag-icon" src="images/Spanish.png" alt="Español" /></a>
         <a class="lang-btn" href="login_zh.html" title="中文"><img class="flag-icon" src="images/Mandarin.png" alt="中文" /></a>
       </div>
     </div>
     <div class="row">
-      <button class="btn ghost" onclick="window.location.href='idle.html'">Home</button>
+      <button class="btn ghost" onclick="window.location.href='idle.html'">主页</button>
     </div>
   </div>
 
   <div class="container">
-    <h1>Customer Login</h1>
-    <p class="muted">Enter your Member ID, or continue as guest.</p>
+    <h1>顾客登录</h1>
+    <p class="muted">请输入会员 ID，或以访客身份继续。</p>
 
     <div class="panel">
       <div class="grid2" style="grid-template-columns:1fr">
         <label class="field">
-          <span class="muted">Member ID</span>
-          <input id="memberID" placeholder="Ex: M1001" />
+          <span class="muted">会员 ID</span>
+          <input id="memberID" placeholder="例如: AAA001" />
         </label>
       </div>
 
       <div class="row" style="margin-top:14px">
-        <button class="btn primary" id="btnLogin">Continue as Member</button>
-        <button class="btn" onclick="window.location.href='create_customer.html'">Create Customer Account</button>
-        <button class="btn" id="guest">Continue as Guest</button>
+        <button class="btn primary" id="btnLogin">会员继续</button>
+        <button class="btn" onclick="window.location.href='create_customer_zh.html'">创建顾客账号</button>
+        <button class="btn" id="guest">访客继续</button>
       </div>
 
       <div id="msg" class="muted" style="margin-top:12px"></div>
@@ -60,28 +60,28 @@
       const msg = document.getElementById("msg");
       msg.textContent = "";
       if (!member_ID) {
-        msg.textContent = "Please enter a Member ID.";
+        msg.textContent = "请输入会员 ID。";
         return;
       }
 
       try {
         const user = await apiPost("/api/auth/login", { member_ID });
         setSession(user);
-        window.location.href = "customer.html";
+        window.location.href = "customer_zh.html";
       } catch (e) {
-        msg.textContent = "Login failed: " + e.message;
+        msg.textContent = "登录失败: " + e.message;
       }
     });
 
     document.getElementById("guest").onclick = () => {
       setSession({
         member_ID: randomGuestId(),
-        first_name: "Guest",
+        first_name: "访客",
         last_name: "",
         access_level: "customer",
         guest: true
       });
-      window.location.href = "customer.html";
+      window.location.href = "customer_zh.html";
     };
   </script>
 </body>

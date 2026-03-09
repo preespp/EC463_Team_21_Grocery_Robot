@@ -287,3 +287,143 @@ hr{
   font-size: 20px;
   border-radius: 12px;
 }
+
+.lang-switch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.lang-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.lang-btn.active {
+  border-color: rgba(94, 234, 212, 0.8);
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.24);
+}
+
+.flag-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+}
+
+.cute-bot {
+  width: 180px;
+  height: 180px;
+  position: relative;
+  margin: 6px auto 2px;
+  animation: bot-float 2.6s ease-in-out infinite;
+}
+
+.cute-bot .head {
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  width: 130px;
+  height: 108px;
+  transform: translateX(-50%);
+  border-radius: 28px;
+  background: linear-gradient(180deg, #dff7ff 0%, #bde6ff 100%);
+  border: 3px solid rgba(11, 15, 25, 0.45);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.28);
+}
+
+.cute-bot .eye {
+  position: absolute;
+  top: 34px;
+  width: 17px;
+  height: 22px;
+  border-radius: 999px;
+  background: #0b0f19;
+  animation: bot-blink 3.2s infinite;
+}
+
+.cute-bot .eye.left {
+  left: 38px;
+}
+
+.cute-bot .eye.right {
+  right: 38px;
+}
+
+.cute-bot .mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  width: 34px;
+  height: 16px;
+  transform: translateX(-50%);
+  border-bottom: 4px solid #0b0f19;
+  border-radius: 0 0 18px 18px;
+}
+
+.cute-bot .cheek {
+  position: absolute;
+  top: 62px;
+  width: 14px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(251, 113, 133, 0.7);
+}
+
+.cute-bot .cheek.left {
+  left: 18px;
+}
+
+.cute-bot .cheek.right {
+  right: 18px;
+}
+
+.cute-bot .antenna {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 6px;
+  height: 34px;
+  transform: translateX(-50%);
+  background: rgba(189, 230, 255, 0.95);
+  border-radius: 999px;
+}
+
+.cute-bot .antenna::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #5eead4;
+  box-shadow: 0 0 14px rgba(94, 234, 212, 0.65);
+}
+
+@keyframes bot-float {
+  0%,
+  100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes bot-blink {
+  0%,
+  46%,
+  52%,
+  100% { transform: scaleY(1); }
+  48%,
+  50% { transform: scaleY(0.12); }
+}

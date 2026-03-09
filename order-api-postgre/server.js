@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process";
 import pkg from "pg";
 
 const { Pool } = pkg;
@@ -31,6 +32,53 @@ app.get("/", (_req, res) => {
 app.get("/favicon.ico", (_req, res) => {
   res.status(204).end();
 });
+
+function normalizeInventoryLang(langRaw) {
+  const v = String(langRaw || "en").trim().toLowerCase();
+  if (!v || v === "en" || v === "en-us") return "en";
+  if (v === "es" || v === "es-es" || v === "es-mx") return "es";
+  if (v === "zh" || v === "zh-cn" || v === "zh-hans") return "zh-cn";
+  return "en";
+}
+
+function translateWithDeepTranslator(texts, targetLang) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, "translate_inventory.py");
+    const child = spawn("python3", [scriptPath, targetLang], { stdio: ["pipe", "pipe", "pipe"] });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (err) => {
+      reject(new Error(`translator spawn error: ${err.message}`));
+    });
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`translator exit ${code}: ${stderr.trim() || "unknown error"}`));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout);
+        if (!Array.isArray(parsed)) {
+          reject(new Error("translator output is not an array"));
+          return;
+        }
+        resolve(parsed);
+      } catch (err) {
+        reject(new Error(`translator invalid JSON: ${err.message}`));
+      }
+    });
+
+    child.stdin.write(JSON.stringify(texts));
+    child.stdin.end();
+  });
+}
 
 function memberIdToOrdinal(memberId) {
   const s = String(memberId || "").trim().toUpperCase();
@@ -164,16 +212,44 @@ app.post("/api/account/create_customer", async (req, res) => {
 // INVENTORY LIST (customer UI format)
 app.get("/api/inventory/list", async (req, res) => {
   try {
+    const lang = normalizeInventoryLang(req.query.lang);
     const result = await pool.query("SELECT * FROM inventory ORDER BY product_name");
     const items = result.rows.map((r) => ({
       id: r.product_id ?? r.id,
       name: r.product_name ?? r.name ?? "",
+      category_id: r.category_id ?? null,
+      category_name: r.category_name ?? "",
       price: r.price ?? 0,
       stock: Number(r.stock ?? 0),
       x: r.x ?? null,
       y: r.y ?? null,
       z: r.z ?? null,
     }));
+
+    if (lang !== "en" && items.length > 0) {
+      try {
+        const englishNames = items.map((it) => String(it.name ?? ""));
+        const englishCategories = items.map((it) => String(it.category_name ?? ""));
+
+        const translatedNames = await translateWithDeepTranslator(englishNames, lang);
+        const translatedCategories = await translateWithDeepTranslator(englishCategories, lang);
+
+        if (
+          translatedNames.length === items.length &&
+          translatedCategories.length === items.length
+        ) {
+          for (let i = 0; i < items.length; i += 1) {
+            items[i].name = String(translatedNames[i] ?? items[i].name);
+            items[i].category_name = String(
+              translatedCategories[i] ?? items[i].category_name
+            );
+          }
+        }
+      } catch (e) {
+        console.warn(`inventory translation failed (lang=${lang}): ${e.message}`);
+      }
+    }
+
     res.json({ items });
   } catch (e) {
     res.status(500).json({ error: e.message });
