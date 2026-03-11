@@ -674,7 +674,7 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--host-set-frecho-filter", type=parse_bool, default=False)
     stack_common.add_argument("--host-set-lfp-angle-range-filter", type=parse_bool, default=False)
     stack_common.add_argument("--host-set-lfp-interval-filter", type=parse_bool, default=False)
-    stack_common.add_argument("--lidar-x", type=float, default=0.254)
+    stack_common.add_argument("--lidar-x", type=float, default=0.2413)
     stack_common.add_argument("--lidar-y", type=float, default=0.0)
     stack_common.add_argument("--lidar-z", type=float, default=0.0)
     stack_common.add_argument("--lidar-roll", type=float, default=0.0)

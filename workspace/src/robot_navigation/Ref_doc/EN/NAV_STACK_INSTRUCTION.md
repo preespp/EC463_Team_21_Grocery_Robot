@@ -81,7 +81,7 @@ ros2 run sick_scan_xd sick_generic_caller \
   hostname:=192.168.8.150 \
   udp_receiver_ip:=192.168.8.249 \
   publish_frame_id:=lidar_link \
-  publish_imu_frame_id:=lidar_link \
+  publish_imu_frame_id:=imu_link \
   tf_publish_rate:=0.0 \
   imu_udp_port:=7503 \
   scandataformat:=2 \
@@ -94,13 +94,26 @@ ros2 run sick_scan_xd sick_generic_caller \
   imu_topic:=/sick_scansegment_xd/imu
 ```
 
-### 2.2 Static TF (`base_link -> lidar_link`)
+### 2.2 Static TF (`base_link -> lidar_link`, `lidar_link -> imu_link`)
 ```bash
 ros2 run tf2_ros static_transform_publisher \
-  --x 0.254 --y 0.0 --z 0.0 \
+  --x 0.2413 --y 0.0 --z 0.0 \
   --roll 0.0 --pitch 0.0 --yaw 0.0 \
   --frame-id base_link --child-frame-id lidar_link
 ```
+
+```bash
+ros2 run tf2_ros static_transform_publisher \
+  --x 0.0124 --y 0.0185 --z -0.0484 \
+  --roll 0.0 --pitch 0.0 --yaw 0.0 \
+  --frame-id lidar_link --child-frame-id imu_link
+```
+
+Notes:
+
+- Current project preset follows the user-validated mount assumption: `lidar_link` is modeled at the bracket center and used as the project's optical-origin proxy.
+- `0.2413 m` comes from `20 in / 2 - 1 in / 2 = 9.5 in = 0.2413 m`, i.e. half the 20 in base minus half the standard 1.00 in 80/20 front bar width.
+- `0.0124, 0.0185, -0.0484 m` comes from the SICK operating instructions as IMU position relative to the optical origin.
 
 ### 2.3 Cartographer mapping
 ```bash
@@ -168,5 +181,5 @@ ros2 action list | grep navigate_to_pose
 - `use_ekf`: `true`
 - `fallback_odom`: `false`
 - LiDAR frame: `lidar_link`
-- Static TF default: `base_link -> lidar_link = (0.254, 0, 0, 0, 0, 0)`
+- Static TF default: `base_link -> lidar_link = (0.2413, 0, 0, 0, 0, 0)`
 - `with_nav2_rviz`: `false`

@@ -103,3 +103,7 @@ ros_ws/log/
 
 # Project reports
 /reports/
+
+# Local temporary reference PDFs
+/workspace/tmp_picoscan_ds.pdf
+/workspace/tmp_picoscan_oi.pdf

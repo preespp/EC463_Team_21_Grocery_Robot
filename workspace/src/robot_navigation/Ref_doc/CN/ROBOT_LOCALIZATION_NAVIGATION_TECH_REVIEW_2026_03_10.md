@@ -1,5 +1,15 @@
 # Robot Localization and Navigation Tech Review
 
+> Status update (2026-03-11):
+> - Current code now publishes LiDAR in `lidar_link` and IMU in `imu_link`.
+> - Cartographer now uses `tracking_frame = "imu_link"`, `published_frame = "base_link"`, `use_imu_data = true`, and `publish_frame_projected_to_2d = true`.
+> - The current TF chain is `base_link -> lidar_link -> imu_link`.
+> - Current mount preset now uses `base_link -> lidar_link = (0.2413, 0, 0, 0, 0, 0)`.
+> - This `0.2413 m` preset comes from the repo's `20 x 20 in` base dimension and the confirmed standard `1.00 in` 80/20 front bar: `0.508 / 2 - 0.0254 / 2 = 0.2413 m`.
+> - `lidar_link -> imu_link = (0.0124, 0.0185, -0.0484, 0, 0, 0)` is now set from the SICK operating instructions as the IMU position relative to the optical origin.
+> - For the current project preset, `lidar_link` is modeled at the bracket center and treated as the project's optical-origin proxy, following the manual mount assumption for this robot.
+> - Any statement below saying "current `tracking_frame = base_link` / `publish_imu_frame_id = lidar_link` / `use_imu_data = false`" should now be read as historical analysis for the pre-2026-03-11 code state.
+
 > 状态更新（2026-03-10）：
 > `ROBOT_NAV_STACK_EXECUTION_PLAN_2026_03.md` 的 D0 执行默认已改为 PointCloud2 主路径（`points2 -> /cloud_all_fields_fullframe`），并移除原输入模式切换任务（D0-2）。
 > 本文中关于 LaserScan / scan_segment 的内容保留为技术备选与历史分析，不作为当前 D0 默认执行项。

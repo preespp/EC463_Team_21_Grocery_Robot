@@ -108,8 +108,13 @@ ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 
 Default behavior in both mapping/localization stacks:
 
-- LiDAR and IMU are published in `lidar_link`.
-- Static TF `base_link -> lidar_link` is published with default offset `(x=0.254, y=0, z=0, rpy=0,0,0)`.
+- LiDAR is published in `lidar_link`.
+- IMU is published in `imu_link`.
+- Static TF `base_link -> lidar_link` is published with default offset `(x=0.2413, y=0, z=0, rpy=0,0,0)`.
+- Static TF `lidar_link -> imu_link` is published with default offset `(x=0.0124, y=0.0185, z=-0.0484, rpy=0,0,0)`.
+- Cartographer tracks `imu_link` so raw IMU input is colocated with the tracking frame.
+- Cartographer still publishes `base_link` projected to 2D, so Nav2 keeps the usual planar robot frame.
+- The `0.2413 m` LiDAR forward offset is the current project preset for this robot mount: `20 in / 2 - 1 in / 2 = 9.5 in = 0.2413 m`, with the front mount centered on a standard 1.00 in 80/20 bar.
 - Bridge publishes `/odom_raw`.
 - EKF (`robot_localization`) fuses `/odom_raw + /sick_scansegment_xd/imu` and publishes filtered `/odom`.
 

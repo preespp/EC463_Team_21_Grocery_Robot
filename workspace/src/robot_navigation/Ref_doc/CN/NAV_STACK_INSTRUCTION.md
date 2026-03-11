@@ -77,7 +77,7 @@ ros2 run sick_scan_xd sick_generic_caller \
   hostname:=192.168.8.150 \
   udp_receiver_ip:=192.168.8.249 \
   publish_frame_id:=lidar_link \
-  publish_imu_frame_id:=lidar_link \
+  publish_imu_frame_id:=imu_link \
   tf_publish_rate:=0.0 \
   imu_udp_port:=7503 \
   scandataformat:=2 \
@@ -90,13 +90,26 @@ ros2 run sick_scan_xd sick_generic_caller \
   imu_topic:=/sick_scansegment_xd/imu
 ```
 
-### 2.2 static TF (`base_link -> lidar_link`)
+### 2.2 static TF (`base_link -> lidar_link`, `lidar_link -> imu_link`)
 ```bash
 ros2 run tf2_ros static_transform_publisher \
-  --x 0.254 --y 0.0 --z 0.0 \
+  --x 0.2413 --y 0.0 --z 0.0 \
   --roll 0.0 --pitch 0.0 --yaw 0.0 \
   --frame-id base_link --child-frame-id lidar_link
 ```
+
+```bash
+ros2 run tf2_ros static_transform_publisher \
+  --x 0.0124 --y 0.0185 --z -0.0484 \
+  --roll 0.0 --pitch 0.0 --yaw 0.0 \
+  --frame-id lidar_link --child-frame-id imu_link
+```
+
+Notes:
+
+- 当前项目预设按你的安装假设处理：`lidar_link` 取 bracket 中心，且该中心与当前 project 的 optical-origin proxy 视为同一点。
+- `0.2413 m` 来自 `20 in / 2 - 1 in / 2 = 9.5 in = 0.2413 m`，也就是 20 英寸底盘半宽减去标准 1 英寸 80/20 前横梁半宽。
+- `0.0124, 0.0185, -0.0484 m` comes from the SICK operating instructions as IMU position relative to the optical origin.
 
 ### 2.3 Cartographer mapping
 ```bash
@@ -164,5 +177,5 @@ ros2 action list | grep navigate_to_pose
 - `use_ekf` 默认: `true`
 - `fallback_odom` 默认: `false`
 - LiDAR frame 默认: `lidar_link`
-- static TF 默认: `base_link -> lidar_link = (0.254, 0, 0, 0, 0, 0)`
+- static TF 默认: `base_link -> lidar_link = (0.2413, 0, 0, 0, 0, 0)`
 - `with_nav2_rviz` 默认: `false`
