@@ -75,6 +75,12 @@ ros2 topic pub -r 100 /back_alert std_msgs/msg/Bool "{data: false}"
 ros2 run robot_navigation nav_assistant mapping-stack
 ```
 
+D0 quality-profile run (PointCloud2 input path):
+```bash
+ros2 run robot_navigation nav_assistant mapping-stack \
+  --cartographer-config-basename pico_2d_mapping_quality.lua
+```
+
 Optional:
 
 ```bash

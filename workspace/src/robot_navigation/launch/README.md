@@ -11,6 +11,13 @@ Mapping phase (LiDAR + Cartographer + serial bridge):
 ros2 run robot_navigation nav_assistant mapping-stack
 ```
 
+Mapping phase with D0 quality profile (PointCloud2 path):
+
+```bash
+ros2 run robot_navigation nav_assistant mapping-stack \
+  --cartographer-config-basename pico_2d_mapping_quality.lua
+```
+
 Localization + Nav2 phase:
 
 ```bash

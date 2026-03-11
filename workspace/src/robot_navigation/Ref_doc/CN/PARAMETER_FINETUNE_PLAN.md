@@ -5,7 +5,7 @@ Robot Navigation Stack Implementation Plan
 本次修订后的关键默认决策：
 
 建图阶段继续用 Cartographer
-建图质量主路径固定切到 LaserScan
+建图质量主路径固定为 PointCloud2（沿用当前 points2 接线）
 Cartographer 建图质量判断以“内部 SLAM 参数 + 传感器输入 + 导图资产一致性”为准，不把 export-map --resolution 当成建图质量代理
 运行时定位切到 EKF + AMCL + map_server + Nav2
 Nav2 目标配置默认是 SmacPlanner2D + MPPI(Omni)
@@ -21,14 +21,14 @@ Cartographer 原生 IMU 默认仍保持关闭，直到 tracking_frame 与 IMU fr
 实现内容：
 
 新增一套质量优先 Cartographer 配置，固定命名为 pico_2d_mapping_quality.lua
-修改 mapping launch，新增公开参数 sensor_input_mode:=scan_fullframe|scan_segment|points2_fullframe
-v1 默认使用 scan_fullframe
-在驱动 segment LaserScan 路径核通后，把质量主路径切到 scan_segment
+保持 mapping launch 使用现有 points2 输入，不新增 sensor_input_mode
+D0 默认使用 /cloud_all_fields_fullframe
+原 D0-2 输入模式切换任务移除，后续若需要再单独立项
 Cartographer 质量优先参数固定为：
-num_laser_scans = 1
+num_laser_scans = 0
 num_multi_echo_laser_scans = 0
-num_subdivisions_per_laser_scan = 4
-num_point_clouds = 0
+num_subdivisions_per_laser_scan = 1
+num_point_clouds = 1
 TRAJECTORY_BUILDER_2D.submaps.num_range_data = 60
 TRAJECTORY_BUILDER_2D.submaps.grid_options_2d.resolution = 0.03
 TRAJECTORY_BUILDER_2D.min_range = 0.15
@@ -46,9 +46,9 @@ POSE_GRAPH.optimize_every_n_nodes = 35
 POSE_GRAPH.constraint_builder.min_score = 0.65
 POSE_GRAPH.optimization_problem.odometry_translation_weight = 1e5
 POSE_GRAPH.optimization_problem.odometry_rotation_weight = 1e4
-echo 策略默认改为单 echo
-普通室内默认 first echo
-若场地有玻璃、透明挡板或保护罩，单独提供 last echo 变体
+建图验收优先关注 PointCloud2 频率与 frame 一致性
+scan 相关参数可继续发布但不作为 D0 通过门槛
+若后续重启 LaserScan 方案，再单独定义 echo 策略
 PicoScan 启动 profile 默认锁定为 30 Hz / 0.1°
 导图流程继续复用 nav_assistant save-map 和 nav_assistant export-map
 但验收逻辑明确区分：
@@ -61,7 +61,7 @@ export-map --resolution 只负责最终栅格化输出分辨率
 公开接口变化：
 
 cartographer_mapping.launch.py
-新增 sensor_input_mode
+保持 `points2` remap，不新增输入模式开关
 nav_assistant.py
 新增只读命令：
 verify-mapping-profile
@@ -69,12 +69,12 @@ verify-sensors
 verify-map-artifacts
 Codex 可验证标准：
 
-输入模式验证
-读取 launch 和 Lua，确认 num_laser_scans=1、num_point_clouds=0
-ros2 node info /cartographer_node 显示订阅的是 scan，不是 points2
+输入路径验证
+读取 launch 和 Lua，确认 num_laser_scans=0、num_point_clouds=1
+ros2 node info /cartographer_node 显示订阅的是 points2
 传感器频率与 frame
-ros2 topic hz /scan_fullframe 或 /scan_segment 在目标频率 ±10%
-ros2 topic echo /scan_fullframe --once 的 header.frame_id == lidar_link
+ros2 topic hz /cloud_all_fields_fullframe 在目标频率 ±10%
+ros2 topic echo /cloud_all_fields_fullframe --once 的 header.frame_id == lidar_link
 ros2 topic hz /sick_scansegment_xd/imu >= 90 Hz
 ros2 topic hz /odom 在 50 Hz ±10%
 质量参数验证
@@ -89,7 +89,7 @@ ros2 topic hz /odom 在 50 Hz ±10%
 地图输出验证
 export-map --resolution 只检查导出文件满足请求分辨率，不用于判定建图质量通过
 建图质量通过条件固定是：
-LaserScan 路径生效
+PointCloud2 路径生效（points2 -> /cloud_all_fields_fullframe）
 内部 submaps.grid_options_2d.resolution == 0.03
 min_range == 0.15
 missing_data_ray_length == max_range
@@ -117,7 +117,7 @@ AMCL
 Nav2
 localization 栈中不再启动 cartographer_localization.launch.py
 新增运行时参数文件 nav2_params_amcl_mppi.yaml
-amcl.scan_topic 固定为 /scan_fullframe
+amcl.scan_topic 固定为 /scan_fullframe（仅运行时定位链路）
 启动模式固定公开为：
 startup_mode:=fixed_pose
 startup_mode:=global_localization
@@ -269,7 +269,7 @@ verification/nav_benchmark_summary.json
 阶段验收门槛
 建图阶段通过条件：
 
-Cartographer 已切到 LaserScan 路径
+Cartographer 已固定为 PointCloud2 路径
 submaps.grid_options_2d.resolution == 0.03
 min_range == 0.15
 missing_data_ray_length == max_range
@@ -289,7 +289,7 @@ smac_mppi_omni 优先参与评估并默认作为目标配置
 若 Omni 失败，脚本自动建议切到 smac_mppi_diff 或 smac_rpp
 假设与默认值
 建图主线仍保留 Cartographer
-默认质量主路径是 LaserScan
+默认质量主路径是 PointCloud2
 默认目标 controller 是 MPPI(Omni)，不是 DiffDrive
 DiffDrive 仅作为 Omni 失败后的回退 profile
 export-map --resolution 只代表输出栅格分辨率，不代表 SLAM 质量
@@ -300,7 +300,7 @@ missing_data_ray_length
 submaps.num_range_data
 motion_filter
 translation_delta_cost_weight
-LaserScan 输入路径是否生效
+PointCloud2 输入路径是否生效
 Cartographer 原生 IMU 在本计划中默认不启用，直到 frame 设计满足共点要求
 所有比较统一基于同一地图、同一 EKF、同一 benchmark case 集
 所有验收优先使用脚本和 rosbag 自动判断，不把 RViz 目视结果作为通过标准

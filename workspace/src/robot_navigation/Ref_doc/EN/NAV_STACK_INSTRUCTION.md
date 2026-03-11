@@ -23,6 +23,12 @@ Starts: LiDAR, static TF, Cartographer mapping, serial bridge, EKF.
 ros2 run robot_navigation nav_assistant mapping-stack
 ```
 
+For D0 parameter validation (PointCloud2 path), use the quality config directly:
+```bash
+ros2 run robot_navigation nav_assistant mapping-stack \
+  --cartographer-config-basename pico_2d_mapping_quality.lua
+```
+
 With RViz:
 ```bash
 ros2 run robot_navigation nav_assistant mapping-stack --with-rviz true
@@ -85,7 +91,6 @@ ros2 run sick_scan_xd sick_generic_caller \
   host_set_LFPintervalFilter:=0 \
   custom_pointclouds:=cloud_all_fields_fullframe \
   cloud_all_fields_fullframe:='coordinateNotation=3 updateMethod=0 fields=x,y,z,i,range,azimuth,elevation,t,ts,lidar_sec,lidar_nsec,ring,layer,echo,reflector echos=0,1,2 layers=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 topic=/cloud_all_fields_fullframe frameid=lidar_link publish=1' \
-  publish_laserscan_fullframe_topic:=/scan_fullframe \
   imu_topic:=/sick_scansegment_xd/imu
 ```
 
@@ -151,6 +156,7 @@ ros2 launch nav2_bringup navigation_launch.py \
 
 ```bash
 ros2 run robot_navigation nav_assistant quick-check
+ros2 node info /cartographer_node | grep points2
 ros2 topic hz /odom
 ros2 topic hz /cloud_all_fields_fullframe
 ros2 action list | grep navigate_to_pose

@@ -1,5 +1,9 @@
 # Robot Localization and Navigation Tech Review
 
+> 状态更新（2026-03-10）：
+> `ROBOT_NAV_STACK_EXECUTION_PLAN_2026_03.md` 的 D0 执行默认已改为 PointCloud2 主路径（`points2 -> /cloud_all_fields_fullframe`），并移除原输入模式切换任务（D0-2）。
+> 本文中关于 LaserScan / scan_segment 的内容保留为技术备选与历史分析，不作为当前 D0 默认执行项。
+
 ## 0. 文档目的
 
 本文档整理 2026-03-10 对当前 `robot_navigation` 工作区中 localization、mapping、Nav2、PicoScan 传感器接线和参数链路的集中审视结论，目标是把以下问题收敛成一份可追溯记录：
@@ -1807,4 +1811,3 @@ Nav2 官方默认恢复树已经很成熟，支持：
 
 - `SCURM_SentryNavigation` README  
   https://raw.githubusercontent.com/PolarisXQ/SCURM_SentryNavigation/master/README.md
-
