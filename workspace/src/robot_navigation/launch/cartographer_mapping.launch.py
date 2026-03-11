@@ -21,7 +21,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "configuration_basename",
-                default_value="pico_2d.lua",
+                default_value="pico_2d_mapping_quality.lua",
                 description="Cartographer lua configuration file name",
             ),
             DeclareLaunchArgument(

@@ -30,6 +30,7 @@ options = {
   use_landmarks = false,
   num_laser_scans = 0,
   num_multi_echo_laser_scans = 0,
+  -- Unused in PointCloud2 mode; kept explicit to avoid ambiguity.
   num_subdivisions_per_laser_scan = 1,
   num_point_clouds = 1,
   lookup_transform_timeout_sec = 0.2,
@@ -44,7 +45,6 @@ options = {
 }
 
 MAP_BUILDER.use_trajectory_builder_2d = true
-TRAJECTORY_BUILDER.pure_localization = true
 
 TRAJECTORY_BUILDER_2D.submaps.num_range_data = 60
 TRAJECTORY_BUILDER_2D.submaps.grid_options_2d.resolution = 0.03
@@ -55,8 +55,10 @@ TRAJECTORY_BUILDER_2D.use_imu_data = false
 TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true
 TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.linear_search_window = 0.2
 TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.translation_delta_cost_weight = 0.1
-TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.rotation_delta_cost_weight = 1e-1
-
+TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.rotation_delta_cost_weight = 0.1
+TRAJECTORY_BUILDER_2D.motion_filter.max_time_seconds = 0.5
+TRAJECTORY_BUILDER_2D.motion_filter.max_distance_meters = 0.05
+TRAJECTORY_BUILDER_2D.motion_filter.max_angle_radians = math.rad(0.5)
 
 POSE_GRAPH.optimization_problem.huber_scale = 1e2
 POSE_GRAPH.optimize_every_n_nodes = 20
