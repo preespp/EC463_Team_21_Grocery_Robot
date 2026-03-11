@@ -86,20 +86,29 @@ ros2 run sick_scan_xd sick_generic_caller \
   imu_udp_port:=7503 \
   scandataformat:=2 \
   send_sopas_start_stop_cmd:=0 \
-  host_set_FREchoFilter:=0 \
+  host_FREchoFilter:=2 \
+  host_set_FREchoFilter:=1 \
   host_set_LFPangleRangeFilter:=0 \
   host_set_LFPintervalFilter:=0 \
+  publish_laserscan_segment_topic:=/scan_segment \
   custom_pointclouds:=cloud_all_fields_fullframe \
   cloud_all_fields_fullframe:='coordinateNotation=3 updateMethod=0 fields=x,y,z,i,range,azimuth,elevation,t,ts,lidar_sec,lidar_nsec,ring,layer,echo,reflector echos=0,1,2 layers=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 topic=/cloud_all_fields_fullframe frameid=lidar_link publish=1' \
   imu_topic:=/sick_scansegment_xd/imu
 ```
 
-### 2.2 Static TF (`base_link -> lidar_link`, `lidar_link -> imu_link`)
+### 2.2 Static TF (`base_link -> lidar_link`, `lidar_link -> lidar_link_1`, `lidar_link -> imu_link`)
 ```bash
 ros2 run tf2_ros static_transform_publisher \
   --x 0.2413 --y 0.0 --z 0.0 \
   --roll 0.0 --pitch 0.0 --yaw 0.0 \
   --frame-id base_link --child-frame-id lidar_link
+```
+
+```bash
+ros2 run tf2_ros static_transform_publisher \
+  --x 0.0 --y 0.0 --z 0.0 \
+  --roll 0.0 --pitch 0.0 --yaw 0.0 \
+  --frame-id lidar_link --child-frame-id lidar_link_1
 ```
 
 ```bash
@@ -113,6 +122,8 @@ Notes:
 
 - Current project preset follows the user-validated mount assumption: `lidar_link` is modeled at the bracket center and used as the project's optical-origin proxy.
 - `0.2413 m` comes from `20 in / 2 - 1 in / 2 = 9.5 in = 0.2413 m`, i.e. half the 20 in base minus half the standard 1.00 in 80/20 front bar width.
+- Segmented LaserScan is now explicitly forced to `last echo only`: `host_FREchoFilter=2`.
+- The identity TF `lidar_link -> lidar_link_1` is added for the segmented LaserScan frame suffix used by `sick_scan_xd`.
 - `0.0124, 0.0185, -0.0484 m` comes from the SICK operating instructions as IMU position relative to the optical origin.
 
 ### 2.3 Cartographer mapping

@@ -22,7 +22,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "configuration_basename",
-                default_value="pico_2d_localization.lua",
+                default_value="pico_2d_localization_scan_segment.lua",
                 description="Cartographer lua localization config file name",
             ),
             DeclareLaunchArgument(
@@ -39,6 +39,11 @@ def generate_launch_description():
                 "points_topic",
                 default_value="/cloud_all_fields_fullframe",
                 description="PointCloud2 topic from sick_scan_xd",
+            ),
+            DeclareLaunchArgument(
+                "scan_topic",
+                default_value="/scan_segment",
+                description="LaserScan topic from sick_scan_xd",
             ),
             DeclareLaunchArgument(
                 "imu_topic",
@@ -76,6 +81,7 @@ def generate_launch_description():
                     LaunchConfiguration("load_frozen_state"),
                 ],
                 remappings=[
+                    ("scan", LaunchConfiguration("scan_topic")),
                     ("points2", LaunchConfiguration("points_topic")),
                     ("imu", LaunchConfiguration("imu_topic")),
                 ],

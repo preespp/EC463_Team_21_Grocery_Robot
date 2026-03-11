@@ -54,11 +54,11 @@ DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
 DEFAULT_RUN_MODE = "normal"
 RUN_MODES = ("normal", "bench")
 MAPPING_CONFIG_BASENAME = {
-    "normal": "pico_2d.lua",
+    "normal": "pico_2d_mapping_quality_scan_segment.lua",
     "bench": "pico_2d_bench.lua",
 }
 LOCALIZATION_CONFIG_BASENAME = {
-    "normal": "pico_2d_localization.lua",
+    "normal": "pico_2d_localization_scan_segment.lua",
     "bench": "pico_2d_localization_bench.lua",
 }
 
@@ -436,6 +436,7 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"imu_udp_port:={args.imu_udp_port}",
         f"scandataformat:={args.scandataformat}",
         f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+        f"host_frecho_filter:={args.host_frecho_filter}",
         f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
         f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
         f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
@@ -482,6 +483,7 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"imu_udp_port:={args.imu_udp_port}",
         f"scandataformat:={args.scandataformat}",
         f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+        f"host_frecho_filter:={args.host_frecho_filter}",
         f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
         f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
         f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
@@ -671,7 +673,8 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--imu-udp-port", type=int, default=7503)
     stack_common.add_argument("--scandataformat", type=int, default=2)
     stack_common.add_argument("--send-sopas-start-stop-cmd", type=parse_bool, default=False)
-    stack_common.add_argument("--host-set-frecho-filter", type=parse_bool, default=False)
+    stack_common.add_argument("--host-frecho-filter", type=int, default=2)
+    stack_common.add_argument("--host-set-frecho-filter", type=parse_bool, default=True)
     stack_common.add_argument("--host-set-lfp-angle-range-filter", type=parse_bool, default=False)
     stack_common.add_argument("--host-set-lfp-interval-filter", type=parse_bool, default=False)
     stack_common.add_argument("--lidar-x", type=float, default=0.2413)

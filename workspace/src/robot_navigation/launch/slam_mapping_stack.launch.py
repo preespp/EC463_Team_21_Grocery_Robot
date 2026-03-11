@@ -40,6 +40,7 @@ def generate_launch_description():
             ["imu_udp_port:=", LaunchConfiguration("imu_udp_port")],
             ["scandataformat:=", LaunchConfiguration("scandataformat")],
             ["send_sopas_start_stop_cmd:=", LaunchConfiguration("send_sopas_start_stop_cmd")],
+            ["host_FREchoFilter:=", LaunchConfiguration("host_frecho_filter")],
             ["host_set_FREchoFilter:=", LaunchConfiguration("host_set_frecho_filter")],
             [
                 "host_set_LFPangleRangeFilter:=",
@@ -52,6 +53,7 @@ def generate_launch_description():
             ["laserscan_layer_filter:=", LaunchConfiguration("laserscan_layer_filter")],
             "custom_pointclouds:=cloud_all_fields_fullframe",
             ["cloud_all_fields_fullframe:=", POINTCLOUD_CONFIG],
+            ["publish_laserscan_segment_topic:=", LaunchConfiguration("scan_topic")],
             "publish_laserscan_fullframe_topic:=/scan_fullframe",
             ["imu_topic:=", LaunchConfiguration("imu_topic")],
         ],
@@ -107,6 +109,31 @@ def generate_launch_description():
         ],
     )
 
+    segment_scan_frame_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="lidar_to_segment_scan_frame_static_tf",
+        output="screen",
+        arguments=[
+            "--x",
+            "0.0",
+            "--y",
+            "0.0",
+            "--z",
+            "0.0",
+            "--roll",
+            "0.0",
+            "--pitch",
+            "0.0",
+            "--yaw",
+            "0.0",
+            "--frame-id",
+            "lidar_link",
+            "--child-frame-id",
+            "lidar_link_1",
+        ],
+    )
+
     cartographer_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -115,6 +142,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             "configuration_basename": LaunchConfiguration("cartographer_config_basename"),
+            "scan_topic": LaunchConfiguration("scan_topic"),
         }.items(),
     )
 
@@ -189,7 +217,7 @@ def generate_launch_description():
             DeclareLaunchArgument("ekf_params_file", default_value=ekf_params),
             DeclareLaunchArgument(
                 "cartographer_config_basename",
-                default_value="pico_2d_mapping_quality.lua",
+                default_value="pico_2d_mapping_quality_scan_segment.lua",
             ),
             DeclareLaunchArgument("imu_topic", default_value="/sick_scansegment_xd/imu"),
             DeclareLaunchArgument("sick_tf_publish_rate", default_value="0.0"),
@@ -197,10 +225,12 @@ def generate_launch_description():
             DeclareLaunchArgument("scandataformat", default_value="2"),
             # sick_generic_caller parses bool launch overrides as numeric strings.
             DeclareLaunchArgument("send_sopas_start_stop_cmd", default_value="0"),
-            DeclareLaunchArgument("host_set_frecho_filter", default_value="0"),
+            DeclareLaunchArgument("host_frecho_filter", default_value="2"),
+            DeclareLaunchArgument("host_set_frecho_filter", default_value="1"),
             DeclareLaunchArgument("host_set_lfp_angle_range_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_interval_filter", default_value="0"),
             DeclareLaunchArgument("laserscan_layer_filter", default_value="0"),
+            DeclareLaunchArgument("scan_topic", default_value="/scan_segment"),
             DeclareLaunchArgument("lidar_x", default_value="0.2413"),
             DeclareLaunchArgument("lidar_y", default_value="0.0"),
             DeclareLaunchArgument("lidar_z", default_value="0.0"),
@@ -218,6 +248,7 @@ def generate_launch_description():
             sick_driver,
             lidar_static_tf,
             imu_static_tf,
+            segment_scan_frame_tf,
             cartographer_launch,
             serial_bridge,
             ekf_node,

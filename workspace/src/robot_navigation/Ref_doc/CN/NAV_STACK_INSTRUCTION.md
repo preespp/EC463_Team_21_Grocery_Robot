@@ -82,9 +82,11 @@ ros2 run sick_scan_xd sick_generic_caller \
   imu_udp_port:=7503 \
   scandataformat:=2 \
   send_sopas_start_stop_cmd:=0 \
-  host_set_FREchoFilter:=0 \
+  host_FREchoFilter:=2 \
+  host_set_FREchoFilter:=1 \
   host_set_LFPangleRangeFilter:=0 \
   host_set_LFPintervalFilter:=0 \
+  publish_laserscan_segment_topic:=/scan_segment \
   custom_pointclouds:=cloud_all_fields_fullframe \
   cloud_all_fields_fullframe:='coordinateNotation=3 updateMethod=0 fields=x,y,z,i,range,azimuth,elevation,t,ts,lidar_sec,lidar_nsec,ring,layer,echo,reflector echos=0,1,2 layers=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 topic=/cloud_all_fields_fullframe frameid=lidar_link publish=1' \
   imu_topic:=/sick_scansegment_xd/imu
@@ -100,6 +102,13 @@ ros2 run tf2_ros static_transform_publisher \
 
 ```bash
 ros2 run tf2_ros static_transform_publisher \
+  --x 0.0 --y 0.0 --z 0.0 \
+  --roll 0.0 --pitch 0.0 --yaw 0.0 \
+  --frame-id lidar_link --child-frame-id lidar_link_1
+```
+
+```bash
+ros2 run tf2_ros static_transform_publisher \
   --x 0.0124 --y 0.0185 --z -0.0484 \
   --roll 0.0 --pitch 0.0 --yaw 0.0 \
   --frame-id lidar_link --child-frame-id imu_link
@@ -109,6 +118,8 @@ Notes:
 
 - 当前项目预设按你的安装假设处理：`lidar_link` 取 bracket 中心，且该中心与当前 project 的 optical-origin proxy 视为同一点。
 - `0.2413 m` 来自 `20 in / 2 - 1 in / 2 = 9.5 in = 0.2413 m`，也就是 20 英寸底盘半宽减去标准 1 英寸 80/20 前横梁半宽。
+- segmented LaserScan 当前显式固定为 `last echo only`：`host_FREchoFilter=2`。
+- `lidar_link -> lidar_link_1` 零 TF 是给 `sick_scan_xd` 的 segmented LaserScan frame suffix 用的。
 - `0.0124, 0.0185, -0.0484 m` comes from the SICK operating instructions as IMU position relative to the optical origin.
 
 ### 2.3 Cartographer mapping

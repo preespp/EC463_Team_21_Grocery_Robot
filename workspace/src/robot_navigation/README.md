@@ -110,7 +110,11 @@ Default behavior in both mapping/localization stacks:
 
 - LiDAR is published in `lidar_link`.
 - IMU is published in `imu_link`.
+- Cartographer now defaults to segmented `LaserScan` on `/scan_segment` for SLAM/localization.
+- The fullframe `PointCloud2` topic `/cloud_all_fields_fullframe` is still published, but it is no longer the default Cartographer input path.
+- SICK driver is now explicitly forced to `last echo only` for the segmented LaserScan path (`host_FREchoFilter=2`).
 - Static TF `base_link -> lidar_link` is published with default offset `(x=0.2413, y=0, z=0, rpy=0,0,0)`.
+- Static TF `lidar_link -> lidar_link_1` is published as identity so Cartographer can resolve the segmented LaserScan frame suffix used by `sick_scan_xd`.
 - Static TF `lidar_link -> imu_link` is published with default offset `(x=0.0124, y=0.0185, z=-0.0484, rpy=0,0,0)`.
 - Cartographer tracks `imu_link` so raw IMU input is colocated with the tracking frame.
 - Cartographer still publishes `base_link` projected to 2D, so Nav2 keeps the usual planar robot frame.
