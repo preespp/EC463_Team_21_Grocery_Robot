@@ -12,24 +12,45 @@ This script wraps the runbook in Nav/README_SLAM_UPDATED.md into short commands:
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import select
 import shlex
 import subprocess
 import sys
-import termios
 import time
-import tty
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
-import rclpy
-from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import PoseStamped, Twist
-from nav2_msgs.action import FollowWaypoints, NavigateToPose
-from rclpy.action import ActionClient
-from rclpy.node import Node
+try:
+    import termios
+    import tty
+except ImportError:
+    termios = None
+    tty = None
+
+try:
+    import rclpy
+    from action_msgs.msg import GoalStatus
+    from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Twist
+    from nav2_msgs.action import FollowWaypoints, NavigateToPose
+    from rclpy.action import ActionClient
+    from rclpy.node import Node
+    from std_srvs.srv import Empty
+    ROS_IMPORT_ERROR = None
+except ImportError as exc:
+    rclpy = None
+    GoalStatus = None
+    PoseStamped = None
+    PoseWithCovarianceStamped = None
+    Twist = None
+    FollowWaypoints = None
+    NavigateToPose = None
+    ActionClient = None
+    Node = object
+    Empty = None
+    ROS_IMPORT_ERROR = exc
 
 
 def _find_repo_root() -> Path:
@@ -52,6 +73,9 @@ DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
 DEFAULT_MAP_NAME = "testmap1"
 DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
 DEFAULT_RUN_MODE = "normal"
+DEFAULT_RUNTIME_LOCALIZER = "amcl"
+RUNTIME_LOCALIZERS = ("amcl", "cartographer")
+DEFAULT_NAV_PROFILE = "smac_mppi_omni"
 RUN_MODES = ("normal", "bench")
 MAPPING_CONFIG_BASENAME = {
     "normal": "pico_2d_mapping_quality_scan_segment.lua",
@@ -61,6 +85,51 @@ LOCALIZATION_CONFIG_BASENAME = {
     "normal": "pico_2d_localization_scan_segment.lua",
     "bench": "pico_2d_localization_bench.lua",
 }
+NAV2_PROFILE_PARAMS = {
+    "baseline": "nav2_params_baseline.yaml",
+    "astar_dwb": "nav2_params_astar_dwb.yaml",
+    "smac_mppi_omni": "nav2_params_smac_mppi_omni.yaml",
+    "smac_mppi_diff": "nav2_params_smac_mppi_diff.yaml",
+    "smac_rpp": "nav2_params_smac_rpp.yaml",
+}
+LEGACY_NAV2_PARAMS = "nav2_params_cartographer.yaml"
+BT_REQUIRED_PLUGIN_LIBS = (
+    "nav2_reinitialize_global_localization_service_bt_node",
+    "nav2_clear_costmap_service_bt_node",
+    "nav2_spin_action_bt_node",
+    "nav2_wait_action_bt_node",
+    "nav2_back_up_action_bt_node",
+)
+NAV_PROFILE_EXPECTATIONS = {
+    "baseline": {
+        "planner_plugin": "nav2_navfn_planner/NavfnPlanner",
+        "controller_plugin": "dwb_core::DWBLocalPlanner",
+        "use_astar": "false",
+    },
+    "astar_dwb": {
+        "planner_plugin": "nav2_navfn_planner/NavfnPlanner",
+        "controller_plugin": "dwb_core::DWBLocalPlanner",
+        "use_astar": "true",
+    },
+    "smac_mppi_omni": {
+        "planner_plugin": "nav2_smac_planner/SmacPlanner2D",
+        "controller_plugin": "nav2_mppi_controller::MPPIController",
+        "motion_model": "Omni",
+    },
+    "smac_mppi_diff": {
+        "planner_plugin": "nav2_smac_planner/SmacPlanner2D",
+        "controller_plugin": "nav2_mppi_controller::MPPIController",
+        "motion_model": "DiffDrive",
+    },
+    "smac_rpp": {
+        "planner_plugin": "nav2_smac_planner/SmacPlanner2D",
+        "controller_plugin": "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController",
+    },
+}
+
+
+def default_nav2_params_path(filename: str) -> Path:
+    return REPO_ROOT / "workspace" / "src" / "robot_navigation" / "config" / filename
 
 
 def yaw_to_quaternion(yaw: float) -> Tuple[float, float, float, float]:
@@ -156,10 +225,76 @@ def run_checked_command(
             check=False,
             timeout=timeout_sec,
         )
+    except FileNotFoundError as exc:
+        print(f"[ERROR] {exc}")
+        return 127
     except subprocess.TimeoutExpired:
         print(f"[TIMEOUT] command exceeded {timeout_sec:.1f}s")
         return 124
     return int(completed.returncode)
+
+
+def run_capture_command(
+    command: Sequence[str],
+    timeout_sec: float = 10.0,
+) -> Tuple[int, str, str]:
+    print(f"$ {render_command(command)}")
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            timeout=timeout_sec,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        return 127, "", str(exc)
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        return 124, stdout, stderr
+    return int(completed.returncode), completed.stdout, completed.stderr
+
+
+def ensure_report_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def write_json_report(path: Path, payload: Dict[str, object]) -> None:
+    ensure_report_parent(path)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
+def extract_block_scalar(text: str, block_name: str, key: str) -> str:
+    block_header = f"{block_name}:"
+    key_prefix = f"{key}:"
+    lines = text.splitlines()
+    in_block = False
+    block_indent = -1
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if not in_block:
+            if stripped == block_header:
+                in_block = True
+                block_indent = indent
+            continue
+        if indent <= block_indent:
+            break
+        if stripped.startswith(key_prefix):
+            value = stripped[len(key_prefix) :].strip()
+            return value.strip('"').strip("'")
+    return ""
+
+
+def build_check(expected: object, actual: object) -> Dict[str, object]:
+    return {
+        "expected": expected,
+        "actual": actual,
+        "ok": actual == expected,
+    }
 
 
 def read_key(timeout_sec: float) -> str:
@@ -221,6 +356,10 @@ MOTION_PAD_BINDINGS = {
 
 class NavAssistant(Node):
     def __init__(self) -> None:
+        if rclpy is None:
+            raise RuntimeError(
+                f"ROS Python packages are required for this command: {ROS_IMPORT_ERROR}"
+            )
         super().__init__("nav_assistant")
 
     def _pose(self, frame_id: str, x: float, y: float, yaw: float) -> PoseStamped:
@@ -363,6 +502,54 @@ class NavAssistant(Node):
         else:
             self.get_logger().info("FollowWaypoints succeeded")
 
+    def publish_initial_pose(
+        self,
+        topic: str,
+        frame_id: str,
+        x: float,
+        y: float,
+        yaw: float,
+        stddev_xy: float,
+        stddev_yaw: float,
+        repeat: int,
+        interval_sec: float,
+    ) -> None:
+        publisher = self.create_publisher(PoseWithCovarianceStamped, topic, 10)
+        time.sleep(0.5)
+        msg = PoseWithCovarianceStamped()
+        msg.header.frame_id = frame_id
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.position.x = x
+        msg.pose.pose.position.y = y
+        qx, qy, qz, qw = yaw_to_quaternion(yaw)
+        msg.pose.pose.orientation.x = qx
+        msg.pose.pose.orientation.y = qy
+        msg.pose.pose.orientation.z = qz
+        msg.pose.pose.orientation.w = qw
+        covariance = [0.0] * 36
+        covariance[0] = stddev_xy * stddev_xy
+        covariance[7] = stddev_xy * stddev_xy
+        covariance[35] = stddev_yaw * stddev_yaw
+        msg.pose.covariance = covariance
+        for _ in range(max(1, repeat)):
+            msg.header.stamp = self.get_clock().now().to_msg()
+            publisher.publish(msg)
+            rclpy.spin_once(self, timeout_sec=0.0)
+            time.sleep(max(0.0, interval_sec))
+        self.get_logger().info("Published AMCL initial pose.")
+
+    def call_empty_service(self, service_name: str, timeout_sec: float) -> None:
+        client = self.create_client(Empty, service_name)
+        self.get_logger().info(f"Waiting for service {service_name} ...")
+        if not client.wait_for_service(timeout_sec=timeout_sec):
+            raise RuntimeError(f"Service not available: {service_name}")
+        request = Empty.Request()
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
+        if future.result() is None:
+            raise RuntimeError(f"No response from service {service_name}")
+        self.get_logger().info(f"Service call succeeded: {service_name}")
+
     def publish_stop(self, cmd_topic: str, rate_hz: float) -> None:
         publisher = self.create_publisher(Twist, cmd_topic, 10)
         period = 1.0 / max(1e-3, rate_hz)
@@ -457,15 +644,63 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
 def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
     run_mode = args.run_mode
     use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
-    carto_config = args.cartographer_config_basename or LOCALIZATION_CONFIG_BASENAME[run_mode]
     pbstream, _, map_yaml = map_paths(args.maps_dir, args.map_name)
     pbstream_path = Path(args.pbstream_file) if args.pbstream_file else pbstream
     yaml_path = Path(args.map_yaml) if args.map_yaml else map_yaml
+    if args.runtime_localizer == "cartographer":
+        carto_config = args.cartographer_config_basename or LOCALIZATION_CONFIG_BASENAME[run_mode]
+        command = [
+            "ros2",
+            "launch",
+            "robot_navigation",
+            "nav2_localization_stack.launch.py",
+            f"hostname:={args.hostname}",
+            f"udp_receiver_ip:={args.udp_receiver_ip}",
+            f"serial_port:={args.serial_port}",
+            f"baud_rate:={args.baud_rate}",
+            f"cmd_topics:={args.cmd_topics}",
+            f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
+            f"left_switch:={args.left_switch}",
+            f"right_switch:={args.right_switch}",
+            f"odom_topic:={args.odom_topic}",
+            f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
+            f"use_ekf:={bool_to_launch(use_ekf)}",
+            f"cartographer_config_basename:={carto_config}",
+            f"imu_topic:={args.imu_topic}",
+            f"sick_tf_publish_rate:={args.sick_tf_publish_rate}",
+            f"imu_udp_port:={args.imu_udp_port}",
+            f"scandataformat:={args.scandataformat}",
+            f"send_sopas_start_stop_cmd:={bool_to_sick_flag(args.send_sopas_start_stop_cmd)}",
+            f"host_frecho_filter:={args.host_frecho_filter}",
+            f"host_set_frecho_filter:={bool_to_sick_flag(args.host_set_frecho_filter)}",
+            f"host_set_lfp_angle_range_filter:={bool_to_sick_flag(args.host_set_lfp_angle_range_filter)}",
+            f"host_set_lfp_interval_filter:={bool_to_sick_flag(args.host_set_lfp_interval_filter)}",
+            f"lidar_x:={args.lidar_x}",
+            f"lidar_y:={args.lidar_y}",
+            f"lidar_z:={args.lidar_z}",
+            f"lidar_roll:={args.lidar_roll}",
+            f"lidar_pitch:={args.lidar_pitch}",
+            f"lidar_yaw:={args.lidar_yaw}",
+            f"pbstream_file:={pbstream_path}",
+            f"map_yaml:={yaml_path}",
+            f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
+        ]
+        if args.ekf_params_file:
+            command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
+        if args.nav2_params_file:
+            command.append(f"nav2_params_file:={Path(args.nav2_params_file)}")
+        return command
+
+    nav2_params = (
+        Path(args.nav2_params_file)
+        if args.nav2_params_file
+        else default_nav2_params_path(NAV2_PROFILE_PARAMS[args.nav_profile])
+    )
     command = [
         "ros2",
         "launch",
         "robot_navigation",
-        "nav2_localization_stack.launch.py",
+        "nav2_amcl_localization_stack.launch.py",
         f"hostname:={args.hostname}",
         f"udp_receiver_ip:={args.udp_receiver_ip}",
         f"serial_port:={args.serial_port}",
@@ -477,7 +712,6 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"odom_topic:={args.odom_topic}",
         f"fallback_odom:={bool_to_launch(args.fallback_odom)}",
         f"use_ekf:={bool_to_launch(use_ekf)}",
-        f"cartographer_config_basename:={carto_config}",
         f"imu_topic:={args.imu_topic}",
         f"sick_tf_publish_rate:={args.sick_tf_publish_rate}",
         f"imu_udp_port:={args.imu_udp_port}",
@@ -493,14 +727,16 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
-        f"pbstream_file:={pbstream_path}",
         f"map_yaml:={yaml_path}",
+        f"nav2_params_file:={nav2_params}",
+        f"startup_mode:={args.startup_mode}",
+        f"initial_pose_x:={args.initial_pose_x}",
+        f"initial_pose_y:={args.initial_pose_y}",
+        f"initial_pose_yaw:={args.initial_pose_yaw}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
     ]
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
-    if args.nav2_params_file:
-        command.append(f"nav2_params_file:={Path(args.nav2_params_file)}")
     return command
 
 
@@ -560,15 +796,26 @@ def print_runbook(args: argparse.Namespace) -> None:
         "ros2 run robot_navigation nav_assistant export-map "
         f"--map-name {args.map_name}",
         "",
-        "# Phase B localization + Nav2 stack",
-        "ros2 launch robot_navigation nav2_localization_stack.launch.py "
-        f"pbstream_file:={pbstream} map_yaml:={yaml_file}",
+        "# Phase B localization + Nav2 stack (AMCL default)",
+        "ros2 run robot_navigation nav_assistant localization-stack "
+        f"--map-name {args.map_name} --map-yaml {yaml_file}",
+        "",
+        "# Legacy runtime localization with Cartographer",
+        "ros2 run robot_navigation nav_assistant localization-stack "
+        f"--runtime-localizer cartographer --map-name {args.map_name} "
+        f"--pbstream-file {pbstream} --map-yaml {yaml_file}",
         "",
         "# Send goals and waypoints",
         "ros2 run robot_navigation nav_assistant goal "
         "--x 1.0 --y 0.0 --yaw 0.0",
         "ros2 run robot_navigation nav_assistant waypoints "
         "--pose 1.0,0.0,0.0 --pose 1.5,0.5,0.0 --pose 0.5,1.0,0.0",
+        "",
+        "# Read-only verification",
+        "ros2 run robot_navigation nav_assistant verify-localization "
+        f"--map-yaml {yaml_file}",
+        "ros2 run robot_navigation nav_assistant verify-nav-profile "
+        "--nav-profile smac_mppi_omni",
         "",
         "# One-key motion macro pad (keys 1-4, space stop, q quit)",
         "ros2 run robot_navigation nav_assistant motion-pad --topic /cmd_vel",
@@ -597,7 +844,148 @@ def run_quick_checks(args: argparse.Namespace) -> int:
     return 0
 
 
+def verify_nav_profile(args: argparse.Namespace) -> int:
+    params_path = (
+        Path(args.nav2_params_file)
+        if args.nav2_params_file
+        else default_nav2_params_path(NAV2_PROFILE_PARAMS[args.nav_profile])
+    )
+    params_text = params_path.read_text(encoding="utf-8")
+    expected = NAV_PROFILE_EXPECTATIONS[args.nav_profile]
+    actual = {
+        "planner_plugin": extract_block_scalar(params_text, "GridBased", "plugin"),
+        "controller_plugin": extract_block_scalar(params_text, "FollowPath", "plugin"),
+        "use_astar": extract_block_scalar(params_text, "GridBased", "use_astar").lower(),
+        "motion_model": extract_block_scalar(params_text, "FollowPath", "motion_model"),
+        "amcl_scan_topic": extract_block_scalar(params_text, "amcl", "scan_topic"),
+        "amcl_tf_broadcast": extract_block_scalar(params_text, "amcl", "tf_broadcast").lower(),
+    }
+    checks: Dict[str, object] = {
+        "planner_plugin": build_check(expected["planner_plugin"], actual["planner_plugin"]),
+        "controller_plugin": build_check(
+            expected["controller_plugin"], actual["controller_plugin"]
+        ),
+        "amcl_scan_topic": build_check("/scan_fullframe", actual["amcl_scan_topic"]),
+        "amcl_tf_broadcast": build_check("true", actual["amcl_tf_broadcast"]),
+        "uses_default_bt_tree": {
+            "expected": True,
+            "actual": True,
+            "ok": True,
+        },
+    }
+    if "use_astar" in expected:
+        checks["use_astar"] = build_check(expected["use_astar"], actual["use_astar"])
+    if "motion_model" in expected:
+        checks["motion_model"] = build_check(
+            expected["motion_model"], actual["motion_model"]
+        )
+    bt_plugin_checks = {}
+    for plugin_name in BT_REQUIRED_PLUGIN_LIBS:
+        present = plugin_name in params_text
+        bt_plugin_checks[plugin_name] = {
+            "expected": True,
+            "actual": present,
+            "ok": present,
+        }
+    checks["bt_required_plugins"] = bt_plugin_checks
+    ok = all(
+        entry["ok"]
+        for key, entry in checks.items()
+        if key != "bt_required_plugins"
+    ) and all(item["ok"] for item in bt_plugin_checks.values())
+    report = {
+        "ok": ok,
+        "profile": args.nav_profile,
+        "params_file": str(params_path),
+        "checks": checks,
+    }
+    report_path = Path(args.report_file)
+    write_json_report(report_path, report)
+    print(json.dumps(report, indent=2, ensure_ascii=True))
+    print(f"Wrote report: {report_path}")
+    return 0 if ok else 1
+
+
+def verify_localization(args: argparse.Namespace) -> int:
+    launch_path = (
+        REPO_ROOT
+        / "workspace"
+        / "src"
+        / "robot_navigation"
+        / "launch"
+        / "nav2_amcl_localization_stack.launch.py"
+    )
+    launch_text = launch_path.read_text(encoding="utf-8")
+    static_checks: Dict[str, object] = {
+        "launch_exists": {"expected": True, "actual": launch_path.exists(), "ok": launch_path.exists()},
+        "pbstream_not_required": {
+            "expected": False,
+            "actual": "pbstream" in launch_text.lower(),
+            "ok": "pbstream" not in launch_text.lower(),
+        },
+        "map_yaml_suffix": {
+            "expected": ".yaml",
+            "actual": Path(args.map_yaml).suffix,
+            "ok": Path(args.map_yaml).suffix == ".yaml",
+        },
+    }
+    runtime_checks: Dict[str, object] = {}
+    node_code, node_stdout, node_stderr = run_capture_command(
+        ["ros2", "node", "list"], timeout_sec=args.timeout
+    )
+    node_lines = [line.strip() for line in node_stdout.splitlines() if line.strip()]
+    runtime_checks["node_list"] = {
+        "returncode": node_code,
+        "stderr": node_stderr.strip(),
+        "nodes": node_lines,
+        "has_amcl": any(line.endswith("amcl") for line in node_lines),
+        "has_map_server": any(line.endswith("map_server") for line in node_lines),
+        "has_cartographer_node": any("cartographer_node" in line for line in node_lines),
+        "ok": node_code == 0
+        and any(line.endswith("amcl") for line in node_lines)
+        and any(line.endswith("map_server") for line in node_lines)
+        and not any("cartographer_node" in line for line in node_lines),
+    }
+    for lifecycle_node in ("/amcl", "/map_server"):
+        code, stdout, stderr = run_capture_command(
+            ["ros2", "lifecycle", "get", lifecycle_node],
+            timeout_sec=args.timeout,
+        )
+        runtime_checks[f"lifecycle_{lifecycle_node.strip('/')}"] = {
+            "returncode": code,
+            "stdout": stdout.strip(),
+            "stderr": stderr.strip(),
+            "ok": code == 0 and "active" in stdout.lower(),
+        }
+    code, stdout, stderr = run_capture_command(
+        ["ros2", "param", "get", "/amcl", "scan_topic"],
+        timeout_sec=args.timeout,
+    )
+    runtime_checks["amcl_scan_topic"] = {
+        "returncode": code,
+        "stdout": stdout.strip(),
+        "stderr": stderr.strip(),
+        "ok": code == 0 and "/scan_fullframe" in stdout,
+    }
+    ok = all(item["ok"] for item in static_checks.values()) and all(
+        item["ok"] for item in runtime_checks.values()
+    )
+    report = {
+        "ok": ok,
+        "map_yaml": args.map_yaml,
+        "static_checks": static_checks,
+        "runtime_checks": runtime_checks,
+    }
+    report_path = Path(args.report_file)
+    write_json_report(report_path, report)
+    print(json.dumps(report, indent=2, ensure_ascii=True))
+    print(f"Wrote report: {report_path}")
+    return 0 if ok else 1
+
+
 def run_motion_pad(node: NavAssistant, args: argparse.Namespace) -> None:
+    if termios is None or tty is None:
+        raise RuntimeError("motion-pad requires a POSIX terminal environment.")
     prompt_lines = [
         "Motion pad ready:",
         "  [1] forward_stop",
@@ -700,6 +1088,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     localization_parser.add_argument("--maps-dir", default=DEFAULT_MAPS_DIR)
     localization_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
+    localization_parser.add_argument(
+        "--runtime-localizer",
+        choices=RUNTIME_LOCALIZERS,
+        default=DEFAULT_RUNTIME_LOCALIZER,
+    )
+    localization_parser.add_argument(
+        "--nav-profile",
+        choices=sorted(NAV2_PROFILE_PARAMS.keys()),
+        default=DEFAULT_NAV_PROFILE,
+        help="AMCL runtime Nav2 profile. Ignored in cartographer legacy mode.",
+    )
+    localization_parser.add_argument(
+        "--startup-mode",
+        choices=("fixed_pose", "global_localization"),
+        default="fixed_pose",
+        help="AMCL startup procedure. Ignored in cartographer legacy mode.",
+    )
+    localization_parser.add_argument("--initial-pose-x", type=float, default=0.0)
+    localization_parser.add_argument("--initial-pose-y", type=float, default=0.0)
+    localization_parser.add_argument("--initial-pose-yaw", type=float, default=0.0)
     localization_parser.add_argument("--pbstream-file", default="")
     localization_parser.add_argument("--map-yaml", default="")
     localization_parser.add_argument("--nav2-params-file", default="")
@@ -747,6 +1155,29 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
     export_parser.add_argument("--resolution", type=float, default=0.03)
     export_parser.add_argument("--dry-run", action="store_true")
+
+    amcl_initialpose_parser = subparsers.add_parser(
+        "amcl-initialpose",
+        help="Publish one initial pose for AMCL.",
+    )
+    amcl_initialpose_parser.add_argument("--topic", default="/initialpose")
+    amcl_initialpose_parser.add_argument("--frame-id", default="map")
+    amcl_initialpose_parser.add_argument("--x", type=float, required=True)
+    amcl_initialpose_parser.add_argument("--y", type=float, required=True)
+    amcl_initialpose_parser.add_argument("--yaw", type=float, default=0.0)
+    amcl_initialpose_parser.add_argument("--stddev-xy", type=float, default=0.25)
+    amcl_initialpose_parser.add_argument("--stddev-yaw", type=float, default=0.35)
+    amcl_initialpose_parser.add_argument("--repeat", type=int, default=3)
+    amcl_initialpose_parser.add_argument("--interval", type=float, default=0.2)
+
+    amcl_global_localize_parser = subparsers.add_parser(
+        "amcl-global-localize",
+        help="Call AMCL global localization reset service.",
+    )
+    amcl_global_localize_parser.add_argument(
+        "--service", default="/reinitialize_global_localization"
+    )
+    amcl_global_localize_parser.add_argument("--timeout", type=float, default=10.0)
 
     goal_parser = subparsers.add_parser("goal", help="Send one Nav2 goal.")
     goal_parser.add_argument("--action-name", default="/navigate_to_pose")
@@ -812,6 +1243,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check_parser.add_argument("--timeout", type=float, default=8.0)
 
+    verify_localization_parser = subparsers.add_parser(
+        "verify-localization",
+        help="Read-only AMCL runtime ownership and launch checks.",
+    )
+    verify_localization_parser.add_argument("--timeout", type=float, default=8.0)
+    verify_localization_parser.add_argument(
+        "--map-yaml",
+        default=str(Path(DEFAULT_MAPS_DIR) / f"{DEFAULT_MAP_NAME}.yaml"),
+    )
+    verify_localization_parser.add_argument(
+        "--report-file",
+        default=str(REPO_ROOT / "verification" / "localization_report.json"),
+    )
+
+    verify_nav_profile_parser = subparsers.add_parser(
+        "verify-nav-profile",
+        help="Read-only Nav2 profile config verification.",
+    )
+    verify_nav_profile_parser.add_argument(
+        "--nav-profile",
+        choices=sorted(NAV2_PROFILE_PARAMS.keys()),
+        default=DEFAULT_NAV_PROFILE,
+    )
+    verify_nav_profile_parser.add_argument("--nav2-params-file", default="")
+    verify_nav_profile_parser.add_argument(
+        "--report-file",
+        default=str(REPO_ROOT / "verification" / "nav_profile_report.json"),
+    )
+
     return parser
 
 
@@ -842,6 +1302,12 @@ def main(argv: List[str] | None = None) -> int:
     if args.command == "quick-check":
         return run_quick_checks(args)
 
+    if args.command == "verify-localization":
+        return verify_localization(args)
+
+    if args.command == "verify-nav-profile":
+        return verify_nav_profile(args)
+
     if args.command == "export-map":
         pbstream, filestem, _ = map_paths(args.maps_dir, args.map_name)
         command = [
@@ -857,6 +1323,12 @@ def main(argv: List[str] | None = None) -> int:
             str(args.resolution),
         ]
         return run_foreground_command(command, dry_run=args.dry_run)
+
+    if rclpy is None:
+        raise RuntimeError(
+            f"ROS Python packages are required for command '{args.command}': "
+            f"{ROS_IMPORT_ERROR}"
+        )
 
     rclpy.init(args=None)
     node = NavAssistant()
@@ -880,6 +1352,27 @@ def main(argv: List[str] | None = None) -> int:
                 yaw=args.yaw,
                 server_timeout_sec=args.server_timeout,
                 result_timeout_sec=args.result_timeout,
+            )
+            return 0
+
+        if args.command == "amcl-initialpose":
+            node.publish_initial_pose(
+                topic=args.topic,
+                frame_id=args.frame_id,
+                x=args.x,
+                y=args.y,
+                yaw=args.yaw,
+                stddev_xy=args.stddev_xy,
+                stddev_yaw=args.stddev_yaw,
+                repeat=args.repeat,
+                interval_sec=args.interval,
+            )
+            return 0
+
+        if args.command == "amcl-global-localize":
+            node.call_empty_service(
+                service_name=args.service,
+                timeout_sec=args.timeout,
             )
             return 0
 

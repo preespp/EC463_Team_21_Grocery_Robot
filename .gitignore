@@ -103,6 +103,7 @@ ros_ws/log/
 
 # Project reports
 /reports/
+/verification/*.json
 
 # Local temporary reference PDFs
 /workspace/tmp_picoscan_ds.pdf
