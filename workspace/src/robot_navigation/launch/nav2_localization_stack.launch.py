@@ -40,7 +40,7 @@ def generate_launch_description():
 
     default_pbstream = str(maps_dir / "testmap1.pbstream")
     default_map_yaml = str(maps_dir / "testmap1.yaml")
-    default_nav2_params = str(package_share / "config" / "nav2_params_cartographer.yaml")
+    default_nav2_params = str(package_share / "config" / "nav2_params_smac_mppi_omni.yaml")
     default_ekf_params = str(package_share / "config" / "ekf_odom_base_imu.yaml")
 
     # sick_picoscan.launch.py forwards sys.argv directly to sick_generic_caller.
@@ -140,6 +140,18 @@ def generate_launch_description():
                 "cmd_topics": LaunchConfiguration("cmd_topics"),
                 "telemetry_enabled": ParameterValue(
                     LaunchConfiguration("telemetry_enabled"), value_type=bool
+                ),
+                "max_linear_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_linear_speed"), value_type=float
+                ),
+                "max_lateral_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_lateral_speed"), value_type=float
+                ),
+                "max_yaw_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_yaw_speed"), value_type=float
+                ),
+                "axis_deadband": ParameterValue(
+                    LaunchConfiguration("bridge_axis_deadband"), value_type=float
                 ),
                 "left_switch": ParameterValue(LaunchConfiguration("left_switch"), value_type=int),
                 "right_switch": ParameterValue(LaunchConfiguration("right_switch"), value_type=int),
@@ -266,9 +278,13 @@ def generate_launch_description():
             DeclareLaunchArgument("baud_rate", default_value="115200"),
             DeclareLaunchArgument(
                 "cmd_topics",
-                default_value='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]',
+                default_value='["/cmd_vel"]',
             ),
             DeclareLaunchArgument("telemetry_enabled", default_value="true"),
+            DeclareLaunchArgument("bridge_max_linear_speed", default_value="3.0"),
+            DeclareLaunchArgument("bridge_max_lateral_speed", default_value="3.0"),
+            DeclareLaunchArgument("bridge_max_yaw_speed", default_value="12.566370614359172"),
+            DeclareLaunchArgument("bridge_axis_deadband", default_value="0.05"),
             DeclareLaunchArgument("left_switch", default_value="1"),
             DeclareLaunchArgument("right_switch", default_value="1"),
             DeclareLaunchArgument("odom_topic", default_value="/odom_raw"),

@@ -51,6 +51,7 @@ REPO_ROOT = _find_repo_root()
 DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
 DEFAULT_MAP_NAME = "testmap1"
 DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
+DEFAULT_LOCALIZATION_CMD_TOPICS = '["/cmd_vel"]'
 DEFAULT_RUN_MODE = "normal"
 RUN_MODES = ("normal", "bench")
 MAPPING_CONFIG_BASENAME = {
@@ -425,6 +426,10 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"baud_rate:={args.baud_rate}",
         f"cmd_topics:={args.cmd_topics}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
+        f"bridge_max_linear_speed:={args.bridge_max_linear_speed}",
+        f"bridge_max_lateral_speed:={args.bridge_max_lateral_speed}",
+        f"bridge_max_yaw_speed:={args.bridge_max_yaw_speed}",
+        f"bridge_axis_deadband:={args.bridge_axis_deadband}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
         f"odom_topic:={args.odom_topic}",
@@ -720,13 +725,22 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[stack_common],
         help="One-line localization + Nav2 launch.",
     )
-    localization_parser.set_defaults(with_base_link_crop=False)
+    localization_parser.set_defaults(
+        with_base_link_crop=False,
+        cmd_topics=DEFAULT_LOCALIZATION_CMD_TOPICS,
+    )
     localization_parser.add_argument("--maps-dir", default=DEFAULT_MAPS_DIR)
     localization_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
     localization_parser.add_argument("--pbstream-file", default="")
     localization_parser.add_argument("--map-yaml", default="")
     localization_parser.add_argument("--nav2-params-file", default="")
     localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
+    localization_parser.add_argument("--bridge-max-linear-speed", type=float, default=3.0)
+    localization_parser.add_argument("--bridge-max-lateral-speed", type=float, default=3.0)
+    localization_parser.add_argument(
+        "--bridge-max-yaw-speed", type=float, default=4.0 * math.pi
+    )
+    localization_parser.add_argument("--bridge-axis-deadband", type=float, default=0.05)
 
     teleop_common = argparse.ArgumentParser(add_help=False)
     teleop_common.add_argument("--topic", default="/cmd_vel")

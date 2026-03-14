@@ -12,7 +12,18 @@
 > - Current crop box preset is `x=[-0.2540, 0.1397] m`, `y=[-0.2794, 0.2794] m`, `z=[-1.0, 1.0] m`, i.e. the rear `15.5 x 22 in` self-hit filter box.
 > - Localization + Nav2 keeps the older default with crop disabled unless explicitly enabled.
 > - This crop filter only cleans Cartographer's point-cloud input path; Nav2 still uses its own robot footprint/box.
+> - Localization + Nav2 now defaults to `workspace/src/robot_navigation/config/nav2_params_smac_mppi_omni.yaml`.
+> - Current Nav2 stack is `SmacPlanner2D + MPPIController(Omni)`, not the older `NavFn + DWB` path.
+> - `localization-stack` now bridges only `["/cmd_vel"]` by default.
+> - Current working bringup command is:
+>   `cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace`
+>   `source /opt/ros/humble/setup.bash`
+>   `source install/setup.bash`
+>   `ros2 run robot_navigation nav_assistant localization-stack --map-name testmapMain --with-nav2-rviz true`
+> - Rebuild command is:
+>   `cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace && colcon build --symlink-install --packages-select robot_navigation`
 > - Any statement below saying "current `tracking_frame = base_link` / `publish_imu_frame_id = lidar_link` / `use_imu_data = false`" should now be read as historical analysis for the pre-2026-03-11 code state.
+> - Any statement below saying "current Nav2 is `NavFn(use_astar=false) + DWB`" should now be read as historical analysis for the pre-MPPI migration state.
 
 > 状态更新（2026-03-10）：
 > `ROBOT_NAV_STACK_EXECUTION_PLAN_2026_03.md` 的 D0 执行默认已改为 PointCloud2 主路径（`points2 -> /cloud_all_fields_fullframe`），并移除原输入模式切换任务（D0-2）。
@@ -38,7 +49,7 @@
 ### 1.1 当前运行时定位主链路
 
 - 运行时主定位器是 `Cartographer localization`，不是 `AMCL`
-- Nav2 当前全局规划器是 `NavFnPlanner(use_astar=false)`，局部控制器是 `DWBLocalPlanner`
+- Nav2 当前默认全局规划器是 `SmacPlanner2D`，局部控制器是 `MPPIController(Omni)`
 - `robot_localization` EKF 负责：
   `/odom_raw + /sick_scansegment_xd/imu -> /odom`
 
@@ -77,6 +88,15 @@
 - IMU 在当前 EKF 配置里只用了 `yaw` 和 `yaw rate`
 - 当前 EKF 没有使用 IMU 的线加速度项做状态融合
 
+`workspace/src/robot_navigation/config/nav2_params_smac_mppi_omni.yaml`
+
+- 当前默认 planner 是 `nav2_smac_planner/SmacPlanner2D`
+- 当前默认 controller 是 `nav2_mppi_controller::MPPIController`
+- 当前 motion model 是 `Omni`
+- 当前 deadband aware 设置包括:
+  `VelocityDeadbandCritic.deadband_velocities = [0.08, 0.07, 0.12]`
+  和 `velocity_smoother.deadband_velocity = [0.08, 0.07, 0.12]`
+
 ### 1.3 驱动与 launch 实际发布内容
 
 `workspace/src/robot_navigation/launch/slam_mapping_stack.launch.py`
@@ -94,6 +114,8 @@
 - 运行时 localization 栈与 mapping 栈在 LiDAR / IMU 接线方式上保持一致
 - 默认保持 `base_link` 裁剪滤波关闭；只有专项测试时才建议打开
 - 同样默认 `base_link -> lidar_link` 平移为 `0.2413 m`
+- 当前默认 Nav2 参数文件是 `nav2_params_smac_mppi_omni.yaml`
+- 当前 localization 栈默认只桥接 `["/cmd_vel"]`
 
 `workspace/src/robot_navigation/launch/cartographer_mapping.launch.py`
 

@@ -3,13 +3,15 @@
 ## 0. Environment setup
 
 ```bash
-cd <repo_root>/workspace
+cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
+colcon build --symlink-install --packages-select robot_navigation
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ```
 
-If not built yet:
+Rebuild only this package later:
 ```bash
+cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
 colcon build --symlink-install --packages-select robot_navigation
 source install/setup.bash
 ```
@@ -46,26 +48,37 @@ ros2 run robot_navigation nav_assistant teleop
 
 ### 1.3 Save and export map
 ```bash
-ros2 run robot_navigation nav_assistant save-map --map-name testmap1
-ros2 run robot_navigation nav_assistant export-map --map-name testmap1
+ros2 run robot_navigation nav_assistant save-map --map-name testmapMain
+ros2 run robot_navigation nav_assistant export-map --map-name testmapMain
 ```
 
 ### 1.4 Localization + Nav2 phase
 Starts: LiDAR, static TF, serial bridge, EKF, Cartographer localization, map_server, Nav2.
 
+Current working command:
+
 ```bash
-ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
+cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run robot_navigation nav_assistant localization-stack --map-name testmapMain --with-nav2-rviz true
 ```
 
-With RViz:
+Equivalent direct launch:
 ```bash
-ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 --with-nav2-rviz true
+ros2 launch robot_navigation nav2_localization_stack.launch.py \
+  pbstream_file:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmapMain.pbstream \
+  map_yaml:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmapMain.yaml \
+  nav2_params_file:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_navigation/config/nav2_params_smac_mppi_omni.yaml \
+  with_nav2_rviz:=true
 ```
 
 Note: this crop filter cleans Cartographer's point-cloud input path only.
 Nav2 still uses its own robot footprint/box for planning and collision logic.
 Localization + Nav2 keeps crop disabled by default unless you pass
 `--with-base-link-crop true`.
+Current Nav2 stack defaults to `nav2_params_smac_mppi_omni.yaml`
+(`SmacPlanner2D + MPPIController(Omni)`).
 
 ### 1.5 Send goals from CLI
 ```bash
@@ -137,7 +150,7 @@ filter. In the full mapping stack, Cartographer receives
 ### 2.4 Cartographer localization
 ```bash
 ros2 launch robot_navigation cartographer_localization.launch.py \
-  load_state_filename:=<repo_root>/Maps/testmap1.pbstream \
+  load_state_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmapMain.pbstream \
   configuration_basename:=pico_2d_localization.lua
 ```
 
@@ -164,7 +177,7 @@ ros2 run robot_localization ekf_node --ros-args \
 ### 2.7 map_server + lifecycle manager
 ```bash
 ros2 run nav2_map_server map_server --ros-args \
-  -p yaml_filename:=<repo_root>/Maps/testmap1.yaml
+  -p yaml_filename:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/Maps/testmapMain.yaml
 ```
 
 ```bash
@@ -176,7 +189,7 @@ ros2 run nav2_lifecycle_manager lifecycle_manager --ros-args \
 ### 2.8 Nav2 bringup
 ```bash
 ros2 launch nav2_bringup navigation_launch.py \
-  params_file:=<repo_root>/workspace/src/robot_navigation/config/nav2_params_cartographer.yaml
+  params_file:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_navigation/config/nav2_params_smac_mppi_omni.yaml
 ```
 
 ## 3. Common health checks
@@ -201,4 +214,7 @@ ros2 action list | grep navigate_to_pose
 - Cartographer crop box:
   `x=[-0.2540, 0.1397] m`, `y=[-0.2794, 0.2794] m`, `z=[-1.0, 1.0] m`
 - Nav2 footprint/robot box remains separate from this crop behavior
+- Default Nav2 params file: `config/nav2_params_smac_mppi_omni.yaml`
+- Current planner/controller: `SmacPlanner2D + MPPIController(Omni)`
+- `localization-stack cmd_topics`: `["/cmd_vel"]`
 - `with_nav2_rviz`: `false`
