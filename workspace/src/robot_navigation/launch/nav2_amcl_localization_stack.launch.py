@@ -315,7 +315,7 @@ def generate_launch_description():
             DeclareLaunchArgument("host_set_frecho_filter", default_value="1"),
             DeclareLaunchArgument("host_set_lfp_angle_range_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_interval_filter", default_value="0"),
-            DeclareLaunchArgument("laserscan_layer_filter", default_value="0"),
+            DeclareLaunchArgument("laserscan_layer_filter", default_value="1"),
             DeclareLaunchArgument("startup_mode", default_value="fixed_pose"),
             DeclareLaunchArgument("initial_pose_x", default_value="0.0"),
             DeclareLaunchArgument("initial_pose_y", default_value="0.0"),

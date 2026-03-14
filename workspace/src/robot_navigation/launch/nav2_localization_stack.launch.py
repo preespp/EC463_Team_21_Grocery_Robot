@@ -11,6 +11,36 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
+def _segment_scan_frame_tfs():
+    return [
+        Node(
+            package="tf2_ros",
+            executable="static_transform_publisher",
+            name=f"lidar_to_segment_scan_frame_static_tf_{index}",
+            output="screen",
+            arguments=[
+                "--x",
+                "0.0",
+                "--y",
+                "0.0",
+                "--z",
+                "0.0",
+                "--roll",
+                "0.0",
+                "--pitch",
+                "0.0",
+                "--yaw",
+                "0.0",
+                "--frame-id",
+                "lidar_link",
+                "--child-frame-id",
+                f"lidar_link_{index}",
+            ],
+        )
+        for index in range(16)
+    ]
+
+
 POINTCLOUD_CONFIG = (
     "coordinateNotation=3 updateMethod=0 "
     "fields=x,y,z,i,range,azimuth,elevation,t,ts,lidar_sec,lidar_nsec,ring,layer,echo,reflector "
@@ -128,31 +158,6 @@ def generate_launch_description():
         ],
     )
 
-    segment_scan_frame_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="lidar_to_segment_scan_frame_static_tf",
-        output="screen",
-        arguments=[
-            "--x",
-            "0.0",
-            "--y",
-            "0.0",
-            "--z",
-            "0.0",
-            "--roll",
-            "0.0",
-            "--pitch",
-            "0.0",
-            "--yaw",
-            "0.0",
-            "--frame-id",
-            "lidar_link",
-            "--child-frame-id",
-            "lidar_link_1",
-        ],
-    )
-
     serial_bridge = Node(
         package="robot_navigation",
         executable="nav2_serial_bridge",
@@ -204,6 +209,7 @@ def generate_launch_description():
             "load_state_filename": LaunchConfiguration("pbstream_file"),
             "publish_occupancy_grid": "false",
             "scan_topic": LaunchConfiguration("scan_topic"),
+            "publish_sensor_tf": "false",
         }.items(),
     )
 
@@ -296,7 +302,7 @@ def generate_launch_description():
             DeclareLaunchArgument("host_set_frecho_filter", default_value="1"),
             DeclareLaunchArgument("host_set_lfp_angle_range_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_interval_filter", default_value="0"),
-            DeclareLaunchArgument("laserscan_layer_filter", default_value="0"),
+            DeclareLaunchArgument("laserscan_layer_filter", default_value="1"),
             DeclareLaunchArgument("scan_topic", default_value="/scan_segment"),
             DeclareLaunchArgument("lidar_x", default_value="0.2413"),
             DeclareLaunchArgument("lidar_y", default_value="0.0"),
@@ -314,7 +320,7 @@ def generate_launch_description():
             sick_driver,
             lidar_static_tf,
             imu_static_tf,
-            segment_scan_frame_tf,
+            *_segment_scan_frame_tfs(),
             serial_bridge,
             ekf_node,
             cartographer_localization,

@@ -34,6 +34,7 @@ setup(
             'teleop_cmd_vel = robot_navigation.teleop_cmd_vel:main',
             'teleop_cmd_vel_collision = robot_navigation.teleop_cmd_vel_collision:main',
             'nav_assistant = robot_navigation.nav_assistant:main',
+            'laser_scan_sanitizer = robot_navigation.laser_scan_sanitizer:main',
         ],
     },
 )
