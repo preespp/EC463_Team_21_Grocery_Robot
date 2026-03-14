@@ -21,6 +21,11 @@ source install/setup.bash
 ros2 run robot_navigation nav_assistant mapping-stack
 ```
 
+当前 mapping-stack 默认会在 Cartographer 前面打开一个 `base_link` 裁剪滤波器，
+裁剪框是 `x=[-0.2540, 0.1397] m`、`y=[-0.2794, 0.2794] m`、
+`z=[-1.0, 1.0] m`，也就是现在这台车后部 `15.5 x 22 in` 的自车回波过滤框。
+只有做专项排查时才建议用 `--with-base-link-crop false` 关闭。
+
 D0 参数验证建议直接使用质量配置（PointCloud2 路径）：
 ```bash
 ros2 run robot_navigation nav_assistant mapping-stack \
@@ -52,6 +57,11 @@ ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 ```bash
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 --with-nav2-rviz true
 ```
+
+说明：这个裁剪滤波只清理 Cartographer 的点云输入，不替代 Nav2 自己的
+robot footprint / robot box。
+Localization + Nav2 默认保持裁剪关闭，只有你显式传
+`--with-base-link-crop true` 时才会打开。
 
 ### 1.5 命令行发导航目标
 ```bash
@@ -116,6 +126,10 @@ Notes:
 ros2 launch robot_navigation cartographer_mapping.launch.py
 ```
 
+说明：单独直接起 `cartographer_mapping.launch.py` 时，不会自动带上默认裁剪滤波。
+完整 mapping stack 里，Cartographer 实际接的是经过 `base_link` 裁剪后的
+`/cloud_all_fields_fullframe_filtered`。
+
 ### 2.4 Cartographer localization
 ```bash
 ros2 launch robot_navigation cartographer_localization.launch.py \
@@ -178,4 +192,9 @@ ros2 action list | grep navigate_to_pose
 - `fallback_odom` 默认: `false`
 - LiDAR frame 默认: `lidar_link`
 - static TF 默认: `base_link -> lidar_link = (0.2413, 0, 0, 0, 0, 0)`
+- `mapping-stack with_base_link_crop` 默认: `true`
+- `localization-stack with_base_link_crop` 默认: `false`
+- Cartographer 裁剪框默认:
+  `x=[-0.2540, 0.1397] m`、`y=[-0.2794, 0.2794] m`、`z=[-1.0, 1.0] m`
+- Nav2 的 footprint / robot box 仍然独立于这个裁剪逻辑
 - `with_nav2_rviz` 默认: `false`

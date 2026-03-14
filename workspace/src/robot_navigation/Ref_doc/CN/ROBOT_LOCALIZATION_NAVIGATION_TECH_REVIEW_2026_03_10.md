@@ -8,6 +8,10 @@
 > - This `0.2413 m` preset comes from the repo's `20 x 20 in` base dimension and the confirmed standard `1.00 in` 80/20 front bar: `0.508 / 2 - 0.0254 / 2 = 0.2413 m`.
 > - `lidar_link -> imu_link = (0.0124, 0.0185, -0.0484, 0, 0, 0)` is now set from the SICK operating instructions as the IMU position relative to the optical origin.
 > - For the current project preset, `lidar_link` is modeled at the bracket center and treated as the project's optical-origin proxy, following the manual mount assumption for this robot.
+> - Mapping stack now enables a `base_link` crop filter before Cartographer by default.
+> - Current crop box preset is `x=[-0.2540, 0.1397] m`, `y=[-0.2794, 0.2794] m`, `z=[-1.0, 1.0] m`, i.e. the rear `15.5 x 22 in` self-hit filter box.
+> - Localization + Nav2 keeps the older default with crop disabled unless explicitly enabled.
+> - This crop filter only cleans Cartographer's point-cloud input path; Nav2 still uses its own robot footprint/box.
 > - Any statement below saying "current `tracking_frame = base_link` / `publish_imu_frame_id = lidar_link` / `use_imu_data = false`" should now be read as historical analysis for the pre-2026-03-11 code state.
 
 > 状态更新（2026-03-10）：
@@ -78,26 +82,31 @@
 `workspace/src/robot_navigation/launch/slam_mapping_stack.launch.py`
 
 - 驱动发布 frame：`publish_frame_id:=lidar_link`
-- 驱动发布 IMU frame：`publish_imu_frame_id:=lidar_link`
+- 驱动发布 IMU frame：`publish_imu_frame_id:=imu_link`
 - 启用了 custom pointcloud：`cloud_all_fields_fullframe`
 - 启用了 fullframe LaserScan：`publish_laserscan_fullframe_topic:=/scan_fullframe`
-- 配置了 `base_link -> lidar_link` 静态 TF，默认 `x = 0.254`
+- 默认启用 `base_link` 裁剪滤波，输出 `/cloud_all_fields_fullframe_filtered`
+- 默认裁剪框：`x=[-0.2540, 0.1397] m`、`y=[-0.2794, 0.2794] m`、`z=[-1.0, 1.0] m`
+- 配置了 `base_link -> lidar_link` 静态 TF，默认 `x = 0.2413`
 
 `workspace/src/robot_navigation/launch/nav2_localization_stack.launch.py`
 
 - 运行时 localization 栈与 mapping 栈在 LiDAR / IMU 接线方式上保持一致
-- 同样默认 `base_link -> lidar_link` 平移为 `0.254 m`
+- 默认保持 `base_link` 裁剪滤波关闭；只有专项测试时才建议打开
+- 同样默认 `base_link -> lidar_link` 平移为 `0.2413 m`
 
 `workspace/src/robot_navigation/launch/cartographer_mapping.launch.py`
 
-- Cartographer 当前只 remap：
-  - `("points2", "/cloud_all_fields_fullframe")`
-  - `("imu", "/sick_scansegment_xd/imu")`
+- Cartographer 通过 launch 参数 remap：
+  - `points2`
+  - `imu`
+- 在当前完整 mapping stack 里，`points2` 实际接的是 `/cloud_all_fields_fullframe_filtered`
 - 当前没有 remap `scan`
 
 `workspace/src/robot_navigation/launch/cartographer_localization.launch.py`
 
 - Localization launch 与 mapping launch 一样，只 remap `points2` 和 `imu`
+- 在当前完整 localization stack 里，`points2` 实际接的是 `/cloud_all_fields_fullframe_filtered`
 - 当前 Cartographer 实际吃的是 fullframe `PointCloud2`，不是 `LaserScan`
 
 ---

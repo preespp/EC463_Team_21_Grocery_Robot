@@ -23,6 +23,11 @@ Starts: LiDAR, static TF, Cartographer mapping, serial bridge, EKF.
 ros2 run robot_navigation nav_assistant mapping-stack
 ```
 
+Default mapping-stack behavior now enables a `base_link` crop filter before
+Cartographer with `x=[-0.2540, 0.1397] m`, `y=[-0.2794, 0.2794] m`,
+`z=[-1.0, 1.0] m`, i.e. the current rear `15.5 x 22 in` self-hit filter box.
+Disable it only for debugging with `--with-base-link-crop false`.
+
 For D0 parameter validation (PointCloud2 path), use the quality config directly:
 ```bash
 ros2 run robot_navigation nav_assistant mapping-stack \
@@ -56,6 +61,11 @@ With RViz:
 ```bash
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1 --with-nav2-rviz true
 ```
+
+Note: this crop filter cleans Cartographer's point-cloud input path only.
+Nav2 still uses its own robot footprint/box for planning and collision logic.
+Localization + Nav2 keeps crop disabled by default unless you pass
+`--with-base-link-crop true`.
 
 ### 1.5 Send goals from CLI
 ```bash
@@ -120,6 +130,10 @@ Notes:
 ros2 launch robot_navigation cartographer_mapping.launch.py
 ```
 
+Note: `cartographer_mapping.launch.py` alone does not start the default crop
+filter. In the full mapping stack, Cartographer receives
+`/cloud_all_fields_fullframe_filtered` after the `base_link` crop filter.
+
 ### 2.4 Cartographer localization
 ```bash
 ros2 launch robot_navigation cartographer_localization.launch.py \
@@ -182,4 +196,9 @@ ros2 action list | grep navigate_to_pose
 - `fallback_odom`: `false`
 - LiDAR frame: `lidar_link`
 - Static TF default: `base_link -> lidar_link = (0.2413, 0, 0, 0, 0, 0)`
+- `mapping-stack with_base_link_crop`: `true`
+- `localization-stack with_base_link_crop`: `false`
+- Cartographer crop box:
+  `x=[-0.2540, 0.1397] m`, `y=[-0.2794, 0.2794] m`, `z=[-1.0, 1.0] m`
+- Nav2 footprint/robot box remains separate from this crop behavior
 - `with_nav2_rviz`: `false`

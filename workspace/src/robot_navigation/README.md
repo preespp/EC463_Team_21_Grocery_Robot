@@ -75,6 +75,13 @@ ros2 topic pub -r 100 /back_alert std_msgs/msg/Bool "{data: false}"
 ros2 run robot_navigation nav_assistant mapping-stack
 ```
 
+Default mapping-stack behavior now enables a `base_link` crop filter before
+Cartographer to remove rear chassis self-hits. The current default crop box
+in `base_link` is `x=[-0.2540, 0.1397] m`, `y=[-0.2794, 0.2794] m`,
+`z=[-1.0, 1.0] m`, which matches the current rear `15.5 x 22 in` filter box
+on the project robot. Disable it only when debugging with
+`--with-base-link-crop false`.
+
 D0 quality-profile run (PointCloud2 input path):
 ```bash
 ros2 run robot_navigation nav_assistant mapping-stack \
@@ -106,12 +113,15 @@ ros2 run robot_navigation nav_assistant export-map --map-name testmap1
 ros2 run robot_navigation nav_assistant localization-stack --map-name testmap1
 ```
 
-Default behavior in both mapping/localization stacks:
+Default behavior in the current stacks:
 
 - LiDAR is published in `lidar_link`.
 - IMU is published in `imu_link`.
 - Static TF `base_link -> lidar_link` is published with default offset `(x=0.2413, y=0, z=0, rpy=0,0,0)`.
 - Static TF `lidar_link -> imu_link` is published with default offset `(x=0.0124, y=0.0185, z=-0.0484, rpy=0,0,0)`.
+- Mapping stack Cartographer consumes `/cloud_all_fields_fullframe_filtered`, produced by the default `base_link` crop filter.
+- Localization + Nav2 stack keeps the older default with crop disabled unless you pass `--with-base-link-crop true`.
+- The crop filter removes rear chassis self-hits before Cartographer; Nav2 still relies on its own robot footprint/box for planning and collision behavior.
 - Cartographer tracks `imu_link` so raw IMU input is colocated with the tracking frame.
 - Cartographer still publishes `base_link` projected to 2D, so Nav2 keeps the usual planar robot frame.
 - The `0.2413 m` LiDAR forward offset is the current project preset for this robot mount: `20 in / 2 - 1 in / 2 = 9.5 in = 0.2413 m`, with the front mount centered on a standard 1.00 in 80/20 bar.

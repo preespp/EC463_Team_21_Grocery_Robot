@@ -445,6 +445,14 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
+        f"with_base_link_crop:={bool_to_launch(args.with_base_link_crop)}",
+        f"crop_box_frame:={args.crop_box_frame}",
+        f"crop_min_x:={args.crop_min_x}",
+        f"crop_max_x:={args.crop_max_x}",
+        f"crop_min_y:={args.crop_min_y}",
+        f"crop_max_y:={args.crop_max_y}",
+        f"crop_min_z:={args.crop_min_z}",
+        f"crop_max_z:={args.crop_max_z}",
         f"with_collision:={bool_to_launch(args.with_collision)}",
         f"with_rviz:={bool_to_launch(args.with_rviz)}",
     ]
@@ -491,6 +499,14 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
+        f"with_base_link_crop:={bool_to_launch(args.with_base_link_crop)}",
+        f"crop_box_frame:={args.crop_box_frame}",
+        f"crop_min_x:={args.crop_min_x}",
+        f"crop_max_x:={args.crop_max_x}",
+        f"crop_min_y:={args.crop_min_y}",
+        f"crop_max_y:={args.crop_max_y}",
+        f"crop_min_z:={args.crop_min_z}",
+        f"crop_max_z:={args.crop_max_z}",
         f"pbstream_file:={pbstream_path}",
         f"map_yaml:={yaml_path}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
@@ -680,6 +696,14 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--lidar-roll", type=float, default=0.0)
     stack_common.add_argument("--lidar-pitch", type=float, default=0.0)
     stack_common.add_argument("--lidar-yaw", type=float, default=0.0)
+    stack_common.add_argument("--with-base-link-crop", type=parse_bool, default=True)
+    stack_common.add_argument("--crop-box-frame", default="base_link")
+    stack_common.add_argument("--crop-min-x", type=float, default=-0.2540)
+    stack_common.add_argument("--crop-max-x", type=float, default=0.1397)
+    stack_common.add_argument("--crop-min-y", type=float, default=-0.2794)
+    stack_common.add_argument("--crop-max-y", type=float, default=0.2794)
+    stack_common.add_argument("--crop-min-z", type=float, default=-1.0)
+    stack_common.add_argument("--crop-max-z", type=float, default=1.0)
     stack_common.add_argument("--dry-run", action="store_true")
 
     mapping_parser = subparsers.add_parser(
@@ -687,6 +711,7 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[stack_common],
         help="One-line mapping phase launch (LiDAR + Cartographer + serial bridge).",
     )
+    mapping_parser.set_defaults(with_base_link_crop=True)
     mapping_parser.add_argument("--with-collision", type=parse_bool, default=False)
     mapping_parser.add_argument("--with-rviz", type=parse_bool, default=False)
 
@@ -695,6 +720,7 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[stack_common],
         help="One-line localization + Nav2 launch.",
     )
+    localization_parser.set_defaults(with_base_link_crop=False)
     localization_parser.add_argument("--maps-dir", default=DEFAULT_MAPS_DIR)
     localization_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
     localization_parser.add_argument("--pbstream-file", default="")
