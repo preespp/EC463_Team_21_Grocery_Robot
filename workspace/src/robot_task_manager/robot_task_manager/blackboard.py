@@ -25,7 +25,7 @@ def setup_blackboard():
     bb.home_rack = 1
 
     # For navigation
-    bb.nav_goal = (0.0, 0.0)
+    bb.nav_goal = (1.0, 0.0)
     bb.home_goal = (0.0, 0.0)
 
     return bb

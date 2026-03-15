@@ -64,7 +64,7 @@ protected:
     // wheel geometry
     const float Wheel_Radius = 0.0762f;
     const float Wheel_Base_Half_Length = 0.1905f;
-    const float Wheel_Base_Half_Width = 0.3175f;
+    const float Wheel_Base_Half_Width = 0.32385f;
 
     // kinematics outputs
     float Target_Wheel_Omega[4];

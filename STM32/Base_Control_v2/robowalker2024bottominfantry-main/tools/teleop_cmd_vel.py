@@ -14,6 +14,7 @@ import tty
 
 import rclpy
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 
 
 KEY_BINDINGS = {
@@ -83,7 +84,6 @@ def main() -> int:
             twist.linear.y = current[1] * args.linear
             twist.angular.z = current[2] * args.angular
             pub.publish(twist)
-            rclpy.spin_once(node, timeout_sec=0.0)
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
         stop = Twist()
