@@ -25,3 +25,36 @@ ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300 motor_p
 ```
 
 This launch should open the MoveIt RViz window automatically.
+
+## Git Notes
+
+The folders below are local upstream Interbotix clones used by the VX300 launch files:
+
+- `workspace/interbotix_ws/src/interbotix_ros_core`
+- `workspace/interbotix_ws/src/interbotix_ros_manipulators`
+- `workspace/interbotix_ws/src/interbotix_ros_toolboxes`
+
+They are separate Git repositories, not normal folders inside the main
+`EC463_Team_21_Grocery_Robot` repository. By default, the main project should
+track only `workspace/src/robot_manipulation` and keep the Interbotix repos as
+local dependencies.
+
+Recommended workflow for committing this package only:
+
+```bash
+cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot
+git restore --staged workspace/interbotix_ws/src/interbotix_ros_core \
+                    workspace/interbotix_ws/src/interbotix_ros_manipulators \
+                    workspace/interbotix_ws/src/interbotix_ros_toolboxes
+git add .gitignore
+git add workspace/src/robot_manipulation
+git status
+```
+
+The root `.gitignore` should keep these three local repos ignored so `git add *`
+does not accidentally stage them in the outer repository.
+
+If the team ever wants the main repo to own the Interbotix files directly, first
+move each nested `.git` directory somewhere safe, remove the ignore rules, and
+then `git add` those folders as normal directories. This vendors the upstream
+code into the main project and makes future upstream updates more manual.
