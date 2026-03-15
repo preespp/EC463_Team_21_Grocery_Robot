@@ -47,10 +47,19 @@ class SetCurrentItem(py_trees.behaviour.Behaviour):
             f"{item_name} (qty={self.bb.num_current_item})"
         )
 
+        self.bb.slot_id = None
+        self.bb.anchor_id = None
+        self.bb.rack_id = None
+        self.bb.semantic_id = None
+        self.bb.semantic_target_label = None
+        self.bb.nav_goal_source = "legacy"
+        self.bb.shelf_pose = None
+        self.bb.pose = None
+
         x = _to_float(getattr(item, "aisle", 0.0), 0.0)
         y = _to_float(getattr(item, "rack", 0.0), 0.0)
         z = _to_int(getattr(item, "shelf_level", 0), 0)
-        self.bb.nav_goal = (x, y)
+        self.bb.nav_goal = (x, y, 0.0)
         self.bb.rack_goal = z
 
         return py_trees.common.Status.SUCCESS
@@ -66,6 +75,12 @@ class SetHome(py_trees.behaviour.Behaviour):
 
     def update(self):
         self.bb.nav_goal = getattr(self.bb, "home_goal", None)
-        self.bb.rack_goal = getattr(self.bb, "home_pose", 1)
-        self.bb.pose = getattr(self.bb, "home_rack", 1)
+        self.bb.rack_goal = getattr(self.bb, "home_rack", 1)
+        self.bb.pose = getattr(self.bb, "home_pose", None)
+        self.bb.shelf_pose = getattr(self.bb, "home_pose", None)
+        self.bb.slot_id = None
+        self.bb.anchor_id = "home"
+        self.bb.rack_id = None
+        self.bb.semantic_target_label = "Home"
+        self.bb.nav_goal_source = "home_goal"
         return py_trees.common.Status.SUCCESS

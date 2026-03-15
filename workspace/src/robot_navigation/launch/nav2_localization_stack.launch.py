@@ -38,10 +38,11 @@ def generate_launch_description():
     package_share = Path(get_package_share_directory("robot_navigation"))
     maps_dir = repo_root / "Maps"
 
-    default_pbstream = str(maps_dir / "testmap1.pbstream")
-    default_map_yaml = str(maps_dir / "testmap1.yaml")
+    default_pbstream = str(maps_dir / "testmapMain.pbstream")
+    default_map_yaml = str(maps_dir / "testmapMain.yaml")
     default_nav2_params = str(package_share / "config" / "nav2_params_smac_mppi_omni.yaml")
     default_ekf_params = str(package_share / "config" / "ekf_odom_base_imu.yaml")
+    default_semantic_map = str(package_share / "config" / "semantic_map_testmapMain.yaml")
 
     # sick_picoscan.launch.py forwards sys.argv directly to sick_generic_caller.
     # Launching the caller node directly guarantees these args are applied.
@@ -270,6 +271,20 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("with_nav2_rviz")),
     )
 
+    semantic_map_server = Node(
+        package="robot_navigation",
+        executable="semantic_map_server",
+        name="semantic_map_server",
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("with_semantic_map")),
+        parameters=[
+            {
+                "semantic_map_file": LaunchConfiguration("semantic_map_file"),
+                "frame_id": "map",
+            }
+        ],
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument("hostname", default_value="192.168.8.150"),
@@ -291,6 +306,8 @@ def generate_launch_description():
             DeclareLaunchArgument("fallback_odom", default_value="false"),
             DeclareLaunchArgument("pbstream_file", default_value=default_pbstream),
             DeclareLaunchArgument("map_yaml", default_value=default_map_yaml),
+            DeclareLaunchArgument("with_semantic_map", default_value="true"),
+            DeclareLaunchArgument("semantic_map_file", default_value=default_semantic_map),
             DeclareLaunchArgument("nav2_params_file", default_value=default_nav2_params),
             DeclareLaunchArgument("nav2_namespace", default_value=""),
             DeclareLaunchArgument("use_ekf", default_value="true"),
@@ -338,6 +355,7 @@ def generate_launch_description():
             cartographer_localization,
             map_server,
             lifecycle_manager,
+            semantic_map_server,
             TimerAction(period=2.0, actions=[nav2_bringup]),
             nav2_rviz,
         ]

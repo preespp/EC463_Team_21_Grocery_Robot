@@ -1,6 +1,5 @@
 import py_trees
 import robot_task_manager.bt_nodes as bt_nodes
-from robot_task_manager.bt_nodes.navigation_nodes import MoveDistanceForCurrentItem
 
 
 def create_customer_tree(bb):
@@ -10,10 +9,7 @@ def create_customer_tree(bb):
         memory=True,
         children=[
             bt_nodes.SetCurrentItem(bb),
-            ### Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)
-            #MoveDistanceForCurrentItem(bb),
-            ###############################################
-
+            bt_nodes.ResolveCurrentItemSemanticTarget(bb),
             bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
             # bt_nodes.RepositionRackToGoalLevel(goal_key="rack_goal"),
             # bt_nodes.VerifyPosition(),

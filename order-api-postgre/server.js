@@ -1,20 +1,22 @@
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import pkg from "pg";
+import { getMapPgmPath, getSemanticMapBundle, saveSemanticMapBundle } from "./semantic_map.js";
 
 const { Pool } = pkg;
 
 // PostgreSQL connection
 const pool = new Pool({
-  user: "grocerybot",
-  host: "localhost",
-  database: "grocery_inventory",
-  password: "team21",
-  port: 5432,
+  user: process.env.PGUSER || "grocerybot",
+  host: process.env.PGHOST || "localhost",
+  database: process.env.PGDATABASE || "grocery_inventory",
+  password: process.env.PGPASSWORD || "team21",
+  port: Number(process.env.PGPORT || 5432),
 });
 
 const app = express();
@@ -23,6 +25,7 @@ app.use(bodyParser.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, "..");
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (_req, res) => {
@@ -159,6 +162,258 @@ function requireEmployeeAuth(req, res, next) {
   req.employeeSession = session;
   next();
 }
+
+function getAnchorPose(bundle, anchorId, fallbackPose) {
+  const anchor = (bundle?.anchors || []).find((item) => item.id === anchorId);
+  if (!anchor) return fallbackPose;
+  return {
+    x: Number(anchor.x ?? fallbackPose.x ?? 0),
+    y: Number(anchor.y ?? fallbackPose.y ?? 0),
+    yaw: Number(anchor.yaw ?? fallbackPose.yaw ?? 0),
+  };
+}
+
+function normalizeSemanticVersion(row) {
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    version_seq: Number(row.version_seq),
+    map_name: row.map_name ?? "",
+    semantic_id: row.semantic_id ?? "",
+    saved_by_employee_id: row.saved_by_employee_id ?? null,
+    saved_at: row.saved_at ?? null,
+    change_summary: row.change_summary ?? "",
+  };
+}
+
+async function ensureSemanticVersionTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS semantic_map_versions (
+      id BIGSERIAL PRIMARY KEY,
+      map_name VARCHAR(128) NOT NULL,
+      semantic_id VARCHAR(128) NOT NULL,
+      version_seq INTEGER NOT NULL,
+      saved_by_employee_id VARCHAR(16),
+      saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      change_summary TEXT NOT NULL DEFAULT '',
+      source_yaml_path TEXT NOT NULL,
+      yaml_text TEXT NOT NULL,
+      semantic_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+      CONSTRAINT semantic_map_versions_unique_version UNIQUE (map_name, version_seq)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_semantic_map_versions_lookup
+    ON semantic_map_versions (map_name, semantic_id, version_seq DESC)
+  `);
+}
+
+async function migrateLegacySemanticIds() {
+  await pool.query(`
+    UPDATE semantic_map_versions
+    SET semantic_id = map_name
+    WHERE semantic_id LIKE map_name || '\\_v%'
+  `);
+}
+
+async function getLatestSemanticVersion(mapName) {
+  const result = await pool.query(
+    `SELECT id, map_name, semantic_id, version_seq, saved_by_employee_id, saved_at, change_summary
+     FROM semantic_map_versions
+     WHERE map_name = $1
+     ORDER BY version_seq DESC
+     LIMIT 1`,
+    [String(mapName || "")]
+  );
+  return normalizeSemanticVersion(result.rows[0]);
+}
+
+async function recordSemanticVersion({ bundle, employeeId = null, changeSummary = "" }) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const versionResult = await client.query(
+      `SELECT COALESCE(MAX(version_seq), 0) + 1 AS next_version
+       FROM semantic_map_versions
+       WHERE map_name = $1`,
+      [bundle.map.name]
+    );
+    const nextVersion = Number(versionResult.rows[0]?.next_version ?? 1);
+    const yamlText = fs.readFileSync(bundle.source_files.semantic_map, "utf8");
+    const semanticJson = {
+      map: bundle.map,
+      anchors: bundle.anchors,
+      racks: bundle.racks,
+      slots: bundle.slots,
+      summary: bundle.summary,
+    };
+
+    const insertResult = await client.query(
+      `INSERT INTO semantic_map_versions (
+         map_name,
+         semantic_id,
+         version_seq,
+         saved_by_employee_id,
+         change_summary,
+         source_yaml_path,
+         yaml_text,
+         semantic_json
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+       RETURNING id, map_name, semantic_id, version_seq, saved_by_employee_id, saved_at, change_summary`,
+      [
+        bundle.map.name,
+        bundle.map.semantic_id,
+        nextVersion,
+        employeeId,
+        String(changeSummary || ""),
+        bundle.source_files.semantic_map,
+        yamlText,
+        JSON.stringify(semanticJson),
+      ]
+    );
+    await client.query("COMMIT");
+    return normalizeSemanticVersion(insertResult.rows[0]);
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_rollbackError) {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function attachSemanticVersion(bundle, versionOverride = null) {
+  const version = versionOverride || await getLatestSemanticVersion(bundle?.map?.name);
+  return {
+    ...bundle,
+    version,
+  };
+}
+
+async function bootstrapSemanticVersionSnapshot() {
+  const bundle = getSemanticMapBundle(REPO_ROOT);
+  const existing = await getLatestSemanticVersion(bundle.map.name);
+  if (existing) return existing;
+  return recordSemanticVersion({
+    bundle,
+    employeeId: null,
+    changeSummary: "Bootstrap snapshot from semantic YAML",
+  });
+}
+
+async function enrichSemanticBundle(bundle) {
+  const bundleWithVersion = await attachSemanticVersion(bundle);
+  const slotProductIds = [
+    ...new Set(
+      (bundleWithVersion.slots || [])
+        .flatMap((slot) => slot.product_ids || [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value))
+    ),
+  ];
+
+  let inventoryById = new Map();
+  if (slotProductIds.length > 0) {
+    const inventoryResult = await pool.query(
+      `SELECT product_id, product_name, category_name, stock, price
+       FROM inventory
+       WHERE product_id = ANY($1::int[])`,
+      [slotProductIds]
+    );
+    inventoryById = new Map(
+      inventoryResult.rows.map((row) => [
+        Number(row.product_id),
+        {
+          product_id: String(row.product_id),
+          product_name: row.product_name ?? "",
+          category_name: row.category_name ?? "",
+          stock: Number(row.stock ?? 0),
+          price: Number(row.price ?? 0),
+        },
+      ])
+    );
+  }
+
+  const slots = bundleWithVersion.slots.map((slot) => ({
+    ...slot,
+    products: slot.product_ids.map((productId, index) => {
+      const inventoryItem = inventoryById.get(Number(productId));
+      return {
+        product_id: String(productId),
+        product_name:
+          inventoryItem?.product_name ??
+          slot.product_names[index] ??
+          slot.product_names[0] ??
+          "",
+        category_name: inventoryItem?.category_name ?? "",
+        stock: inventoryItem?.stock ?? null,
+        price: inventoryItem?.price ?? null,
+      };
+    }),
+  }));
+
+  return {
+    ...bundleWithVersion,
+    slots,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+app.get("/api/maps/base/:mapName.pgm", (req, res) => {
+  try {
+    const filePath = getMapPgmPath(REPO_ROOT, req.params.mapName);
+    res.type("image/x-portable-graymap");
+    res.sendFile(filePath);
+  } catch (e) {
+    res.status(404).json({ error: e.message });
+  }
+});
+
+app.get("/api/maps/semantic/current", requireEmployeeAuth, async (_req, res) => {
+  try {
+    const bundle = getSemanticMapBundle(REPO_ROOT);
+    res.json(await enrichSemanticBundle(bundle));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put("/api/maps/semantic/current", requireEmployeeAuth, async (req, res) => {
+  try {
+    const nextBundle = req.body?.map ? req.body : req.body?.bundle;
+    const changeSummary = String(req.body?.change_summary || "Saved from Store Map UI");
+    if (!nextBundle || !nextBundle.map) {
+      return res.status(400).json({ error: "Semantic map bundle is required" });
+    }
+
+    const currentBundle = getSemanticMapBundle(REPO_ROOT);
+    const previousYaml = fs.readFileSync(currentBundle.source_files.semantic_map, "utf8");
+
+    let savedBundle = null;
+    let version = null;
+    try {
+      savedBundle = saveSemanticMapBundle(REPO_ROOT, nextBundle);
+      version = await recordSemanticVersion({
+        bundle: savedBundle,
+        employeeId: req.employeeSession?.employee_ID || null,
+        changeSummary,
+      });
+    } catch (saveError) {
+      fs.writeFileSync(currentBundle.source_files.semantic_map, previousYaml, "utf8");
+      throw saveError;
+    }
+
+    res.json({
+      ok: true,
+      bundle: await enrichSemanticBundle(await attachSemanticVersion(savedBundle, version)),
+      saved_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // CUSTOMER LOGIN (member only, no password)
 app.post("/api/auth/login", async (req, res) => {
@@ -383,6 +638,17 @@ app.get("/api/employee/inventory/options", requireEmployeeAuth, async (_req, res
 // EMPLOYEE ROBOT STATUS (placeholder source for dashboard UI)
 app.get("/api/employee/robot/status", requireEmployeeAuth, async (_req, res) => {
   const now = new Date().toISOString();
+  let bundle = null;
+  try {
+    bundle = getSemanticMapBundle(REPO_ROOT);
+  } catch (_err) {
+    bundle = null;
+  }
+
+  const homePose = getAnchorPose(bundle, "home", { x: 0.0, y: 0.0, yaw: 0.0 });
+  const drinksPose = getAnchorPose(bundle, "drinks_anchor", { x: 1.0, y: 2.0, yaw: 0.0 });
+  const snacksPose = getAnchorPose(bundle, "snacks_anchor", { x: 9.0, y: 5.0, yaw: 0.0 });
+
   res.json({
     robots: [
       {
@@ -390,6 +656,11 @@ app.get("/api/employee/robot/status", requireEmployeeAuth, async (_req, res) => 
         battery_level: 86,
         status_key: "customer",
         status_text: "Operate for Customer",
+        map_name: bundle?.map?.name ?? "testmapMain",
+        x: homePose.x,
+        y: homePose.y,
+        yaw: homePose.yaw,
+        anchor_id: "home",
         updated_at: now
       },
       {
@@ -397,6 +668,11 @@ app.get("/api/employee/robot/status", requireEmployeeAuth, async (_req, res) => 
         battery_level: 62,
         status_key: "restock",
         status_text: "Operate for Restock",
+        map_name: bundle?.map?.name ?? "testmapMain",
+        x: drinksPose.x,
+        y: drinksPose.y,
+        yaw: drinksPose.yaw,
+        anchor_id: "drinks_anchor",
         updated_at: now
       },
       {
@@ -404,6 +680,11 @@ app.get("/api/employee/robot/status", requireEmployeeAuth, async (_req, res) => 
         battery_level: 100,
         status_key: "charged",
         status_text: "Charged",
+        map_name: bundle?.map?.name ?? "testmapMain",
+        x: snacksPose.x,
+        y: snacksPose.y,
+        yaw: snacksPose.yaw,
+        anchor_id: "snacks_anchor",
         updated_at: now
       }
     ]
@@ -881,6 +1162,17 @@ app.post("/order/complete", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(3000, () =>
-  console.log("Server running: http://localhost:3000")
-);
+const PORT = Number(process.env.PORT || 3000);
+
+ensureSemanticVersionTable()
+  .then(() => migrateLegacySemanticIds())
+  .then(() => bootstrapSemanticVersionSnapshot())
+  .then(() => {
+    app.listen(PORT, () =>
+      console.log(`Server running: http://localhost:${PORT}`)
+    );
+  })
+  .catch((error) => {
+    console.error(`Failed to initialize semantic version storage: ${error.message}`);
+    process.exit(1);
+  });

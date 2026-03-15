@@ -35,6 +35,7 @@ setup(
             'teleop_cmd_vel = robot_navigation.teleop_cmd_vel:main',
             'teleop_cmd_vel_collision = robot_navigation.teleop_cmd_vel_collision:main',
             'nav_assistant = robot_navigation.nav_assistant:main',
+            'semantic_map_server = robot_navigation.semantic_map_server:main',
         ],
     },
 )

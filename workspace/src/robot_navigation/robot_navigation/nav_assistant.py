@@ -49,7 +49,7 @@ def _find_repo_root() -> Path:
 
 REPO_ROOT = _find_repo_root()
 DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
-DEFAULT_MAP_NAME = "testmap1"
+DEFAULT_MAP_NAME = "testmapMain"
 DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
 DEFAULT_LOCALIZATION_CMD_TOPICS = '["/cmd_vel"]'
 DEFAULT_RUN_MODE = "normal"
@@ -469,6 +469,9 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
 def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
     run_mode = args.run_mode
     use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    with_semantic_map = args.with_semantic_map
+    if not args.semantic_map_file and args.map_name != "testmapMain":
+        with_semantic_map = False
     carto_config = args.cartographer_config_basename or LOCALIZATION_CONFIG_BASENAME[run_mode]
     pbstream, _, map_yaml = map_paths(args.maps_dir, args.map_name)
     pbstream_path = Path(args.pbstream_file) if args.pbstream_file else pbstream
@@ -514,12 +517,15 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"crop_max_z:={args.crop_max_z}",
         f"pbstream_file:={pbstream_path}",
         f"map_yaml:={yaml_path}",
+        f"with_semantic_map:={bool_to_launch(with_semantic_map)}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
     ]
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     if args.nav2_params_file:
         command.append(f"nav2_params_file:={Path(args.nav2_params_file)}")
+    if args.semantic_map_file:
+        command.append(f"semantic_map_file:={Path(args.semantic_map_file)}")
     return command
 
 
@@ -734,6 +740,8 @@ def build_parser() -> argparse.ArgumentParser:
     localization_parser.add_argument("--pbstream-file", default="")
     localization_parser.add_argument("--map-yaml", default="")
     localization_parser.add_argument("--nav2-params-file", default="")
+    localization_parser.add_argument("--with-semantic-map", type=parse_bool, default=True)
+    localization_parser.add_argument("--semantic-map-file", default="")
     localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
     localization_parser.add_argument("--bridge-max-linear-speed", type=float, default=3.0)
     localization_parser.add_argument("--bridge-max-lateral-speed", type=float, default=3.0)

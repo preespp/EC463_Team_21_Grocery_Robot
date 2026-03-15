@@ -27,6 +27,7 @@ find_package(tf2_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/NewOrder.srv"
+  "srv/ResolveSemanticTarget.srv"
   "msg/Order.msg"
   "msg/OrderItem.msg"
   "action/MoveRack.action"

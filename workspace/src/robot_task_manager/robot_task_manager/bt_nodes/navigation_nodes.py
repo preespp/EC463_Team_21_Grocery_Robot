@@ -5,11 +5,17 @@ import time
 import math
 
 from rclpy.action import ActionClient
-from rclpy.duration import Duration
 from geometry_msgs.msg import PoseStamped, Twist
 from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
-import py_trees
+
+
+def _quaternion_to_yaw(orientation) -> float:
+    return math.atan2(
+        2.0 * ((orientation.w * orientation.z) + (orientation.x * orientation.y)),
+        1.0 - 2.0 * ((orientation.y * orientation.y) + (orientation.z * orientation.z)),
+    )
+
 
 class NavigateToGoalPose(py_trees.behaviour.Behaviour):
     """
@@ -38,6 +44,8 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         print(f"[NavigateToGoalPose] {msg}", flush=True)
 
     def setup(self, **kwargs):
+        if self.client is not None:
+            return True
         if not rclpy.ok():
             self._dbg("setup failed: rclpy not ok")
             return False
@@ -52,15 +60,14 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
 
         goal = getattr(self.bb, self.goal_key, None)
         self._dbg(f"initialise: bb.{self.goal_key} raw={goal}")
-        if not isinstance(goal, (list, tuple)) or len(goal) < 2:
+        if goal is None:
             self.feedback_message = f"Invalid goal in bb.{self.goal_key}: {goal}"
             self.initialise_error = True
             self._dbg(f"FAIL: {self.feedback_message}")
             return
 
         try:
-            self.x = 2.0#float(goal[0])
-            self.y = 0.0#float(goal[1])
+            self.x, self.y, self.yaw = self._parse_goal(goal)
             self._dbg(f"parsed goal: x={self.x}, y={self.y}, yaw={self.yaw}")
         except (TypeError, ValueError):
             self.feedback_message = f"Non-numeric goal in bb.{self.goal_key}: {goal}"
@@ -96,6 +103,27 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         )
         self.goal_handle = None
         self.result_future = None
+
+    def _parse_goal(self, goal):
+        if isinstance(goal, PoseStamped):
+            return (
+                float(goal.pose.position.x),
+                float(goal.pose.position.y),
+                _quaternion_to_yaw(goal.pose.orientation),
+            )
+
+        if isinstance(goal, dict):
+            return (
+                float(goal.get("x", 0.0)),
+                float(goal.get("y", 0.0)),
+                float(goal.get("yaw", self.yaw)),
+            )
+
+        if isinstance(goal, (list, tuple)) and len(goal) >= 2:
+            yaw = float(goal[2]) if len(goal) >= 3 else float(self.yaw)
+            return float(goal[0]), float(goal[1]), yaw
+
+        raise TypeError(f"Unsupported goal type: {type(goal)}")
 
     def update(self):
         if self.initialise_error:
@@ -145,12 +173,6 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         return py_trees.common.Status.RUNNING
 
     def terminate(self, new_status):
-        if self.node is not None:
-            try:
-                self.node.destroy_node()
-            except Exception:
-                pass
-        self.client = None
         self.send_future = None
         self.result_future = None
         self.goal_handle = None

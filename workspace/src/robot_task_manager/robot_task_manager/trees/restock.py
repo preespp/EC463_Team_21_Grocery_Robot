@@ -1,17 +1,13 @@
 import py_trees
 import robot_task_manager.bt_nodes as bt_nodes
-from robot_task_manager.bt_nodes.navigation_nodes import MoveDistanceForCurrentItem
 
 
 def create_restock_tree(bb):
 
     process_one_item = py_trees.composites.Sequence("ProcessRestockItem", memory=True, children=[
         bt_nodes.SetCurrentItem(bb),
-        ### Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)
-        MoveDistanceForCurrentItem(bb),
-        ###############################################
-
-        # bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
+        bt_nodes.ResolveCurrentItemSemanticTarget(bb),
+        bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
 
         # bt_nodes.RepositionArmToGoalPose(goal_key="basket_pose"),
 
@@ -58,8 +54,8 @@ def create_restock_tree(bb):
         bt_nodes.DebugPrint("Restock/Employee tree selected"),
         bt_nodes.DebugPrint(lambda: f"Items in order: {len(getattr(bb, 'items', []))}"),
         repeat_each_item,
-        # bt_nodes.SetHome(bb),
-        # bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
+        bt_nodes.SetHome(bb),
+        bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
     ])
 
     return root

@@ -1,0 +1,9 @@
+Source repository: https://github.com/StarLionJiang/ros_web_gui_app
+Vendored source path: /third_party/ros_web_gui_app
+Embedded build target: /order-api-postgre/fleet-manager/public/embedded/ros-web-gui
+
+This folder contains the production build of the vendored ROS Web GUI app used by SlamMapView.
+Rebuild it from the vendored source with:
+1. npm --prefix third_party/ros_web_gui_app install
+2. npm --prefix third_party/ros_web_gui_app run build:embed
+3. npm --prefix order-api-postgre/fleet-manager run build:ros-web-gui
