@@ -17,6 +17,7 @@ option(BUILD_ARM_CONTROLLER_NODE "Build arm_controller (autonomous control)" ON)
 option(BUILD_ARM_DEMO_CONTROLLER_NODE "Build arm_demo_controller (no-MoveIt demo action server)" ON)
 option(BUILD_ARM_TO_GAZEBO_NODE "Build arm_to_gazebo (sim bridge)" ON)
 option(BUILD_ARM_WAYPOINT_SERVER_NODE "Build arm_waypoint_server" ON)
+option(BUILD_VIPERX_ARM_SERVER_NODE "Build viperx_arm_server (MoveIt-backed action server)" ON)
 option(BUILD_RACK_CONTROLLER_NODE "Build rack_controller" ON)
 
 find_package(ament_cmake REQUIRED)
@@ -92,6 +93,23 @@ if(BUILD_ROBOT_MANIPULATION_NODES)
       robot_interfaces
     )
     install(TARGETS arm_waypoint_server DESTINATION lib/${PROJECT_NAME})
+  endif()
+
+  if(BUILD_VIPERX_ARM_SERVER_NODE)
+    add_executable(viperx_arm_server src/viperx_arm_server.cpp)
+    ament_target_dependencies(viperx_arm_server
+      rclcpp
+      rclcpp_action
+      geometry_msgs
+      tf2
+      tf2_ros
+      tf2_geometry_msgs
+      moveit_msgs
+      robot_interfaces
+      moveit_ros_planning_interface
+      moveit_core
+    )
+    install(TARGETS viperx_arm_server DESTINATION lib/${PROJECT_NAME})
   endif()
 endif()
 if(BUILD_LEGACY_MANIPULATION_CPP)

@@ -6,6 +6,8 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
+from launch_ros.actions import Node
 
 
 def launch_setup(context, *args, **kwargs):
@@ -17,6 +19,7 @@ def launch_setup(context, *args, **kwargs):
     motor_port = LaunchConfiguration("motor_port").perform(context)
     use_moveit_rviz = LaunchConfiguration("use_moveit_rviz").perform(context)
     xs_driver_logging_level = LaunchConfiguration("xs_driver_logging_level").perform(context)
+    use_viperx_arm_server = LaunchConfiguration("use_viperx_arm_server").perform(context)
 
     if robot_model not in {"vx300", "vx300s"}:
         raise RuntimeError("robot_model must be 'vx300' or 'vx300s'.")
@@ -55,7 +58,15 @@ def launch_setup(context, *args, **kwargs):
                 "xs_driver_logging_level": xs_driver_logging_level,
                 "use_moveit_rviz": use_moveit_rviz,
             }.items(),
-        )
+        ),
+        Node(
+            package="robot_manipulation",
+            executable="viperx_arm_server",
+            name="viperx_arm_server",
+            output="screen",
+            parameters=[os.path.join(pkg_dir, "config", "viperx_arm_server.yaml")],
+            condition=IfCondition(use_viperx_arm_server),
+        ),
     ]
 
 
@@ -65,6 +76,7 @@ def generate_launch_description():
         DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
         DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB0"),
         DeclareLaunchArgument("use_moveit_rviz", default_value="true"),
+        DeclareLaunchArgument("use_viperx_arm_server", default_value="true"),
         DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),
         OpaqueFunction(function=launch_setup),
     ])
