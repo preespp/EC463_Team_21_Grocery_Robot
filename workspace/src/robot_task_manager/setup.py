@@ -33,6 +33,7 @@ setup(
     entry_points={
         'console_scripts': [
             'bt_executor = robot_task_manager.bt_executor:main',
+            'bt_executor_viperX = robot_task_manager.bt_executor_viperx:main',
         ],
     },
 )
