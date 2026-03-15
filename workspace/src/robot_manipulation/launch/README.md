@@ -6,6 +6,11 @@ Launches the original manipulation stack that pairs the MoveIt action server wit
 `rack_launch.py`
 Launches the rack subsystem.
 
+For testing each functionality or node, different configuration or integration of each node might be different. After finishing, each launch file, edit this file and explain each functionality.
+
+`arm_waypoint_launch.py`:
+- Standalone arm waypoint action server (`/pick_arm_waypoint`) + arm motor bridge launcher.
+- Full run/test/CLI guide: `workspace/src/robot_manipulation/README_ARM_WAYPOINT.md`
 `vx300_bringup.launch.py`
 Launches a local Interbotix VX300 or VX300S bringup using the official motor configs, local URDF/xacro files, and `interbotix_xs_sdk`.
 

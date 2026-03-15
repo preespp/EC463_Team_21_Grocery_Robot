@@ -1,0 +1,27 @@
+arm_controller:
+  ros__parameters:
+    action_name: "pick_arm"
+    planning_group: "arm"
+    ee_link: "upper_1"
+
+    joint_trajectory_topic: "/arm/joint_trajectory_cmd"
+
+    controlled_joints:
+      - "joint1_base_yaw"
+      - "joint2_shoulder"
+      - "joint3_elbow"
+
+    default_pregrasp_offset_m: 0.10
+    default_retreat_offset_m: 0.10
+
+    planning_time_sec: 3.0
+    max_velocity_scaling: 0.25
+    max_acceleration_scaling: 0.25
+
+    cartesian_eef_step_m: 0.01
+    cartesian_min_fraction: 0.90
+
+    correction_target_frame: ""
+    correction_threshold_m: 0.02
+
+    execute_wait_padding_sec: 0.25
