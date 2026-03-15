@@ -986,3 +986,403 @@ The navigation stack itself is substantially more real than before. The weak poi
 - inventory side effects,
 - live robot status in the dashboard,
 - and full manipulation wiring from BT to arm execution.
+
+## 13. Detailed Launch, Node, Topic, Service, and Action Inventory
+
+### 13.1 Launch file inventory
+
+| Launch file | Current purpose | Included nodes / includes | Important defaults |
+| --- | --- | --- | --- |
+| `launch/slam_mapping_stack.launch.py` | full mapping stack | `sick_generic_caller`, 2 static TF publishers, `base_link_crop_filter`, `cartographer_mapping.launch.py`, `nav2_serial_bridge`, optional `ekf_node`, optional collision launch, optional RViz | crop enabled, `cmd_topics=["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]`, `odom_topic=/odom_raw` |
+| `launch/cartographer_mapping.launch.py` | pure Cartographer mapping core | `cartographer_node`, `cartographer_occupancy_grid_node` | `configuration_basename=pico_2d_mapping_quality.lua`, `resolution=0.03` |
+| `launch/nav2_localization_stack.launch.py` | localization + Nav2 + semantic map | `sick_generic_caller`, 2 static TF publishers, `nav2_serial_bridge`, optional `ekf_node`, optional `base_link_crop_filter`, `cartographer_localization.launch.py`, `map_server`, map lifecycle manager, delayed `nav2_bringup/navigation_launch.py`, optional Nav2 RViz, optional `semantic_map_server` | default map `testmapMain`, crop disabled, semantic map enabled, `cmd_topics=["/cmd_vel"]` |
+| `launch/cartographer_localization.launch.py` | Cartographer localization core | `cartographer_node`, optional `cartographer_occupancy_grid_node` | `configuration_basename=pico_2d_localization.lua`, `load_frozen_state=true`, local occupancy grid off by default |
+
+### 13.2 Runtime executable inventory
+
+#### `robot_navigation` executables
+
+| Executable | Role | Publishes | Subscribes | Services / actions | Current status |
+| --- | --- | --- | --- | --- | --- |
+| `nav2_serial_bridge` | STM32 command + telemetry bridge | `nav_msgs/Odometry` on configured `odom_topic`, optional TF | configured `cmd_topics`, `/front_alert`, `/back_alert`, `/left_alert`, `/right_alert` | none | active in mapping and localization |
+| `base_link_crop_filter` | remove chassis self-hits from point cloud | filtered `PointCloud2` | raw `PointCloud2` | none | active in mapping by default |
+| `semantic_map_server` | semantic overlay publisher + semantic target resolver | `/semantic_map/markers` | none | `/semantic_map/resolve_target` | active in localization by default |
+| `nav_assistant` | CLI helper for launch, save-map, export-map, goal, teleop macros | transient `Twist` in motion modes | none persistent | uses `WriteState`, `NavigateToPose`, `FollowWaypoints` clients | operator tool, not a persistent runtime node |
+| `teleop_cmd_vel` | simple keyboard teleop | `Twist` | none | none | utility |
+| `teleop_cmd_vel_collision` | keyboard teleop with one collision stop input | `Twist` | `right_alert` | none | utility, not part of launch stacks |
+| `teleop_ros` | older configurable teleop publisher | `Twist` | none | none | legacy utility |
+| `wheel_motor` | older I2C mecanum driver path | none | configurable `cmd_vel`, `obstacle_alert` | none | legacy path, not used by current Nav2 stack |
+
+#### `robot_task_manager` executables
+
+| Executable | Role | ROS interfaces | External interfaces | Current status |
+| --- | --- | --- | --- | --- |
+| `bt_executor` | default customer / employee BT executor | `/order/new` service; Nav2 action client inside BT; semantic resolve client inside BT | polls backend `GET /api/order/latest`; posts `/api/order/ack`; posts `/api/order/complete`; `ChangeInventory` posts `/api/inventory/decrement` | current default path |
+| `bt_executor_viperX` | alternate ViperX-focused executor | same `/order/new` service pattern; ViperX-specific BT nodes | same backend polling pattern as default executor | present, but not the main workflow path |
+
+#### `robot_manipulation` executables
+
+| Executable | Role | Interfaces | Current status |
+| --- | --- | --- | --- |
+| `arm_controller` | MoveIt-backed arm action server | `PickArm` action, `JointTrajectory` publisher | implemented and usable |
+| `viperx_arm_server` | MoveIt-backed ViperX arm action server | `PickArm` action on default `pick_viperx` | implemented |
+| `arm_waypoint_server` | waypoint-style arm action server | `PickArm` action on default `pick_arm_waypoint` | implemented |
+| `arm_demo_controller` | simplified arm demo action server | `PickArm` action on default `pick_arm_demo` | implemented for demo/testing |
+| `rack_controller` | rack lift action server | `MoveRack` action on `move_rack` | implemented |
+| `arm_motor` | I2C hardware bridge | `JointTrajectory` subscriber | implemented |
+| `arm_to_gazebo` | simulation bridge | publishers/subscribers for Gazebo integration | implemented |
+| `vx300_quick_move.py` | diagnostic/helper script | publishers + service clients | utility |
+| `vx300_hardware_diagnostics.py` | diagnostic/helper script | publishers + service clients + subscriptions | utility |
+
+### 13.3 ROS topic inventory by current main workflow
+
+#### Navigation and localization topics
+
+| Topic | Type | Producer | Primary consumers | Notes |
+| --- | --- | --- | --- | --- |
+| `/cloud_all_fields_fullframe` | `sensor_msgs/PointCloud2` | SICK driver | crop filter, Nav2 costmaps | raw point cloud |
+| `/cloud_all_fields_fullframe_filtered` | `sensor_msgs/PointCloud2` | crop filter | Cartographer mapping/localization | current Cartographer input |
+| `/scan_fullframe` | `sensor_msgs/LaserScan` | SICK driver | currently not the main Cartographer path | still available |
+| `/sick_scansegment_xd/imu` | IMU | SICK driver | EKF, Cartographer | current IMU path |
+| `/odom_raw` | `nav_msgs/Odometry` | `nav2_serial_bridge` | EKF | raw base odom |
+| `/odom` | `nav_msgs/Odometry` | EKF | Nav2, Cartographer localization | filtered odom |
+| `/map` | `nav_msgs/OccupancyGrid` | Cartographer in mapping; `map_server` in localization | RViz, Nav2 global stack, embedded ROS GUI | source changes by mode |
+| `/cmd_vel` | `geometry_msgs/Twist` | teleop or Nav2 path | serial bridge | localization stack bridge listens here by default |
+| `/cmd_vel_nav` | `geometry_msgs/Twist` | optional nav path | serial bridge in mapping only by default | not listened to by localization stack default |
+| `/cmd_vel_smoothed` | `geometry_msgs/Twist` | optional smoother path | serial bridge in mapping only by default | same note as above |
+| `/semantic_map/markers` | `visualization_msgs/MarkerArray` | semantic map server | RViz | semantic overlay display |
+
+#### Collision / safety topics currently wired into the bridge
+
+| Topic | Type | Consumer | Effect |
+| --- | --- | --- | --- |
+| `/front_alert` | `std_msgs/Bool` | `nav2_serial_bridge` | blocks forward motion when true |
+| `/back_alert` | `std_msgs/Bool` | `nav2_serial_bridge` | blocks backward motion when true |
+| `/left_alert` | `std_msgs/Bool` | `nav2_serial_bridge` | blocks left motion when true |
+| `/right_alert` | `std_msgs/Bool` | `nav2_serial_bridge`, `teleop_cmd_vel_collision` | blocks right motion / teleop output |
+
+### 13.4 ROS service inventory
+
+| Service | Type | Server | Current purpose |
+| --- | --- | --- | --- |
+| `/semantic_map/resolve_target` | `robot_interfaces/srv/ResolveSemanticTarget` | `semantic_map_server` | resolve product / slot / anchor into nav and service poses |
+| `/order/new` | `robot_interfaces/srv/NewOrder` | `bt_executor` or `bt_executor_viperX` | manual ROS-side order injection |
+| `/write_state` | `cartographer_ros_msgs/srv/WriteState` | Cartographer | save pbstream through `nav_assistant save-map` |
+
+### 13.5 ROS action inventory
+
+| Action | Type | Server | Client(s) | Current use |
+| --- | --- | --- | --- | --- |
+| `/navigate_to_pose` or `navigate_to_pose` | `nav2_msgs/action/NavigateToPose` | Nav2 | `NavigateToGoalPose`, `nav_assistant goal` | active |
+| `/follow_waypoints` | `nav2_msgs/action/FollowWaypoints` | Nav2 | `nav_assistant waypoints` | utility |
+| `pick_arm` | `robot_interfaces/action/PickArm` | `arm_controller` by default | not used by default BT path yet | implemented backend |
+| `pick_viperx` | `robot_interfaces/action/PickArm` | `viperx_arm_server` default | ViperX BT nodes | alternate path |
+| `move_rack` | `robot_interfaces/action/MoveRack` | `rack_controller` | rack BT node | backend exists; default tree path still commented |
+
+Important implementation note:
+
+- `robot_task_manager/bt_nodes/rack_nodes.py` still imports `rack_interfaces.action.MoveRack`, but the actual interface in this repo is `robot_interfaces/action/MoveRack`. That BT node is also not part of the current default tree import path, so this mismatch is currently dormant rather than runtime-active.
+
+## 14. Full Backend and Frontend API Contract Table
+
+### 14.1 Browser-to-backend transport boundary
+
+Current frontend transport model:
+
+- Vite dev server runs on `5174`.
+- Vite proxies `/api` to `http://localhost:3000`.
+- Static embedded ROS GUI assets are served from frontend public files under `/embedded/ros-web-gui/...`.
+- The SLAM iframe does not call backend APIs for live ROS data; it connects to `rosbridge` directly.
+
+### 14.2 Endpoints currently used by the fleet UI
+
+| Method | Path | Auth | Current caller | Request shape | Response shape | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `POST` | `/api/employee/auth/login` | no | `LoginView` | `{ employee_ID, password }` | `{ ok, token, employee }` or error | bearer token source |
+| `GET` | `/api/employee/inventory/report` | employee | `InventoryReportView` | none | `{ summary, category_summary, items }` | still includes legacy `x/y/z` |
+| `GET` | `/api/maps/semantic/current` | employee | `LocationMapView` | none | semantic bundle with `map`, `anchors`, `racks`, `slots`, `summary`, `version`, `generated_at` | YAML-derived |
+| `PUT` | `/api/maps/semantic/current` | employee | `LocationMapView` | `{ bundle, change_summary }` | `{ ok, bundle, saved_at }` | writes YAML + DB version |
+| `GET` | `/api/employee/robot/status` | employee | `RobotStatusView` | none | `{ robots: [...] }` | placeholder data |
+| `GET` | `/api/employee/inventory/options` | employee | `RestockView` | none | `{ items: [...] }` | product dropdown |
+| `POST` | `/api/employee/restock/submit` | employee | `RestockView` | `{ items: [{ product_id, qty }] }` | `{ status, restock_ID }` | writes `restock_id` only |
+| `GET` | `/api/employee/accounts` | employee | `EmployeeAccountsView` | none | `{ items: [...] }` | employee list |
+| `POST` | `/api/employee/accounts/create` | employee | `EmployeeAccountsView` | `{ employee_ID, first_name, last_name, password }` | `{ ok, employee_ID, first_name, last_name }` | plain-text password persistence |
+
+### 14.3 Robot-facing backend endpoints
+
+| Method | Path | Auth | Current caller | Request shape | Response shape | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `GET` | `/api/order/latest` | no | `bt_executor`, `bt_executor_viperX` | none | `204` or `{ order_id, role, requester_id, items }` | only polls `order_id`, not `restock_id` |
+| `POST` | `/api/order/ack` | no | executors | `{ order_id }` | `{ ok }` | sets `order_id.status='IN_PROGRESS'` |
+| `POST` | `/api/order/complete` | no | executors | `{ order_id, result }` | `{ ok }` | updates `order_id`, not `restock_id` |
+| `POST` | `/api/inventory/decrement` | no | `ChangeInventory` BT node | `{ product_id, qty }` | `{ ok }` | currently used by restock tree too |
+
+### 14.4 Public / customer endpoints
+
+| Method | Path | Auth | Request shape | Response shape | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `POST` | `/api/auth/login` | no | `{ member_ID }` | customer identity block | member login, no password |
+| `POST` | `/api/account/create_customer` | no | `{ first_name, last_name }` | `{ ok, member_ID, first_name, last_name }` | auto-generates member ID |
+| `GET` | `/api/inventory/list` | no | query `lang` optional | `{ items }` | can translate with `deep-translator` |
+| `POST` | `/api/order/customer` | no | `{ member_ID or id, guest, items }` | `{ status, order_id }` | current customer order creation path |
+| `GET` | `/api/order/status/:id` | no | path ID | `{ order_id, status, result, timestamp }` | `/api` version |
+
+### 14.5 Semantic and map asset endpoints
+
+| Method | Path | Auth | Request | Response | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `GET` | `/api/maps/base/:mapName.pgm` | no | path map name | PGM file bytes | base raster for Store Map |
+| `GET` | `/api/maps/semantic/current` | employee | none | semantic bundle | main Store Map source |
+| `PUT` | `/api/maps/semantic/current` | employee | semantic bundle | saved bundle + version | two-way UI save path |
+
+### 14.6 Legacy compatibility endpoints still present
+
+These endpoints are still implemented in `server.js`, but they are not the main fleet-manager contract:
+
+| Method | Path | Current role |
+| --- | --- | --- |
+| `POST` | `/order/customer/new` | older customer order create path |
+| `POST` | `/order/employee/new` | older employee restock create path |
+| `GET` | `/inventory/list/all` | raw inventory list |
+| `GET` | `/inventory/list/category` | category-filtered inventory list |
+| `POST` | `/inventory/add` | add inventory row |
+| `POST` | `/inventory/update` | update inventory row |
+| `POST` | `/inventory/delete` | delete inventory row |
+| `GET` | `/order/status/:id` | older order-status path |
+| `POST` | `/order/complete` | older completion path |
+
+## 15. Textual Sequence Flows
+
+### 15.1 Employee auth flow
+
+1. Browser opens `/login`.
+2. User enters `employee_ID` and `password`.
+3. `LoginView` calls `POST /api/employee/auth/login`.
+4. Backend verifies the row in table `employee`.
+5. Backend creates an in-memory session token with 12-hour TTL.
+6. Frontend stores `fleet_token`, `fleet_employee_id`, `fleet_first_name`, and `fleet_last_name` in `localStorage`.
+7. Vue Router guard allows navigation into `/app/...` routes.
+
+Failure boundary:
+
+- if backend restarts, in-memory employee sessions disappear, but browser `localStorage` still holds the old token until the next request fails with `401`
+
+### 15.2 Store Map load flow
+
+1. User enters `/app/location-map`.
+2. Browser sends `GET /api/maps/semantic/current` with bearer token.
+3. Backend reads:
+   - semantic YAML from `workspace/src/robot_navigation/config/semantic_map_testmapMain.yaml`
+   - map YAML from `Maps/testmapMain.yaml`
+   - map raster header from `Maps/testmapMain.pgm`
+   - latest version row from `semantic_map_versions`
+   - inventory rows for slot product IDs
+4. Backend returns one enriched bundle.
+5. `LocationMapView` clones the bundle into:
+   - `savedBundle`
+   - editable `bundle`
+6. `SemanticMapCanvas` fetches the base PGM through `/api/maps/base/testmapMain.pgm`.
+7. Canvas converts map coordinates to pixels using:
+   - `px = (x - origin_x) / resolution`
+   - `py = height_px - (y - origin_y) / resolution`
+8. Canvas auto-fits either content or full-map bounds into the viewport.
+
+### 15.3 Store Map save flow
+
+1. User drags or numerically edits anchor / rack / slot geometry.
+2. Local page state marks the bundle as dirty.
+3. User presses `Save`.
+4. Frontend calls `PUT /api/maps/semantic/current` with `{ bundle, change_summary }`.
+5. Backend reads current YAML text as rollback backup.
+6. Backend serializes the submitted bundle back to YAML and writes it to disk.
+7. Backend inserts a new row into `semantic_map_versions`.
+8. If DB insert fails, backend writes the previous YAML text back to disk.
+9. Backend responds with the normalized saved bundle plus version info.
+10. Frontend replaces local draft state with the saved bundle and clears dirty state.
+
+### 15.4 SLAM page load flow
+
+1. User opens `/app/slam-map`.
+2. `SlamMapView` loads iframe source `/embedded/ros-web-gui/index.html`.
+3. The iframe app is served from frontend static assets, not backend APIs.
+4. The embedded ROS GUI app initializes its own ROS connection UI.
+5. User connects the embedded app to `ws://<host>:9090`.
+6. `rosbridge_server` becomes the live transport for ROS topics, TF, map, scans, and overlays.
+
+Important boundary:
+
+- the main Vue app does not mediate live ROS traffic for the SLAM page
+
+### 15.5 Restock submit flow
+
+1. Employee opens `/app/restock`.
+2. Frontend loads dropdown options from `/api/employee/inventory/options`.
+3. Employee adds selected product IDs and quantities to a local cart.
+4. Frontend submits `POST /api/employee/restock/submit`.
+5. Backend validates product IDs and quantities.
+6. Backend writes one new `restock_id` row and stores the JSON items payload.
+7. Backend updates `employee.restock_ID`.
+8. Frontend shows the generated `restock_ID`.
+
+Current break in the larger workflow:
+
+- default `bt_executor` does not poll `restock_id`, so the submission stops at database persistence unless another consumer is added
+
+## 16. Parameter Review and Explanations
+
+### 16.1 Cartographer mapping and localization parameters
+
+Current mapping file:
+
+- `config/pico_2d_mapping_quality.lua`
+
+Current localization file:
+
+- `config/pico_2d_localization.lua`
+
+Important parameter groups and what they mean in the current code:
+
+| Parameter / group | Current value direction | Practical meaning |
+| --- | --- | --- |
+| `map_frame = "map"` | fixed | global map frame |
+| `tracking_frame = "imu_link"` | fixed | Cartographer tracks the IMU frame rather than `base_link` |
+| `published_frame = "base_link"` | fixed | downstream consumers still see planar robot pose in `base_link` |
+| `odom_frame = "odom"` | fixed | odom frame aligns with EKF output chain |
+| `provide_odom_frame = true` | enabled | Cartographer can maintain map/odom relationship |
+| `publish_frame_projected_to_2d = true` | enabled | planar navigation consumers receive 2D-projected robot pose |
+| `use_odometry = true` | enabled | Cartographer uses odom as a motion prior |
+| `use_imu_data = true` | enabled | IMU contributes orientation stability |
+| `num_point_clouds = 1` | enabled | PointCloud2 is the intended live sensor path |
+| `num_laser_scans = 0` | disabled | LaserScan is not the main mapping/localization input |
+| `submaps.num_range_data = 60` | moderate / quality-biased | each submap integrates 60 range observations before rolling forward |
+| `grid_options_2d.resolution = 0.03` | fixed | aligns with exported map resolution |
+| `min_range = 0.15`, `max_range = 10.0` | broad | accepts close returns and full aisle-range returns |
+| `missing_data_ray_length = 10.0` | broad | unknown-space ray extension equals max usable range |
+| `use_online_correlative_scan_matching = true` | enabled | stronger local scan matching at higher compute cost |
+| `linear_search_window = 0.2` | moderate | local translational search window |
+| `translation_delta_cost_weight = 0.1` | low penalty | allows search freedom for translation |
+| `rotation_delta_cost_weight = 0.1` | low penalty | allows rotation search freedom too |
+| `motion_filter.*` in mapping | strict small motion thresholds | avoids inserting nearly duplicate observations |
+| `pure_localization_trimmer.max_submaps_to_keep = 3` in localization | enabled | keeps localization memory bounded against loaded map state |
+| `constraint_builder.min_score = 0.62` | moderately selective | rejects weak loop/constraint matches |
+| `odometry_translation_weight = 1e3`, `odometry_rotation_weight = 1e3` | high | gives odometry strong influence during optimization |
+
+Current practical interpretation:
+
+- the stack is biased toward stable warehouse/store localization using odom + IMU + cloud together
+- it is not configured as a light-weight scan-only setup
+
+### 16.2 EKF parameter explanation
+
+Current EKF file:
+
+- `config/ekf_odom_base_imu.yaml`
+
+Important parameter groups:
+
+| Parameter / group | Current behavior | Practical effect |
+| --- | --- | --- |
+| `frequency = 50.0` | high | EKF publishes at 50 Hz |
+| `sensor_timeout = 0.3` | moderate | stale inputs are dropped relatively quickly |
+| `two_d_mode = true` | enabled | suppresses 3D motion states for planar robot use |
+| `publish_tf = false` | disabled | EKF does not become another TF authority |
+| `world_frame = odom` | fixed | filtered state remains odom-relative |
+| `odom0 = /odom_raw` | active | raw bridge odom is the motion input |
+| `odom0_config` | twist-dominant selection | odom contributes planar velocities and yaw rate rather than full absolute pose trust |
+| `imu0 = /sick_scansegment_xd/imu` | active | IMU yaw + yaw rate are fused |
+| `imu0_remove_gravitational_acceleration = false` | unchanged | raw IMU preprocessing left as-is |
+| `imu0_config` | yaw + yaw rate only | IMU is used mainly for heading stabilization |
+| `process_noise_covariance` | tuned nonzero matrix | determines smoothing vs responsiveness tradeoff |
+
+Current practical interpretation:
+
+- EKF is acting as a planar motion filter on top of bridge odom and IMU heading data
+- it is not being used as a full 3D inertial fusion stack
+
+### 16.3 Nav2 parameter explanation
+
+Current Nav2 file:
+
+- `config/nav2_params_smac_mppi_omni.yaml`
+
+Important sections:
+
+| Section | Current role | Notes |
+| --- | --- | --- |
+| `amcl` | present in file only | current localization stack does not launch AMCL; this block is effectively dormant |
+| `bt_navigator` | Nav2 behavior-tree navigator | uses Nav2 default BT XMLs and plugin library set |
+| `controller_server` | local motion control | current plugin is `MPPIController` |
+| `planner_server` | global path planning | current plugin is `SmacPlanner2D` |
+| `local_costmap` | short-range obstacle space in `odom` | uses `VoxelLayer` + `InflationLayer` |
+| `global_costmap` | map-space planning costmap | uses static map + obstacle + inflation layers |
+| `behavior_server` | recovery and simple behavior actions | spin, backup, drive-on-heading, assisted teleop, wait |
+| `waypoint_follower` | waypoint task execution | configured with wait-at-waypoint plugin |
+| `velocity_smoother` | command smoothing | configured but the bridge in localization still listens only to `/cmd_vel` by default |
+
+Key controller and planner details:
+
+| Parameter / group | Current value direction | Practical effect |
+| --- | --- | --- |
+| `FollowPath.plugin = nav2_mppi_controller::MPPIController` | active | optimization-based local control |
+| `motion_model = "Omni"` | active | allows lateral motion planning/control |
+| `vx_max = 0.26`, `vy_max = 0.20`, `wz_max = 1.0` | conservative | limits live chassis speed |
+| `batch_size = 1000`, `time_steps = 56` | substantial | MPPI considers many sampled trajectories |
+| `VelocityDeadbandCritic.deadband_velocities = [0.08, 0.07, 0.12]` | active | discourages tiny commands in the drivetrain deadband |
+| `GridBased.plugin = nav2_smac_planner/SmacPlanner2D` | active | graph-based 2D planning on occupancy costmap |
+| `allow_unknown = true` | active | planner can pass through unknown map cells if needed |
+| `cost_travel_multiplier = 2.0` | moderate | obstacle proximity meaningfully affects path cost |
+
+Key costmap details:
+
+| Parameter / group | Current setting | Practical meaning |
+| --- | --- | --- |
+| local costmap `global_frame = odom` | rolling local frame | reactive control uses odom-relative obstacle space |
+| global costmap `global_frame = map` | map-fixed | long-range planning uses global map coordinates |
+| `robot_radius = 0.40` | shared | collision envelope assumption |
+| obstacle topic `/cloud_all_fields_fullframe` | active in both costmaps | Nav2 obstacle processing still sees raw cloud |
+| inflation radius `0.55` | moderate | keeps paths away from obstacles |
+
+### 16.4 Frontend map coordinate conversion
+
+The Store Map page currently uses the following conversion between ROS map coordinates and raster pixels:
+
+- `px = (x - origin_x) / resolution`
+- `py = map_height_px - (y - origin_y) / resolution`
+
+Inverse conversion:
+
+- `x = origin_x + px * resolution`
+- `y = origin_y + (map_height_px - py) * resolution`
+
+This is why:
+
+- the map YAML `origin` is not the same thing as "robot home pose"
+- semantic anchors may legally use `(0,0,0)` even when the raster origin is not `(0,0,0)`
+
+## 17. Current Unfinished Items and Risk Matrix
+
+| Area | Current code reality | Risk | Severity | Recommended next step |
+| --- | --- | --- | --- | --- |
+| Restock execution intake | employee UI writes `restock_id`, default executor polls only `order_id` | restock requests never reach robot execution automatically | High | add `/api/restock/latest|ack|complete` or unify polling contract |
+| Inventory side effects | customer tree does not change stock; restock tree decrements stock | store state diverges from intended business semantics | High | split increment/decrement endpoints and call them by workflow type |
+| Robot status page | placeholder backend positions and batteries | UI may be mistaken for live fleet telemetry | Medium | replace with ROS-fed status source or label page clearly as simulated |
+| Semantic source-of-truth | YAML is live source, DB is only version history | direct DB edits do not affect active semantic map | Medium | choose DB-primary or keep YAML-primary but document and enforce sync tools |
+| SLAM page runtime dependency | embedded app requires external `rosbridge_server` | page appears broken unless operator knows extra launch step | Medium | add diagnostics banner or launch integration helper |
+| Store Map help copy | `i18n.js` still says Store Map and SLAM pages are placeholders | UI copy contradicts real implemented features | Low | update help text and translations |
+| Rack BT node | `rack_nodes.py` imports `rack_interfaces` instead of `robot_interfaces` and is not in current tree import path | future rack activation may fail at import/runtime | Medium | fix import and add tests before enabling rack nodes |
+| Default arm BT path | generic arm nodes are still TODO / commented | navigation reaches target but manipulation chain does not complete | High | wire `pick_arm` into default customer/restock trees |
+| Costmap obstacle source | Nav2 costmaps use raw cloud, not cropped cloud | self-hits may still influence planning in some robot poses | Medium | decide whether Nav2 should also consume filtered cloud |
+| Auth model | plain-text passwords and in-memory sessions | weak security and token loss on restart | Medium | hash passwords and move sessions to signed JWT or persistent store |
+
+## 18. Direct File-to-Feature Crosswalk
+
+| Feature | Primary files |
+| --- | --- |
+| Mapping bringup | `launch/slam_mapping_stack.launch.py`, `launch/cartographer_mapping.launch.py`, `config/pico_2d_mapping_quality.lua` |
+| Localization + Nav2 bringup | `launch/nav2_localization_stack.launch.py`, `launch/cartographer_localization.launch.py`, `config/pico_2d_localization.lua`, `config/nav2_params_smac_mppi_omni.yaml` |
+| Odom bridge and telemetry | `robot_navigation/nav2_serial_bridge.py`, `config/ekf_odom_base_imu.yaml` |
+| Semantic map runtime | `robot_navigation/semantic_map_server.py`, `config/semantic_map_testmapMain.yaml`, `robot_interfaces/srv/ResolveSemanticTarget.srv` |
+| Default BT execution | `robot_task_manager/bt_executor.py`, `trees/customer.py`, `trees/restock.py`, `bt_nodes/semantic_nodes.py`, `bt_nodes/navigation_nodes.py`, `bt_nodes/inventory_nodes.py` |
+| Store Map UI | `fleet-manager/src/views/LocationMapView.vue`, `fleet-manager/src/components/SemanticMapCanvas.vue`, `order-api-postgre/semantic_map.js`, `order-api-postgre/server.js` |
+| SLAM UI shell | `fleet-manager/src/views/SlamMapView.vue`, `fleet-manager/public/embedded/ros-web-gui`, `third_party/ros_web_gui_app` |
+| Employee auth and dashboard APIs | `order-api-postgre/server.js`, `fleet-manager/src/api.js`, `fleet-manager/src/router/index.js`, `fleet-manager/src/layouts/FleetLayout.vue` |

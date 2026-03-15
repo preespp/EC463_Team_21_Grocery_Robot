@@ -991,3 +991,405 @@ Frontend：
 - inventory side effect，
 - dashboard 里的 live robot status，
 - 以及 BT 到 arm execution 的完整接线。
+
+## 13. 详细 Launch、节点、Topic、Service、Action 清单
+
+### 13.1 Launch 文件清单
+
+| Launch 文件 | 当前用途 | 包含的节点 / include | 关键默认值 |
+| --- | --- | --- | --- |
+| `launch/slam_mapping_stack.launch.py` | 完整 mapping 栈 | `sick_generic_caller`、2 个 static TF publisher、`base_link_crop_filter`、`cartographer_mapping.launch.py`、`nav2_serial_bridge`、可选 `ekf_node`、可选 collision launch、可选 RViz | crop 默认开启，`cmd_topics=["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]`，`odom_topic=/odom_raw` |
+| `launch/cartographer_mapping.launch.py` | 纯 Cartographer mapping 核心 | `cartographer_node`、`cartographer_occupancy_grid_node` | `configuration_basename=pico_2d_mapping_quality.lua`，`resolution=0.03` |
+| `launch/nav2_localization_stack.launch.py` | localization + Nav2 + semantic map | `sick_generic_caller`、2 个 static TF publisher、`nav2_serial_bridge`、可选 `ekf_node`、可选 `base_link_crop_filter`、`cartographer_localization.launch.py`、`map_server`、map lifecycle manager、延迟启动的 `nav2_bringup/navigation_launch.py`、可选 Nav2 RViz、可选 `semantic_map_server` | 默认地图 `testmapMain`，crop 默认关闭，semantic map 默认开启，`cmd_topics=["/cmd_vel"]` |
+| `launch/cartographer_localization.launch.py` | Cartographer localization 核心 | `cartographer_node`、可选 `cartographer_occupancy_grid_node` | `configuration_basename=pico_2d_localization.lua`，`load_frozen_state=true`，本地 occupancy grid 默认关闭 |
+
+### 13.2 Runtime executable 清单
+
+#### `robot_navigation` executables
+
+| Executable | 角色 | 发布 | 订阅 | Services / actions | 当前状态 |
+| --- | --- | --- | --- | --- | --- |
+| `nav2_serial_bridge` | STM32 命令与 telemetry 桥 | 配置的 `odom_topic` 上的 `nav_msgs/Odometry`，可选 TF | 配置的 `cmd_topics`，`/front_alert`，`/back_alert`，`/left_alert`，`/right_alert` | 无 | mapping 与 localization 都在用 |
+| `base_link_crop_filter` | 从点云里去掉底盘自击中区域 | 过滤后的 `PointCloud2` | 原始 `PointCloud2` | 无 | mapping 默认启用 |
+| `semantic_map_server` | semantic overlay 发布与 semantic target 解析 | `/semantic_map/markers` | 无 | `/semantic_map/resolve_target` | localization 默认启用 |
+| `nav_assistant` | launch / save-map / export-map / goal / teleop macro CLI | 在 motion 模式下会临时发 `Twist` | 无持久订阅 | 内部使用 `WriteState`、`NavigateToPose`、`FollowWaypoints` client | 操作员工具，不是常驻 runtime 节点 |
+| `teleop_cmd_vel` | 简单键盘 teleop | `Twist` | 无 | 无 | 工具节点 |
+| `teleop_cmd_vel_collision` | 带单个碰撞停机输入的键盘 teleop | `Twist` | `right_alert` | 无 | 工具节点，不在主 launch 栈里 |
+| `teleop_ros` | 旧版可配置 teleop publisher | `Twist` | 无 | 无 | legacy 工具 |
+| `wheel_motor` | 旧版 I2C mecanum 驱动路径 | 无 | 可配置 `cmd_vel`、`obstacle_alert` | 无 | legacy 路径，不是当前 Nav2 主栈的一部分 |
+
+#### `robot_task_manager` executables
+
+| Executable | 角色 | ROS 接口 | 外部接口 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| `bt_executor` | 默认 customer / employee BT executor | `/order/new` service；BT 内部含 Nav2 action client；BT 内部含 semantic resolve client | 轮询 `GET /api/order/latest`；POST `/api/order/ack`；POST `/api/order/complete`；`ChangeInventory` POST `/api/inventory/decrement` | 当前默认路径 |
+| `bt_executor_viperX` | 另一条偏 ViperX 的 executor | 同样提供 `/order/new` service；包含 ViperX 专用 BT nodes | 和默认 executor 一样的 backend polling 模式 | 存在，但不是主业务路径 |
+
+#### `robot_manipulation` executables
+
+| Executable | 角色 | 接口 | 当前状态 |
+| --- | --- | --- | --- |
+| `arm_controller` | MoveIt-backed arm action server | `PickArm` action、`JointTrajectory` publisher | 已实现且可用 |
+| `viperx_arm_server` | MoveIt-backed ViperX arm action server | 默认 `pick_viperx` 的 `PickArm` action | 已实现 |
+| `arm_waypoint_server` | waypoint 风格 arm action server | 默认 `pick_arm_waypoint` 的 `PickArm` action | 已实现 |
+| `arm_demo_controller` | 简化版 arm demo action server | 默认 `pick_arm_demo` 的 `PickArm` action | 用于 demo / 测试 |
+| `rack_controller` | rack lift action server | `move_rack` 上的 `MoveRack` action | 已实现 |
+| `arm_motor` | I2C hardware bridge | `JointTrajectory` subscriber | 已实现 |
+| `arm_to_gazebo` | 仿真桥 | Gazebo 集成相关 pub / sub | 已实现 |
+| `vx300_quick_move.py` | 诊断 / helper 脚本 | publishers + service clients | 工具 |
+| `vx300_hardware_diagnostics.py` | 诊断 / helper 脚本 | publishers + service clients + subscriptions | 工具 |
+
+### 13.3 当前主流程里的 ROS topic 清单
+
+#### 导航与定位相关 topics
+
+| Topic | 类型 | Producer | 主要 Consumer | 说明 |
+| --- | --- | --- | --- | --- |
+| `/cloud_all_fields_fullframe` | `sensor_msgs/PointCloud2` | SICK driver | crop filter、Nav2 costmap | 原始点云 |
+| `/cloud_all_fields_fullframe_filtered` | `sensor_msgs/PointCloud2` | crop filter | Cartographer mapping / localization | 当前 Cartographer 输入 |
+| `/scan_fullframe` | `sensor_msgs/LaserScan` | SICK driver | 当前不是主 Cartographer 路径 | 仍然可用 |
+| `/sick_scansegment_xd/imu` | IMU | SICK driver | EKF、Cartographer | 当前 IMU 路径 |
+| `/odom_raw` | `nav_msgs/Odometry` | `nav2_serial_bridge` | EKF | 底盘 raw odom |
+| `/odom` | `nav_msgs/Odometry` | EKF | Nav2、Cartographer localization | 过滤后的 odom |
+| `/map` | `nav_msgs/OccupancyGrid` | mapping 时来自 Cartographer；localization 时来自 `map_server` | RViz、Nav2、嵌入式 ROS GUI | 来源取决于运行模式 |
+| `/cmd_vel` | `geometry_msgs/Twist` | teleop 或 Nav2 路径 | serial bridge | localization 栈默认监听这个 |
+| `/cmd_vel_nav` | `geometry_msgs/Twist` | 可选 nav 路径 | mapping 栈默认桥接可监听 | localization 默认不监听 |
+| `/cmd_vel_smoothed` | `geometry_msgs/Twist` | 可选 smoother 路径 | mapping 栈默认桥接可监听 | localization 默认不监听 |
+| `/semantic_map/markers` | `visualization_msgs/MarkerArray` | semantic map server | RViz | semantic overlay 显示 |
+
+#### 当前接进 bridge 的碰撞 / 安全 topics
+
+| Topic | 类型 | Consumer | 效果 |
+| --- | --- | --- | --- |
+| `/front_alert` | `std_msgs/Bool` | `nav2_serial_bridge` | 为 true 时禁止前进 |
+| `/back_alert` | `std_msgs/Bool` | `nav2_serial_bridge` | 为 true 时禁止后退 |
+| `/left_alert` | `std_msgs/Bool` | `nav2_serial_bridge` | 为 true 时禁止向左 |
+| `/right_alert` | `std_msgs/Bool` | `nav2_serial_bridge`、`teleop_cmd_vel_collision` | 为 true 时禁止向右 / 让 teleop 停车 |
+
+### 13.4 ROS service 清单
+
+| Service | 类型 | Server | 当前用途 |
+| --- | --- | --- | --- |
+| `/semantic_map/resolve_target` | `robot_interfaces/srv/ResolveSemanticTarget` | `semantic_map_server` | 把 product / slot / anchor 解析成 nav pose 与 service pose |
+| `/order/new` | `robot_interfaces/srv/NewOrder` | `bt_executor` 或 `bt_executor_viperX` | 手工从 ROS 侧注入订单 |
+| `/write_state` | `cartographer_ros_msgs/srv/WriteState` | Cartographer | `nav_assistant save-map` 用于保存 pbstream |
+
+### 13.5 ROS action 清单
+
+| Action | 类型 | Server | Client | 当前用途 |
+| --- | --- | --- | --- | --- |
+| `/navigate_to_pose` 或 `navigate_to_pose` | `nav2_msgs/action/NavigateToPose` | Nav2 | `NavigateToGoalPose`、`nav_assistant goal` | active |
+| `/follow_waypoints` | `nav2_msgs/action/FollowWaypoints` | Nav2 | `nav_assistant waypoints` | 工具能力 |
+| `pick_arm` | `robot_interfaces/action/PickArm` | 默认由 `arm_controller` 提供 | 默认 BT 路径还没真正用上 | 后端已实现 |
+| `pick_viperx` | `robot_interfaces/action/PickArm` | 默认由 `viperx_arm_server` 提供 | ViperX BT nodes | 另一条路径 |
+| `move_rack` | `robot_interfaces/action/MoveRack` | `rack_controller` | rack BT node | 后端已实现；默认树路径仍注释中 |
+
+当前实现里的一个重要细节：
+
+- `robot_task_manager/bt_nodes/rack_nodes.py` 仍然在 import `rack_interfaces.action.MoveRack`，但这个仓库真正的接口是 `robot_interfaces/action/MoveRack`。不过这个 BT node 目前也不在默认树导入路径里，所以这个问题当前是“潜伏的”，不是主路径上的 runtime error。
+
+## 14. 完整 Backend / Frontend API Contract
+
+### 14.1 浏览器到 backend 的传输边界
+
+当前前端传输模型：
+
+- Vite dev server 跑在 `5174`
+- Vite 把 `/api` proxy 到 `http://localhost:3000`
+- 嵌入式 ROS GUI 的静态资源从前端 public 目录下的 `/embedded/ros-web-gui/...` 提供
+- SLAM iframe 不通过 backend API 拉实时 ROS 数据，而是直接连 `rosbridge`
+
+### 14.2 Fleet UI 当前实际使用的 endpoints
+
+| Method | Path | Auth | 当前调用方 | 请求结构 | 响应结构 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `POST` | `/api/employee/auth/login` | 否 | `LoginView` | `{ employee_ID, password }` | `{ ok, token, employee }` 或 error | bearer token 来源 |
+| `GET` | `/api/employee/inventory/report` | employee | `InventoryReportView` | 无 | `{ summary, category_summary, items }` | 仍然带 legacy `x/y/z` |
+| `GET` | `/api/maps/semantic/current` | employee | `LocationMapView` | 无 | 含 `map`、`anchors`、`racks`、`slots`、`summary`、`version`、`generated_at` 的 semantic bundle | 基于 YAML 读出 |
+| `PUT` | `/api/maps/semantic/current` | employee | `LocationMapView` | `{ bundle, change_summary }` | `{ ok, bundle, saved_at }` | 同时写 YAML 和 DB version |
+| `GET` | `/api/employee/robot/status` | employee | `RobotStatusView` | 无 | `{ robots: [...] }` | 当前是 placeholder 数据 |
+| `GET` | `/api/employee/inventory/options` | employee | `RestockView` | 无 | `{ items: [...] }` | restock 下拉产品列表 |
+| `POST` | `/api/employee/restock/submit` | employee | `RestockView` | `{ items: [{ product_id, qty }] }` | `{ status, restock_ID }` | 只写 `restock_id` |
+| `GET` | `/api/employee/accounts` | employee | `EmployeeAccountsView` | 无 | `{ items: [...] }` | 员工列表 |
+| `POST` | `/api/employee/accounts/create` | employee | `EmployeeAccountsView` | `{ employee_ID, first_name, last_name, password }` | `{ ok, employee_ID, first_name, last_name }` | 明文密码入库 |
+
+### 14.3 机器人执行链实际使用的 backend endpoints
+
+| Method | Path | Auth | 当前调用方 | 请求结构 | 响应结构 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `GET` | `/api/order/latest` | 否 | `bt_executor`、`bt_executor_viperX` | 无 | `204` 或 `{ order_id, role, requester_id, items }` | 只读 `order_id`，不读 `restock_id` |
+| `POST` | `/api/order/ack` | 否 | executors | `{ order_id }` | `{ ok }` | 把 `order_id.status` 置为 `IN_PROGRESS` |
+| `POST` | `/api/order/complete` | 否 | executors | `{ order_id, result }` | `{ ok }` | 更新 `order_id`，不更新 `restock_id` |
+| `POST` | `/api/inventory/decrement` | 否 | `ChangeInventory` BT node | `{ product_id, qty }` | `{ ok }` | 当前 restock 树也在错误地用这条 |
+
+### 14.4 Public / customer endpoints
+
+| Method | Path | Auth | 请求结构 | 响应结构 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `POST` | `/api/auth/login` | 否 | `{ member_ID }` | customer identity block | member 登录，不要密码 |
+| `POST` | `/api/account/create_customer` | 否 | `{ first_name, last_name }` | `{ ok, member_ID, first_name, last_name }` | 自动生成 member ID |
+| `GET` | `/api/inventory/list` | 否 | query `lang` 可选 | `{ items }` | 可通过 `deep-translator` 翻译 |
+| `POST` | `/api/order/customer` | 否 | `{ member_ID or id, guest, items }` | `{ status, order_id }` | 当前 customer 下单主路径 |
+| `GET` | `/api/order/status/:id` | 否 | path ID | `{ order_id, status, result, timestamp }` | `/api` 版本 |
+
+### 14.5 Semantic 与地图资产接口
+
+| Method | Path | Auth | 请求 | 响应 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `GET` | `/api/maps/base/:mapName.pgm` | 否 | path map name | PGM 文件字节流 | Store Map 底图 |
+| `GET` | `/api/maps/semantic/current` | employee | 无 | semantic bundle | Store Map 主数据源 |
+| `PUT` | `/api/maps/semantic/current` | employee | semantic bundle | saved bundle + version | 双向保存路径 |
+
+### 14.6 仍然保留的 legacy compatibility endpoints
+
+这些接口在 `server.js` 里还存在，但它们不是当前 fleet-manager 的主 contract：
+
+| Method | Path | 当前角色 |
+| --- | --- | --- |
+| `POST` | `/order/customer/new` | 旧 customer 下单路径 |
+| `POST` | `/order/employee/new` | 旧 employee restock 路径 |
+| `GET` | `/inventory/list/all` | 原始库存列表 |
+| `GET` | `/inventory/list/category` | 分类过滤库存列表 |
+| `POST` | `/inventory/add` | 新增库存行 |
+| `POST` | `/inventory/update` | 更新库存行 |
+| `POST` | `/inventory/delete` | 删除库存行 |
+| `GET` | `/order/status/:id` | 旧 order-status 路径 |
+| `POST` | `/order/complete` | 旧 completion 路径 |
+
+## 15. 文字版时序流
+
+### 15.1 Employee auth 流
+
+1. 浏览器打开 `/login`
+2. 用户输入 `employee_ID` 和 `password`
+3. `LoginView` 调 `POST /api/employee/auth/login`
+4. Backend 在 `employee` 表里校验账号密码
+5. Backend 生成一个 12 小时 TTL 的内存 session token
+6. 前端把 `fleet_token`、`fleet_employee_id`、`fleet_first_name`、`fleet_last_name` 写进 `localStorage`
+7. Vue Router guard 允许用户进入 `/app/...`
+
+失败边界：
+
+- backend 重启后，内存里的 employee session 会消失
+- 浏览器 `localStorage` 里还保留旧 token，直到下一次请求收到 `401`
+
+### 15.2 Store Map 加载流
+
+1. 用户进入 `/app/location-map`
+2. 浏览器带 bearer token 调 `GET /api/maps/semantic/current`
+3. Backend 读取：
+   - `workspace/src/robot_navigation/config/semantic_map_testmapMain.yaml`
+   - `Maps/testmapMain.yaml`
+   - `Maps/testmapMain.pgm`
+   - `semantic_map_versions` 最新版本行
+   - 相关 `inventory` 行
+4. Backend 返回一个 enriched bundle
+5. `LocationMapView` 把它 clone 成：
+   - `savedBundle`
+   - 可编辑的 `bundle`
+6. `SemanticMapCanvas` 再通过 `/api/maps/base/testmapMain.pgm` 拉取底图
+7. Canvas 用以下公式把 map 坐标转成像素：
+   - `px = (x - origin_x) / resolution`
+   - `py = height_px - (y - origin_y) / resolution`
+8. Canvas 再把内容或整图 auto-fit 到 viewport
+
+### 15.3 Store Map 保存流
+
+1. 用户拖拽或手工数值编辑 anchor / rack / slot
+2. 页面本地状态把 bundle 标记为 dirty
+3. 用户点击 `Save`
+4. 前端调 `PUT /api/maps/semantic/current`，发 `{ bundle, change_summary }`
+5. Backend 先把当前 YAML 文本读出来，作为 rollback backup
+6. Backend 把 bundle 序列化回 YAML 并写盘
+7. Backend 往 `semantic_map_versions` 里插一条新版本
+8. 如果 DB insert 失败，backend 会把旧 YAML 文本写回去
+9. Backend 返回标准化后的 saved bundle 和 version
+10. 前端用返回值替换本地 draft，并清掉 dirty 状态
+
+### 15.4 SLAM 页面加载流
+
+1. 用户打开 `/app/slam-map`
+2. `SlamMapView` 加载 iframe 源 `/embedded/ros-web-gui/index.html`
+3. 这个 iframe 应用来自前端静态资源，不是 backend API
+4. 嵌入式 ROS GUI 自己初始化连接页
+5. 用户在里面连接 `ws://<host>:9090`
+6. `rosbridge_server` 成为 map、TF、scan、overlay 等 live ROS 数据的传输层
+
+重要边界：
+
+- 主 Vue app 不参与 SLAM 页 live ROS 数据的中转
+
+### 15.5 Restock submit 流
+
+1. 员工打开 `/app/restock`
+2. 前端先调用 `/api/employee/inventory/options` 拉产品列表
+3. 员工把选中的 product id 和 qty 加入本地 cart
+4. 前端调 `POST /api/employee/restock/submit`
+5. Backend 校验 product id 与 qty
+6. Backend 插入一条新的 `restock_id`
+7. Backend 同步更新 `employee.restock_ID`
+8. 前端显示生成的 `restock_ID`
+
+当前更大流程里的断点：
+
+- 默认 `bt_executor` 不轮询 `restock_id`
+- 所以这个提交动作目前只走到数据库持久化，不会自动进入机器人执行
+
+## 16. 参数解释与技术说明
+
+### 16.1 Cartographer mapping / localization 参数解释
+
+当前 mapping 文件：
+
+- `config/pico_2d_mapping_quality.lua`
+
+当前 localization 文件：
+
+- `config/pico_2d_localization.lua`
+
+关键参数组及其当前含义：
+
+| 参数 / 参数组 | 当前取值方向 | 当前实际含义 |
+| --- | --- | --- |
+| `map_frame = "map"` | 固定 | 全局地图坐标系 |
+| `tracking_frame = "imu_link"` | 固定 | Cartographer 跟踪的是 IMU frame，不是 `base_link` |
+| `published_frame = "base_link"` | 固定 | 下游仍以 `base_link` 作为机器人平面位姿输出 |
+| `odom_frame = "odom"` | 固定 | 和 EKF 输出链一致 |
+| `provide_odom_frame = true` | 开启 | Cartographer 可以维护 map/odom 关系 |
+| `publish_frame_projected_to_2d = true` | 开启 | 给平面导航消费者输出 2D projected 机器人位姿 |
+| `use_odometry = true` | 开启 | Cartographer 使用 odom 作为运动先验 |
+| `use_imu_data = true` | 开启 | IMU 用于提升姿态稳定性 |
+| `num_point_clouds = 1` | 开启 | PointCloud2 是当前主输入路径 |
+| `num_laser_scans = 0` | 关闭 | LaserScan 不是当前主 mapping/localization 输入 |
+| `submaps.num_range_data = 60` | 中等偏质量 | 每个 submap 累积 60 组 range data 再向前滚动 |
+| `grid_options_2d.resolution = 0.03` | 固定 | 与导出地图分辨率对齐 |
+| `min_range = 0.15`，`max_range = 10.0` | 较宽 | 接受较近回波与完整 aisle 范围回波 |
+| `missing_data_ray_length = 10.0` | 较宽 | unknown-space ray 长度与最大有效距离一致 |
+| `use_online_correlative_scan_matching = true` | 开启 | 提高局部 scan matching 鲁棒性，但算力更高 |
+| `linear_search_window = 0.2` | 中等 | 平移方向搜索窗口 |
+| `translation_delta_cost_weight = 0.1` | 惩罚较低 | 允许 translational search 较自由 |
+| `rotation_delta_cost_weight = 0.1` | 惩罚较低 | rotation search 也较自由 |
+| `motion_filter.*`（mapping） | 阈值较严 | 避免插入过多重复观测 |
+| `pure_localization_trimmer.max_submaps_to_keep = 3`（localization） | 开启 | localization 模式下控制内存中的 submap 数量 |
+| `constraint_builder.min_score = 0.62` | 中等偏严格 | 拒绝较弱的匹配约束 |
+| `odometry_translation_weight = 1e3`，`odometry_rotation_weight = 1e3` | 较高 | 优化时对 odom 约束信任较强 |
+
+当前实际解释：
+
+- 整套配置偏向“odom + IMU + cloud 一起工作”的稳定 store / warehouse localization
+- 它不是一个轻量的 scan-only 配置
+
+### 16.2 EKF 参数解释
+
+当前 EKF 文件：
+
+- `config/ekf_odom_base_imu.yaml`
+
+重要参数组：
+
+| 参数 / 参数组 | 当前行为 | 实际效果 |
+| --- | --- | --- |
+| `frequency = 50.0` | 较高 | EKF 以 50 Hz 输出 |
+| `sensor_timeout = 0.3` | 中等 | 输入 stale 后较快剔除 |
+| `two_d_mode = true` | 开启 | 把机器人状态限制在平面 |
+| `publish_tf = false` | 关闭 | EKF 不成为另一套 TF authority |
+| `world_frame = odom` | 固定 | 过滤后的状态保持 odom 参考系 |
+| `odom0 = /odom_raw` | active | bridge raw odom 是运动输入 |
+| `odom0_config` | 偏 twist 选择 | 更信任平面速度和角速度，而不是 raw absolute pose |
+| `imu0 = /sick_scansegment_xd/imu` | active | 融合 IMU yaw 与 yaw rate |
+| `imu0_remove_gravitational_acceleration = false` | 保持默认 | 不做额外重力加速度移除预处理 |
+| `imu0_config` | 只用 yaw + yaw rate | IMU 主要负责 heading 稳定 |
+| `process_noise_covariance` | 已调矩阵 | 决定平滑与响应之间的取舍 |
+
+当前实际解释：
+
+- EKF 当前本质上是对 bridge odom 与 IMU heading 做一个平面滤波
+- 不是一套完整的 3D inertial fusion 栈
+
+### 16.3 Nav2 参数解释
+
+当前 Nav2 文件：
+
+- `config/nav2_params_smac_mppi_omni.yaml`
+
+主要 section：
+
+| Section | 当前角色 | 说明 |
+| --- | --- | --- |
+| `amcl` | 文件里有，但运行栈里没启 | 当前 localization 栈没有 launch AMCL，这一段实际上是 dormant 配置 |
+| `bt_navigator` | Nav2 的行为树导航器 | 使用 Nav2 默认 BT XML 和 plugin 集合 |
+| `controller_server` | 局部控制 | 当前插件是 `MPPIController` |
+| `planner_server` | 全局路径规划 | 当前插件是 `SmacPlanner2D` |
+| `local_costmap` | `odom` 坐标系下的短程 obstacle space | `VoxelLayer + InflationLayer` |
+| `global_costmap` | `map` 坐标系下的规划 costmap | static map + obstacle + inflation |
+| `behavior_server` | recovery 与简单 behavior action | spin、backup、drive-on-heading、assisted teleop、wait |
+| `waypoint_follower` | waypoint 执行 | 配置了 wait-at-waypoint plugin |
+| `velocity_smoother` | 速度平滑 | 配置已在，但 localization 栈的 bridge 默认仍只监听 `/cmd_vel` |
+
+关键 planner / controller 参数：
+
+| 参数 / 参数组 | 当前取值方向 | 实际效果 |
+| --- | --- | --- |
+| `FollowPath.plugin = nav2_mppi_controller::MPPIController` | active | 采用优化式局部控制 |
+| `motion_model = "Omni"` | active | 允许横移 |
+| `vx_max = 0.26`，`vy_max = 0.20`，`wz_max = 1.0` | 偏保守 | 限制底盘最大速度 |
+| `batch_size = 1000`，`time_steps = 56` | 较重 | MPPI 会采样较多轨迹 |
+| `VelocityDeadbandCritic.deadband_velocities = [0.08, 0.07, 0.12]` | active | 避免控制输出落在底盘 deadband 内 |
+| `GridBased.plugin = nav2_smac_planner/SmacPlanner2D` | active | 基于 occupancy costmap 做 2D 图搜索规划 |
+| `allow_unknown = true` | active | planner 可穿过 unknown 区域 |
+| `cost_travel_multiplier = 2.0` | 中等 | 障碍物附近 cost 会明显影响路径 |
+
+关键 costmap 参数：
+
+| 参数 / 参数组 | 当前设置 | 实际含义 |
+| --- | --- | --- |
+| local costmap `global_frame = odom` | rolling local frame | 反应式控制在 odom 参考系下工作 |
+| global costmap `global_frame = map` | map-fixed | 长程规划使用全局地图坐标 |
+| `robot_radius = 0.40` | 共用 | 当前碰撞包络假设 |
+| obstacle topic `/cloud_all_fields_fullframe` | local/global 都在用 | Nav2 obstacle 仍直接看 raw cloud |
+| inflation radius `0.55` | 中等 | 让规划路径离障碍物更远一些 |
+
+### 16.4 前端地图坐标转换
+
+当前 Store Map 页面使用以下 ROS map 坐标到 raster 像素的转换：
+
+- `px = (x - origin_x) / resolution`
+- `py = map_height_px - (y - origin_y) / resolution`
+
+逆变换：
+
+- `x = origin_x + px * resolution`
+- `y = origin_y + (map_height_px - py) * resolution`
+
+这也是为什么：
+
+- map YAML 里的 `origin` 不等于“机器人 home pose”
+- 即便 raster origin 不是 `(0,0,0)`，semantic anchor 也完全可以合法地使用 `(0,0,0)`
+
+## 17. 当前未完成项与风险矩阵
+
+| Area | 当前代码现实 | 风险 | 严重度 | 建议下一步 |
+| --- | --- | --- | --- | --- |
+| Restock execution intake | employee UI 写 `restock_id`，默认 executor 只轮询 `order_id` | restock request 不会自动进入机器人执行 | High | 增加 `/api/restock/latest|ack|complete` 或统一 polling contract |
+| Inventory side effects | customer 树不改库存；restock 树反而减库存 | 业务语义与库存状态会持续偏离 | High | 拆分 increment / decrement endpoint，并按 workflow 类型调用 |
+| Robot status page | backend 里是占位坐标和电量 | UI 容易被误认为是真实 fleet telemetry | Medium | 接 ROS 真数据，或明确标注为 simulated |
+| Semantic source-of-truth | YAML 是 live source，DB 只是 version history | 直接改 DB 不会影响当前 active semantic map | Medium | 选定 DB-primary 或保持 YAML-primary 但提供正式 sync 工具 |
+| SLAM page runtime dependency | 嵌入式 app 依赖额外 `rosbridge_server` | 操作员若不知道额外步骤，页面会像“坏掉” | Medium | 加 diagnostics banner 或可选 launch helper |
+| Store Map help copy | `i18n.js` 仍写着 Store Map / SLAM 是 placeholders | UI 文案和真实功能不一致 | Low | 更新 help 文案和翻译 |
+| Rack BT node | `rack_nodes.py` import 的是 `rack_interfaces` 而不是 `robot_interfaces`，且当前不在默认导入路径 | 后面若启用 rack BT 可能直接 import/runtime 失败 | Medium | 修正 import 并在启用前补测试 |
+| Default arm BT path | generic arm nodes 仍是 TODO / 注释状态 | 机器人能导航到位，但 manipulation 流不会闭环 | High | 把 `pick_arm` 正式接进默认 customer / restock 树 |
+| Costmap obstacle source | Nav2 costmap 用 raw cloud，不是 filtered cloud | 某些姿态下自击中点仍可能影响规划 | Medium | 明确决定 Nav2 是否也切到 filtered cloud |
+| Auth model | 明文密码 + 内存 session | 安全性弱，backend 重启即掉登录态 | Medium | 密码哈希化，并改为 JWT 或持久 session |
+
+## 18. 功能到文件的直接映射
+
+| 功能 | 主要文件 |
+| --- | --- |
+| Mapping bringup | `launch/slam_mapping_stack.launch.py`、`launch/cartographer_mapping.launch.py`、`config/pico_2d_mapping_quality.lua` |
+| Localization + Nav2 bringup | `launch/nav2_localization_stack.launch.py`、`launch/cartographer_localization.launch.py`、`config/pico_2d_localization.lua`、`config/nav2_params_smac_mppi_omni.yaml` |
+| Odom bridge 与 telemetry | `robot_navigation/nav2_serial_bridge.py`、`config/ekf_odom_base_imu.yaml` |
+| Semantic map runtime | `robot_navigation/semantic_map_server.py`、`config/semantic_map_testmapMain.yaml`、`robot_interfaces/srv/ResolveSemanticTarget.srv` |
+| 默认 BT 执行链 | `robot_task_manager/bt_executor.py`、`trees/customer.py`、`trees/restock.py`、`bt_nodes/semantic_nodes.py`、`bt_nodes/navigation_nodes.py`、`bt_nodes/inventory_nodes.py` |
+| Store Map UI | `fleet-manager/src/views/LocationMapView.vue`、`fleet-manager/src/components/SemanticMapCanvas.vue`、`order-api-postgre/semantic_map.js`、`order-api-postgre/server.js` |
+| SLAM UI 外层壳 | `fleet-manager/src/views/SlamMapView.vue`、`fleet-manager/public/embedded/ros-web-gui`、`third_party/ros_web_gui_app` |
+| 员工认证与 dashboard APIs | `order-api-postgre/server.js`、`fleet-manager/src/api.js`、`fleet-manager/src/router/index.js`、`fleet-manager/src/layouts/FleetLayout.vue` |
