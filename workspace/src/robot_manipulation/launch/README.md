@@ -20,6 +20,9 @@ Starts the VX300 bringup and runs a short demo motion after startup. Use `use_si
 `vx300_moveit.launch.py`
 Launches the real VX300 or VX300S with the official Interbotix MoveIt stack, ros2_control trajectory controllers, and the MoveIt RViz window.
 
+`viperx_arm_server.launch.py`
+Launches a BT-facing action server (`/pick_viperx`) that accepts `robot_interfaces/action/PickArm` goals, executes ViperX end-effector pose goals through MoveIt, and handles `open_gripper` / `close_gripper` commands.
+
 Working VX300 MoveIt launch on this machine:
 
 ```bash
@@ -30,6 +33,7 @@ ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300 motor_p
 ```
 
 This launch should open the MoveIt RViz window automatically.
+It now also starts `viperx_arm_server` by default (`use_viperx_arm_server:=true`), exposing `/pick_viperx` for BT action clients.
 
 ## Git Notes
 

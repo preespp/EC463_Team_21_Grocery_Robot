@@ -18,6 +18,7 @@ def setup_blackboard():
     bb.home_pose = None # Home Pose for Arm to see the shelf, assign Constant in here
     bb.basket_pose = None # Assign Constant in here
     bb.pose = None # Placeholder for current pose of the arm
+    bb.goal_pose = None # Preferred BT arm target pose key for ViperX flow
 
     # For rack levels
     bb.current_rack = 1
