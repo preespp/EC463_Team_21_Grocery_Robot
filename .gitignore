@@ -107,3 +107,8 @@ ros_ws/log/
 # Local temporary reference PDFs
 /workspace/tmp_picoscan_ds.pdf
 /workspace/tmp_picoscan_oi.pdf
+
+# Local nested repo support for vx300 arm
+/workspace/interbotix_ws/src/interbotix_ros_core/
+/workspace/interbotix_ws/src/interbotix_ros_manipulators/
+/workspace/interbotix_ws/src/interbotix_ros_toolboxes/
