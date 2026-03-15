@@ -4,43 +4,43 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="icon" type="image/png" href="images/GroceryBot_FirstLogo.png" />
-  <title>Create Customer</title>
+  <title>创建顾客</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
   <div class="topbar">
     <div class="row">
-      <span class="badge">CREATE CUSTOMER</span>
+      <span class="badge">创建顾客</span>
       <span class="muted">GroceryBot</span>
-      <div class="lang-switch" aria-label="Language">
-        <a class="lang-btn active" href="create_customer.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
+      <div class="lang-switch" aria-label="语言">
+        <a class="lang-btn" href="create_customer.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
         <a class="lang-btn" href="create_customer_es.html" title="Español"><img class="flag-icon" src="images/Spanish.png" alt="Español" /></a>
-        <a class="lang-btn" href="create_customer_zh.html" title="中文"><img class="flag-icon" src="images/Mandarin.png" alt="中文" /></a>
+        <a class="lang-btn active" href="create_customer_zh.html" title="中文"><img class="flag-icon" src="images/Mandarin.png" alt="中文" /></a>
       </div>
     </div>
     <div class="row">
-      <button class="btn ghost" onclick="window.location.href='login.html'">Back</button>
+      <button class="btn ghost" onclick="window.location.href='login_zh.html'">返回</button>
     </div>
   </div>
 
   <div class="container">
-    <h1>Create Customer Account</h1>
-    <p class="muted">Member ID will be auto-generated (3 letters + 3 digits).</p>
+    <h1>创建顾客账号</h1>
+    <p class="muted">会员 ID 将自动生成（3 个字母 + 3 个数字）。</p>
 
     <div class="panel">
       <div class="grid2">
         <label class="field">
-          <span class="muted">First name</span>
+          <span class="muted">名</span>
           <input id="first" placeholder="" />
         </label>
         <label class="field">
-          <span class="muted">Last name</span>
+          <span class="muted">姓</span>
           <input id="last" placeholder="" />
         </label>
       </div>
 
       <div class="row" style="margin-top:14px">
-        <button class="btn primary" id="btnCreate">Create</button>
+        <button class="btn primary" id="btnCreate">创建</button>
       </div>
 
       <div id="msg" class="muted" style="margin-top:12px"></div>
@@ -59,18 +59,18 @@
       const last_name = document.getElementById("last").value.trim();
 
       if (!first_name || !last_name) {
-        msg.textContent = "Please fill First name and Last name.";
+        msg.textContent = "请填写名和姓。";
         return;
       }
 
       try {
         const resp = await apiPost("/api/account/create_customer", { first_name, last_name });
-        msg.textContent = `Created successfully. Your Member ID: ${resp.member_ID}. Redirecting to Home...`;
+        msg.textContent = `创建成功。您的会员 ID：${resp.member_ID}。正在跳转...`;
         setTimeout(() => {
           window.location.href = "idle.html";
         }, 800);
       } catch (e) {
-        msg.textContent = "Create failed: " + e.message;
+        msg.textContent = "创建失败: " + e.message;
       }
     });
   </script>

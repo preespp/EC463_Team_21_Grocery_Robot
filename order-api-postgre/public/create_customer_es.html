@@ -4,43 +4,43 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="icon" type="image/png" href="images/GroceryBot_FirstLogo.png" />
-  <title>Create Customer</title>
+  <title>Crear Cliente</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
   <div class="topbar">
     <div class="row">
-      <span class="badge">CREATE CUSTOMER</span>
+      <span class="badge">CREAR CLIENTE</span>
       <span class="muted">GroceryBot</span>
-      <div class="lang-switch" aria-label="Language">
-        <a class="lang-btn active" href="create_customer.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
-        <a class="lang-btn" href="create_customer_es.html" title="Español"><img class="flag-icon" src="images/Spanish.png" alt="Español" /></a>
+      <div class="lang-switch" aria-label="Idioma">
+        <a class="lang-btn" href="create_customer.html" title="English"><img class="flag-icon" src="images/USA.png" alt="English" /></a>
+        <a class="lang-btn active" href="create_customer_es.html" title="Español"><img class="flag-icon" src="images/Spanish.png" alt="Español" /></a>
         <a class="lang-btn" href="create_customer_zh.html" title="中文"><img class="flag-icon" src="images/Mandarin.png" alt="中文" /></a>
       </div>
     </div>
     <div class="row">
-      <button class="btn ghost" onclick="window.location.href='login.html'">Back</button>
+      <button class="btn ghost" onclick="window.location.href='login_es.html'">Volver</button>
     </div>
   </div>
 
   <div class="container">
-    <h1>Create Customer Account</h1>
-    <p class="muted">Member ID will be auto-generated (3 letters + 3 digits).</p>
+    <h1>Crear cuenta de cliente</h1>
+    <p class="muted">El ID de miembro se generará automáticamente (3 letras + 3 dígitos).</p>
 
     <div class="panel">
       <div class="grid2">
         <label class="field">
-          <span class="muted">First name</span>
+          <span class="muted">Nombre</span>
           <input id="first" placeholder="" />
         </label>
         <label class="field">
-          <span class="muted">Last name</span>
+          <span class="muted">Apellido</span>
           <input id="last" placeholder="" />
         </label>
       </div>
 
       <div class="row" style="margin-top:14px">
-        <button class="btn primary" id="btnCreate">Create</button>
+        <button class="btn primary" id="btnCreate">Crear</button>
       </div>
 
       <div id="msg" class="muted" style="margin-top:12px"></div>
@@ -59,18 +59,18 @@
       const last_name = document.getElementById("last").value.trim();
 
       if (!first_name || !last_name) {
-        msg.textContent = "Please fill First name and Last name.";
+        msg.textContent = "Complete nombre y apellido.";
         return;
       }
 
       try {
         const resp = await apiPost("/api/account/create_customer", { first_name, last_name });
-        msg.textContent = `Created successfully. Your Member ID: ${resp.member_ID}. Redirecting to Home...`;
+        msg.textContent = `Creado correctamente. Su ID de miembro: ${resp.member_ID}. Redirigiendo...`;
         setTimeout(() => {
           window.location.href = "idle.html";
         }, 800);
       } catch (e) {
-        msg.textContent = "Create failed: " + e.message;
+        msg.textContent = "Error al crear: " + e.message;
       }
     });
   </script>
