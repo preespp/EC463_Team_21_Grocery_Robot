@@ -1,7 +1,6 @@
 # Local Run on Linux
 
-This setup runs `order-api-postgre` directly on Linux with a native PostgreSQL
-service. Docker is not required.
+This setup runs `order-api-postgre` directly on Linux with a native PostgreSQL service + Ollama (phi3). Docker is not required.
 
 ## Prerequisites
 
@@ -11,13 +10,20 @@ service. Docker is not required.
 - PostgreSQL 14+
 - Python 3 if you want inventory translation to work
 - `psql` available in your shell
+- Ollama (phi3)
 
-## 1. Install PostgreSQL
+## 1. Install PostgreSQL + Ollama
 
 ```bash
 sudo apt update
 sudo apt install -y postgresql postgresql-contrib
 sudo systemctl enable --now postgresql
+```
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+ollama pull phi3
 ```
 
 ## 2. Create the database and role
