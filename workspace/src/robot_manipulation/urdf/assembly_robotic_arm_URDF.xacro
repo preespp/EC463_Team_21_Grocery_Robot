@@ -1,0 +1,298 @@
+<?xml version="1.0" ?>
+<robot name="assembly_robotic_arm_URDF" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="materials.xacro" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="0.025568174865929133 -0.037161526078087564 0.07690409937696371" rpy="0 0 0"/>
+    <mass value="3.600452366591152"/>
+    <inertia ixx="0.014209" iyy="0.022664" izz="0.014399" ixy="4.9e-05" iyz="-0.000128" ixz="-8.8e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="inner-ring_1">
+  <inertial>
+    <origin xyz="-8.7442074626215e-08 -0.004780885684227354 -8.464326463342164e-08" rpy="0 0 0"/>
+    <mass value="0.23504555627740456"/>
+    <inertia ixx="0.000206" iyy="0.000409" izz="0.000206" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.025231 -0.014307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/inner-ring_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.025231 -0.014307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/inner-ring_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="outer-ring_1">
+  <inertial>
+    <origin xyz="-8.744207051145092e-08 0.004729729493174445 -8.464319313505886e-08" rpy="0 0 0"/>
+    <mass value="0.3586130491956171"/>
+    <inertia ixx="0.000547" iyy="0.001089" izz="0.000547" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.025231 -0.004807 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/outer-ring_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.025231 -0.004807 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/outer-ring_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RDS_Servo_1">
+  <inertial>
+    <origin xyz="-8.74420677393628e-08 0.037445726417167785 -8.464323357493253e-08" rpy="0 0 0"/>
+    <mass value="0.5488799503959932"/>
+    <inertia ixx="0.000781" iyy="0.000382" izz="0.000518" ixy="-0.0" iyz="-0.0" ixz="-2.5e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.025231 -0.171307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/RDS_Servo_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.025231 -0.171307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/RDS_Servo_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="base-linkage_1">
+  <inertial>
+    <origin xyz="1.1941234743215873e-05 0.07499992129458155 -1.2318574447722774e-06" rpy="0 0 0"/>
+    <mass value="0.11126416203116223"/>
+    <inertia ixx="0.000216" iyy="1.4e-05" izz="0.000216" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.025231 -0.021307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/base-linkage_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.025231 -0.021307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/base-linkage_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="bearing-base-interface_1">
+  <inertial>
+    <origin xyz="2.980935244515162e-05 0.003476899701562078 -2.935998278344454e-06" rpy="0 0 0"/>
+    <mass value="0.37789173913859087"/>
+    <inertia ixx="0.000215" iyy="0.000427" izz="0.000215" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.025231 -0.014307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/bearing-base-interface_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.025231 -0.014307 -0.077778" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/bearing-base-interface_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="20kg_Servo_1">
+  <inertial>
+    <origin xyz="2.9679660253356666e-06 -0.02268054621276394 3.17635125227228e-05" rpy="0 0 0"/>
+    <mass value="0.28545564068627766"/>
+    <inertia ixx="8.7e-05" iyy="4.9e-05" izz="5.8e-05" ixy="0.0" iyz="0.0" ixz="-3e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.284609 -0.091053 -0.107318" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/20kg_Servo_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.284609 -0.091053 -0.107318" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/20kg_Servo_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lower_1">
+  <inertial>
+    <origin xyz="0.03225199837408904 0.17854870535469428 -0.285857828694417" rpy="0 0 0"/>
+    <mass value="0.1298002433404817"/>
+    <inertia ixx="0.00034" iyy="1.7e-05" izz="0.00034" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.316849 0.0 -0.393175" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/lower_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.316849 0.0 -0.393175" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/lower_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RDS_Servo_2">
+  <inertial>
+    <origin xyz="-0.03727688581107813 -2.55079023125937e-07 0.003555508152516984" rpy="0 0 0"/>
+    <mass value="0.5488799503959932"/>
+    <inertia ixx="0.000383" iyy="0.000784" izz="0.000515" ixy="0.0" iyz="-0.0" ixz="1.3e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.204282 -0.251998 -0.099662" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/RDS_Servo_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.204282 -0.251998 -0.099662" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/RDS_Servo_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="upper_1">
+  <inertial>
+    <origin xyz="0.1484516478586171 -0.029701340692169453 0.014305457848267394" rpy="0 0 0"/>
+    <mass value="0.18540415998295687"/>
+    <inertia ixx="3.3e-05" iyy="0.000977" izz="0.000969" ixy="0.0" iyz="-0.0" ixz="9e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.228319 -0.281687 -0.073491" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/upper_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.228319 -0.281687 -0.073491" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://robot_manipulation/meshes/upper_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="joint1_base_yaw" type="continuous">
+  <origin xyz="0.0 0.0095 0.0" rpy="0 0 0"/>
+  <parent link="outer-ring_1"/>
+  <child link="inner-ring_1"/>
+  <axis xyz="-0.0 1.0 -0.0"/>
+</joint>
+
+<joint name="rigid_11" type="fixed">
+  <origin xyz="0.025231 0.004807 0.077778" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="outer-ring_1"/>
+</joint>
+
+<joint name="rigid_12" type="fixed">
+  <origin xyz="0.0 0.15 0.0" rpy="0 0 0"/>
+  <parent link="base-linkage_1"/>
+  <child link="RDS_Servo_1"/>
+</joint>
+
+<joint name="rigid_13" type="fixed">
+  <origin xyz="0.0 0.007 0.0" rpy="0 0 0"/>
+  <parent link="bearing-base-interface_1"/>
+  <child link="base-linkage_1"/>
+</joint>
+
+<joint name="rigid_14" type="fixed">
+  <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+  <parent link="inner-ring_1"/>
+  <child link="bearing-base-interface_1"/>
+</joint>
+
+<joint name="rigid_15" type="fixed">
+  <origin xyz="0.03224 0.091053 -0.285857" rpy="0 0 0"/>
+  <parent link="lower_1"/>
+  <child link="20kg_Servo_1"/>
+</joint>
+
+<joint name="joint2_shoulder" type="continuous">
+  <origin xyz="-0.112567 -0.251998 0.293513" rpy="0 0 0"/>
+  <parent link="RDS_Servo_2"/>
+  <child link="lower_1"/>
+  <axis xyz="0.094942 0.0 0.995483"/>
+</joint>
+
+<joint name="rigid_18" type="fixed">
+  <origin xyz="0.024037 -0.029689 0.026171" rpy="0 0 0"/>
+  <parent link="upper_1"/>
+  <child link="RDS_Servo_2"/>
+</joint>
+
+<joint name="joint3_elbow" type="continuous">
+  <origin xyz="-0.25355 0.11038 -0.004287" rpy="0 0 0"/>
+  <parent link="RDS_Servo_1"/>
+  <child link="upper_1"/>
+  <axis xyz="0.094942 0.0 0.995483"/>
+</joint>
+
+<gazebo>
+  <plugin
+    filename="libignition-gazebo-joint-position-controller-system.so"
+    name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>joint1_base_yaw</joint_name>
+    <p_gain>10.0</p_gain>
+    <topic>/model/assembly_robotic_arm/joint/joint1_base_yaw/0/cmd_pos</topic>
+  </plugin>
+
+  <plugin
+    filename="libignition-gazebo-joint-position-controller-system.so"
+    name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>joint2_shoulder</joint_name>
+    <p_gain>10.0</p_gain>
+    <topic>/model/assembly_robotic_arm/joint/joint2_shoulder/0/cmd_pos</topic>
+  </plugin>
+
+  <plugin
+    filename="libignition-gazebo-joint-position-controller-system.so"
+    name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>joint3_elbow</joint_name>
+    <p_gain>8.0</p_gain>
+    <topic>/model/assembly_robotic_arm/joint/joint3_elbow/0/cmd_pos</topic>
+  </plugin>
+</gazebo>
+
+</robot>

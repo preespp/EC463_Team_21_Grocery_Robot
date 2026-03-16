@@ -1,0 +1,17 @@
+string product_id
+string product_name
+string slot_id
+string anchor_id
+---
+bool found
+string message
+string map_name
+string semantic_id
+string resolved_by
+string target_label
+string rack_id
+string slot_id
+string anchor_id
+int32 rack_level
+geometry_msgs/PoseStamped nav_pose
+geometry_msgs/PoseStamped service_pose

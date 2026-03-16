@@ -264,7 +264,7 @@ Note:
 | Parameter Path | Current | Note |
 |---|---:|---|
 | `amcl.tf_broadcast` | `false` | prevents `map->odom` conflict with Cartographer |
-| `amcl.scan_topic` | `/scan_fullframe` | config exists, but Cartographer is active localization owner |
+| `amcl.scan_topic` | `/scan_fullframe` | AMCL standby config; Cartographer remains active localization owner, and D0 mapping input is PointCloud2 |
 
 ---
 

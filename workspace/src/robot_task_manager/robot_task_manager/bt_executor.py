@@ -105,11 +105,17 @@ class BTExecutor(Node):
         self.bb.current_item = None
         self.bb.num_current_item = 0
         self.bb.mode = None
-        self.bb.nav_goal = (0.0, 0.0)
+        self.bb.nav_goal = (0.0, 0.0, 0.0)
         self.bb.rack_goal = 1
         self.bb.shelf_pose = None
         self.bb.current_rack = 1
         self.bb.pose = None
+        self.bb.slot_id = None
+        self.bb.anchor_id = None
+        self.bb.rack_id = None
+        self.bb.semantic_id = None
+        self.bb.semantic_target_label = None
+        self.bb.nav_goal_source = None
 
         self.get_logger().info("Order cleared -> IDLE")
 

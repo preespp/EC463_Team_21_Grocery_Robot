@@ -254,7 +254,7 @@ BOOT -> AUTO_EXPLORE -> RETURN_HOME -> SAVE_EXPORT -> LOAD_SEMANTIC -> READY_FOR
 | 参数路径 | 当前值 | 说明 |
 |---|---:|---|
 | `amcl.tf_broadcast` | `false` | 避免与 Cartographer 冲突发布 `map->odom` |
-| `amcl.scan_topic` | `/scan_fullframe` | 配置存在，但当前主定位链路为 Cartographer |
+| `amcl.scan_topic` | `/scan_fullframe` | AMCL 预留配置；当前主定位链路为 Cartographer，且 D0 建图默认输入为 PointCloud2 |
 
 ---
 
@@ -457,4 +457,3 @@ ros2 run tf2_tools view_frames
 在现有代码基础上，继续走 `EKF + Cartographer + Nav2 + Frontier + Safety + Orchestrator` 是最小改动且最稳的路线。
 
 最关键的第一步不是 Frontier 本身，而是先完成控制权架构（`cmd_vel` 仲裁 + `manual_override`），否则无法保证自动化阶段的工程可控性与安全性。
-

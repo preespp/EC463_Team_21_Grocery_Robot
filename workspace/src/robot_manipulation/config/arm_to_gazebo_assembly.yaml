@@ -1,0 +1,14 @@
+arm_to_gazebo:
+  ros__parameters:
+    joint_state_topic: "/arm/joint_state"
+    joint_trajectory_topic: "/arm/joint_trajectory_cmd"
+
+    joint_names:
+      - "joint1_base_yaw"
+      - "joint2_shoulder"
+      - "joint3_elbow"
+
+    output_topics:
+      - "/arm/joint1_cmd"
+      - "/arm/joint2_cmd"
+      - "/arm/joint3_cmd"

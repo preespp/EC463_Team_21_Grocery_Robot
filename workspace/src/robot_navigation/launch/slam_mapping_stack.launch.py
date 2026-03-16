@@ -15,6 +15,8 @@ POINTCLOUD_CONFIG = (
     "reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 "
     "topic=/cloud_all_fields_fullframe frameid=lidar_link publish=1"
 )
+RAW_POINTS_TOPIC = "/cloud_all_fields_fullframe"
+FILTERED_POINTS_TOPIC = "/cloud_all_fields_fullframe_filtered"
 
 
 def generate_launch_description():
@@ -35,7 +37,7 @@ def generate_launch_description():
             ["hostname:=", LaunchConfiguration("hostname")],
             ["udp_receiver_ip:=", LaunchConfiguration("udp_receiver_ip")],
             "publish_frame_id:=lidar_link",
-            "publish_imu_frame_id:=lidar_link",
+            "publish_imu_frame_id:=imu_link",
             ["tf_publish_rate:=", LaunchConfiguration("sick_tf_publish_rate")],
             ["imu_udp_port:=", LaunchConfiguration("imu_udp_port")],
             ["scandataformat:=", LaunchConfiguration("scandataformat")],
@@ -49,6 +51,7 @@ def generate_launch_description():
                 "host_set_LFPintervalFilter:=",
                 LaunchConfiguration("host_set_lfp_interval_filter"),
             ],
+            ["laserscan_layer_filter:=", LaunchConfiguration("laserscan_layer_filter")],
             "custom_pointclouds:=cloud_all_fields_fullframe",
             ["cloud_all_fields_fullframe:=", POINTCLOUD_CONFIG],
             "publish_laserscan_fullframe_topic:=/scan_fullframe",
@@ -81,6 +84,31 @@ def generate_launch_description():
         ],
     )
 
+    imu_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="lidar_to_imu_static_tf",
+        output="screen",
+        arguments=[
+            "--x",
+            LaunchConfiguration("imu_x"),
+            "--y",
+            LaunchConfiguration("imu_y"),
+            "--z",
+            LaunchConfiguration("imu_z"),
+            "--roll",
+            LaunchConfiguration("imu_roll"),
+            "--pitch",
+            LaunchConfiguration("imu_pitch"),
+            "--yaw",
+            LaunchConfiguration("imu_yaw"),
+            "--frame-id",
+            "lidar_link",
+            "--child-frame-id",
+            "imu_link",
+        ],
+    )
+
     cartographer_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -89,7 +117,30 @@ def generate_launch_description():
         ),
         launch_arguments={
             "configuration_basename": LaunchConfiguration("cartographer_config_basename"),
+            "points_topic": FILTERED_POINTS_TOPIC,
         }.items(),
+    )
+
+    crop_filter = Node(
+        package="robot_navigation",
+        executable="base_link_crop_filter",
+        output="screen",
+        parameters=[
+            {
+                "enabled": ParameterValue(
+                    LaunchConfiguration("with_base_link_crop"), value_type=bool
+                ),
+                "input_topic": RAW_POINTS_TOPIC,
+                "output_topic": FILTERED_POINTS_TOPIC,
+                "box_frame": LaunchConfiguration("crop_box_frame"),
+                "min_x": ParameterValue(LaunchConfiguration("crop_min_x"), value_type=float),
+                "max_x": ParameterValue(LaunchConfiguration("crop_max_x"), value_type=float),
+                "min_y": ParameterValue(LaunchConfiguration("crop_min_y"), value_type=float),
+                "max_y": ParameterValue(LaunchConfiguration("crop_max_y"), value_type=float),
+                "min_z": ParameterValue(LaunchConfiguration("crop_min_z"), value_type=float),
+                "max_z": ParameterValue(LaunchConfiguration("crop_max_z"), value_type=float),
+            }
+        ],
     )
 
     serial_bridge = Node(
@@ -161,7 +212,10 @@ def generate_launch_description():
             DeclareLaunchArgument("fallback_odom", default_value="false"),
             DeclareLaunchArgument("use_ekf", default_value="true"),
             DeclareLaunchArgument("ekf_params_file", default_value=ekf_params),
-            DeclareLaunchArgument("cartographer_config_basename", default_value="pico_2d.lua"),
+            DeclareLaunchArgument(
+                "cartographer_config_basename",
+                default_value="pico_2d_mapping_quality.lua",
+            ),
             DeclareLaunchArgument("imu_topic", default_value="/sick_scansegment_xd/imu"),
             DeclareLaunchArgument("sick_tf_publish_rate", default_value="0.0"),
             DeclareLaunchArgument("imu_udp_port", default_value="7503"),
@@ -171,16 +225,33 @@ def generate_launch_description():
             DeclareLaunchArgument("host_set_frecho_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_angle_range_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_interval_filter", default_value="0"),
-            DeclareLaunchArgument("lidar_x", default_value="0.254"),
+            DeclareLaunchArgument("laserscan_layer_filter", default_value="0"),
+            DeclareLaunchArgument("lidar_x", default_value="0.2413"),
             DeclareLaunchArgument("lidar_y", default_value="0.0"),
             DeclareLaunchArgument("lidar_z", default_value="0.0"),
             DeclareLaunchArgument("lidar_roll", default_value="0.0"),
             DeclareLaunchArgument("lidar_pitch", default_value="0.0"),
             DeclareLaunchArgument("lidar_yaw", default_value="0.0"),
+            DeclareLaunchArgument("imu_x", default_value="0.0124"),
+            DeclareLaunchArgument("imu_y", default_value="0.0185"),
+            DeclareLaunchArgument("imu_z", default_value="-0.0484"),
+            DeclareLaunchArgument("imu_roll", default_value="0.0"),
+            DeclareLaunchArgument("imu_pitch", default_value="0.0"),
+            DeclareLaunchArgument("imu_yaw", default_value="0.0"),
+            DeclareLaunchArgument("with_base_link_crop", default_value="true"),
+            DeclareLaunchArgument("crop_box_frame", default_value="base_link"),
+            DeclareLaunchArgument("crop_min_x", default_value="-0.2540"),
+            DeclareLaunchArgument("crop_max_x", default_value="0.1397"),
+            DeclareLaunchArgument("crop_min_y", default_value="-0.2794"),
+            DeclareLaunchArgument("crop_max_y", default_value="0.2794"),
+            DeclareLaunchArgument("crop_min_z", default_value="-1.0"),
+            DeclareLaunchArgument("crop_max_z", default_value="1.0"),
             DeclareLaunchArgument("with_collision", default_value="false"),
             DeclareLaunchArgument("with_rviz", default_value="false"),
             sick_driver,
             lidar_static_tf,
+            imu_static_tf,
+            crop_filter,
             cartographer_launch,
             serial_bridge,
             ekf_node,

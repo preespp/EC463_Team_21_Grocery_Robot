@@ -1,0 +1,47 @@
+{
+  "name": "ros_web_gui_app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.17.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:embed": "vite build --base=/embedded/ros-web-gui/",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@lichtblick/cdr": "^1.0.1",
+    "@lichtblick/rosmsg": "^1.0.0",
+    "@lichtblick/rosmsg-serialization": "^1.0.0",
+    "@lichtblick/rosmsg2-serialization": "^1.0.0",
+    "@types/roslib": "^1.3.5",
+    "@types/three": "^0.181.0",
+    "jszip": "^3.10.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-toastify": "^11.0.5",
+    "roslib": "^1.4.1",
+    "three": "^0.181.1",
+    "urdf-loader": "^0.12.5",
+    "xacro-parser": "^0.3.11"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.3",
+    "vite": "^5.4.14"
+  }
+}

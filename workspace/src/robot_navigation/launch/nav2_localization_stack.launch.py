@@ -18,6 +18,8 @@ POINTCLOUD_CONFIG = (
     "reflectors=0,1 infringed=0,1 rangeFilter=0,999,0 "
     "topic=/cloud_all_fields_fullframe frameid=lidar_link publish=1"
 )
+RAW_POINTS_TOPIC = "/cloud_all_fields_fullframe"
+FILTERED_POINTS_TOPIC = "/cloud_all_fields_fullframe_filtered"
 
 
 def _find_repo_root() -> Path:
@@ -36,10 +38,11 @@ def generate_launch_description():
     package_share = Path(get_package_share_directory("robot_navigation"))
     maps_dir = repo_root / "Maps"
 
-    default_pbstream = str(maps_dir / "testmap1.pbstream")
-    default_map_yaml = str(maps_dir / "testmap1.yaml")
-    default_nav2_params = str(package_share / "config" / "nav2_params_cartographer.yaml")
+    default_pbstream = str(maps_dir / "testmapMain.pbstream")
+    default_map_yaml = str(maps_dir / "testmapMain.yaml")
+    default_nav2_params = str(package_share / "config" / "nav2_params_smac_mppi_omni.yaml")
     default_ekf_params = str(package_share / "config" / "ekf_odom_base_imu.yaml")
+    default_semantic_map = str(package_share / "config" / "semantic_map_testmapMain.yaml")
 
     # sick_picoscan.launch.py forwards sys.argv directly to sick_generic_caller.
     # Launching the caller node directly guarantees these args are applied.
@@ -54,7 +57,7 @@ def generate_launch_description():
             ["hostname:=", LaunchConfiguration("hostname")],
             ["udp_receiver_ip:=", LaunchConfiguration("udp_receiver_ip")],
             "publish_frame_id:=lidar_link",
-            "publish_imu_frame_id:=lidar_link",
+            "publish_imu_frame_id:=imu_link",
             ["tf_publish_rate:=", LaunchConfiguration("sick_tf_publish_rate")],
             ["imu_udp_port:=", LaunchConfiguration("imu_udp_port")],
             ["scandataformat:=", LaunchConfiguration("scandataformat")],
@@ -68,6 +71,7 @@ def generate_launch_description():
                 "host_set_LFPintervalFilter:=",
                 LaunchConfiguration("host_set_lfp_interval_filter"),
             ],
+            ["laserscan_layer_filter:=", LaunchConfiguration("laserscan_layer_filter")],
             "custom_pointclouds:=cloud_all_fields_fullframe",
             ["cloud_all_fields_fullframe:=", POINTCLOUD_CONFIG],
             "publish_laserscan_fullframe_topic:=/scan_fullframe",
@@ -100,6 +104,31 @@ def generate_launch_description():
         ],
     )
 
+    imu_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="lidar_to_imu_static_tf",
+        output="screen",
+        arguments=[
+            "--x",
+            LaunchConfiguration("imu_x"),
+            "--y",
+            LaunchConfiguration("imu_y"),
+            "--z",
+            LaunchConfiguration("imu_z"),
+            "--roll",
+            LaunchConfiguration("imu_roll"),
+            "--pitch",
+            LaunchConfiguration("imu_pitch"),
+            "--yaw",
+            LaunchConfiguration("imu_yaw"),
+            "--frame-id",
+            "lidar_link",
+            "--child-frame-id",
+            "imu_link",
+        ],
+    )
+
     serial_bridge = Node(
         package="robot_navigation",
         executable="nav2_serial_bridge",
@@ -112,6 +141,18 @@ def generate_launch_description():
                 "cmd_topics": LaunchConfiguration("cmd_topics"),
                 "telemetry_enabled": ParameterValue(
                     LaunchConfiguration("telemetry_enabled"), value_type=bool
+                ),
+                "max_linear_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_linear_speed"), value_type=float
+                ),
+                "max_lateral_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_lateral_speed"), value_type=float
+                ),
+                "max_yaw_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_yaw_speed"), value_type=float
+                ),
+                "axis_deadband": ParameterValue(
+                    LaunchConfiguration("bridge_axis_deadband"), value_type=float
                 ),
                 "left_switch": ParameterValue(LaunchConfiguration("left_switch"), value_type=int),
                 "right_switch": ParameterValue(LaunchConfiguration("right_switch"), value_type=int),
@@ -136,6 +177,28 @@ def generate_launch_description():
         remappings=[("odometry/filtered", "/odom")],
     )
 
+    crop_filter = Node(
+        package="robot_navigation",
+        executable="base_link_crop_filter",
+        output="screen",
+        parameters=[
+            {
+                "enabled": ParameterValue(
+                    LaunchConfiguration("with_base_link_crop"), value_type=bool
+                ),
+                "input_topic": RAW_POINTS_TOPIC,
+                "output_topic": FILTERED_POINTS_TOPIC,
+                "box_frame": LaunchConfiguration("crop_box_frame"),
+                "min_x": ParameterValue(LaunchConfiguration("crop_min_x"), value_type=float),
+                "max_x": ParameterValue(LaunchConfiguration("crop_max_x"), value_type=float),
+                "min_y": ParameterValue(LaunchConfiguration("crop_min_y"), value_type=float),
+                "max_y": ParameterValue(LaunchConfiguration("crop_max_y"), value_type=float),
+                "min_z": ParameterValue(LaunchConfiguration("crop_min_z"), value_type=float),
+                "max_z": ParameterValue(LaunchConfiguration("crop_max_z"), value_type=float),
+            }
+        ],
+    )
+
     cartographer_localization = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -149,6 +212,7 @@ def generate_launch_description():
         launch_arguments={
             "configuration_basename": LaunchConfiguration("cartographer_config_basename"),
             "load_state_filename": LaunchConfiguration("pbstream_file"),
+            "points_topic": FILTERED_POINTS_TOPIC,
             "publish_occupancy_grid": "false",
         }.items(),
     )
@@ -207,6 +271,20 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("with_nav2_rviz")),
     )
 
+    semantic_map_server = Node(
+        package="robot_navigation",
+        executable="semantic_map_server",
+        name="semantic_map_server",
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("with_semantic_map")),
+        parameters=[
+            {
+                "semantic_map_file": LaunchConfiguration("semantic_map_file"),
+                "frame_id": "map",
+            }
+        ],
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument("hostname", default_value="192.168.8.150"),
@@ -215,15 +293,21 @@ def generate_launch_description():
             DeclareLaunchArgument("baud_rate", default_value="115200"),
             DeclareLaunchArgument(
                 "cmd_topics",
-                default_value='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]',
+                default_value='["/cmd_vel"]',
             ),
             DeclareLaunchArgument("telemetry_enabled", default_value="true"),
+            DeclareLaunchArgument("bridge_max_linear_speed", default_value="3.0"),
+            DeclareLaunchArgument("bridge_max_lateral_speed", default_value="3.0"),
+            DeclareLaunchArgument("bridge_max_yaw_speed", default_value="12.566370614359172"),
+            DeclareLaunchArgument("bridge_axis_deadband", default_value="0.05"),
             DeclareLaunchArgument("left_switch", default_value="1"),
             DeclareLaunchArgument("right_switch", default_value="1"),
             DeclareLaunchArgument("odom_topic", default_value="/odom_raw"),
             DeclareLaunchArgument("fallback_odom", default_value="false"),
             DeclareLaunchArgument("pbstream_file", default_value=default_pbstream),
             DeclareLaunchArgument("map_yaml", default_value=default_map_yaml),
+            DeclareLaunchArgument("with_semantic_map", default_value="true"),
+            DeclareLaunchArgument("semantic_map_file", default_value=default_semantic_map),
             DeclareLaunchArgument("nav2_params_file", default_value=default_nav2_params),
             DeclareLaunchArgument("nav2_namespace", default_value=""),
             DeclareLaunchArgument("use_ekf", default_value="true"),
@@ -240,20 +324,38 @@ def generate_launch_description():
             DeclareLaunchArgument("host_set_frecho_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_angle_range_filter", default_value="0"),
             DeclareLaunchArgument("host_set_lfp_interval_filter", default_value="0"),
-            DeclareLaunchArgument("lidar_x", default_value="0.254"),
+            DeclareLaunchArgument("laserscan_layer_filter", default_value="0"),
+            DeclareLaunchArgument("lidar_x", default_value="0.2413"),
             DeclareLaunchArgument("lidar_y", default_value="0.0"),
             DeclareLaunchArgument("lidar_z", default_value="0.0"),
             DeclareLaunchArgument("lidar_roll", default_value="0.0"),
             DeclareLaunchArgument("lidar_pitch", default_value="0.0"),
             DeclareLaunchArgument("lidar_yaw", default_value="0.0"),
+            DeclareLaunchArgument("imu_x", default_value="0.0124"),
+            DeclareLaunchArgument("imu_y", default_value="0.0185"),
+            DeclareLaunchArgument("imu_z", default_value="-0.0484"),
+            DeclareLaunchArgument("imu_roll", default_value="0.0"),
+            DeclareLaunchArgument("imu_pitch", default_value="0.0"),
+            DeclareLaunchArgument("imu_yaw", default_value="0.0"),
+            DeclareLaunchArgument("with_base_link_crop", default_value="false"),
+            DeclareLaunchArgument("crop_box_frame", default_value="base_link"),
+            DeclareLaunchArgument("crop_min_x", default_value="-0.2540"),
+            DeclareLaunchArgument("crop_max_x", default_value="0.1397"),
+            DeclareLaunchArgument("crop_min_y", default_value="-0.2794"),
+            DeclareLaunchArgument("crop_max_y", default_value="0.2794"),
+            DeclareLaunchArgument("crop_min_z", default_value="-1.0"),
+            DeclareLaunchArgument("crop_max_z", default_value="1.0"),
             DeclareLaunchArgument("with_nav2_rviz", default_value="false"),
             sick_driver,
             lidar_static_tf,
+            imu_static_tf,
+            crop_filter,
             serial_bridge,
             ekf_node,
             cartographer_localization,
             map_server,
             lifecycle_manager,
+            semantic_map_server,
             TimerAction(period=2.0, actions=[nav2_bringup]),
             nav2_rviz,
         ]

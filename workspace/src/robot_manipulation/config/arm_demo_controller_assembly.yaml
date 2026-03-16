@@ -1,0 +1,27 @@
+arm_demo_controller:
+  ros__parameters:
+    action_name: "pick_arm_demo"
+    joint_trajectory_topic: "/arm/joint_trajectory_cmd"
+
+    controlled_joints:
+      - "joint1_base_yaw"
+      - "joint2_shoulder"
+      - "joint3_elbow"
+
+    # Keep demo motion small to avoid CAD-export kinematic breakup in Gazebo.
+    joint_min: [-0.8, -0.25, 0.0]
+    joint_max: [0.8, 0.25, 0.35]
+
+    # Approximate kinematic lengths for simple demo IK
+    link1_length_m: 0.27
+    link2_length_m: 0.27
+    base_height_m: 0.08
+
+    point_duration_sec: 1.2
+    wait_padding_sec: 0.2
+
+    default_pregrasp_offset_m: 0.08
+    default_retreat_offset_m: 0.10
+
+    open_gripper_pos: 1.0
+    closed_gripper_pos: 0.0

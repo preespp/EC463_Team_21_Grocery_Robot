@@ -16,6 +16,12 @@ Before EKF, Nav2 tuning, or TF refactors, this stack needs one geometry truth so
 - LiDAR mount: middle of front bar (not robot center)
 - Mecanum wheel center spacing (left to right): `25.5 in` (`0.6477 m`)
 
+For the current mount preset used in this repo:
+- Project assumption: the bracket center is used as the LiDAR optical-origin proxy.
+- Confirmed front-bar profile for the preset: standard `1.00 in` 80/20 profile width.
+- Therefore `base_link -> lidar_link.x = 0.508 / 2 - 0.0254 / 2 = 0.2413 m`.
+- Keep `lidar_link -> imu_link = (0.0124, 0.0185, -0.0484) m` from the SICK operating instructions.
+
 ### 0.2 Current geometry settings snapshot (by file)
 
 STM32 base kinematics (`test` firmware source currently in repo):
@@ -95,7 +101,7 @@ Current radius underestimation:
 #### D) LiDAR extrinsic mismatch
 - Current stack treats LiDAR point cloud frame as `base_link` (implicit zero offset).
 - Physical mounting is front-center on a 20 in base, so with `base_link` at geometric center:
-  - expected `x` offset is about `+0.254 m`
+  - expected `x` offset is about `+0.2413 m` for the current preset (`20 in / 2 - 1 in / 2`)
   - expected `y` offset is about `0.0 m`
   - `z` and roll/pitch/yaw must be measured
 
@@ -114,7 +120,7 @@ Option 2 (recommended, accurate):
 
 1. Keep `base_link` at robot center (same reference used by odom/kinematics interpretation).
 2. Introduce `lidar_link` and publish static TF:
-   - `base_link -> lidar_link = (x=+0.254, y=0.0, z=<measured>, roll/pitch/yaw=<measured>)`
+   - `base_link -> lidar_link = (x=+0.2413, y=0.0, z=<measured>, roll/pitch/yaw=<measured>)`
 3. Update SICK driver launch args:
    - `publish_frame_id:=lidar_link`
    - pointcloud config `frameid=lidar_link`

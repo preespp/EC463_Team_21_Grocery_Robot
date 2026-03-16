@@ -49,8 +49,9 @@ def _find_repo_root() -> Path:
 
 REPO_ROOT = _find_repo_root()
 DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
-DEFAULT_MAP_NAME = "testmap1"
+DEFAULT_MAP_NAME = "testmapMain"
 DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
+DEFAULT_LOCALIZATION_CMD_TOPICS = '["/cmd_vel"]'
 DEFAULT_RUN_MODE = "normal"
 RUN_MODES = ("normal", "bench")
 MAPPING_CONFIG_BASENAME = {
@@ -425,6 +426,10 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"baud_rate:={args.baud_rate}",
         f"cmd_topics:={args.cmd_topics}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
+        f"bridge_max_linear_speed:={args.bridge_max_linear_speed}",
+        f"bridge_max_lateral_speed:={args.bridge_max_lateral_speed}",
+        f"bridge_max_yaw_speed:={args.bridge_max_yaw_speed}",
+        f"bridge_axis_deadband:={args.bridge_axis_deadband}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
         f"odom_topic:={args.odom_topic}",
@@ -445,6 +450,14 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
+        f"with_base_link_crop:={bool_to_launch(args.with_base_link_crop)}",
+        f"crop_box_frame:={args.crop_box_frame}",
+        f"crop_min_x:={args.crop_min_x}",
+        f"crop_max_x:={args.crop_max_x}",
+        f"crop_min_y:={args.crop_min_y}",
+        f"crop_max_y:={args.crop_max_y}",
+        f"crop_min_z:={args.crop_min_z}",
+        f"crop_max_z:={args.crop_max_z}",
         f"with_collision:={bool_to_launch(args.with_collision)}",
         f"with_rviz:={bool_to_launch(args.with_rviz)}",
     ]
@@ -456,6 +469,9 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
 def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
     run_mode = args.run_mode
     use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    with_semantic_map = args.with_semantic_map
+    if not args.semantic_map_file and args.map_name != "testmapMain":
+        with_semantic_map = False
     carto_config = args.cartographer_config_basename or LOCALIZATION_CONFIG_BASENAME[run_mode]
     pbstream, _, map_yaml = map_paths(args.maps_dir, args.map_name)
     pbstream_path = Path(args.pbstream_file) if args.pbstream_file else pbstream
@@ -491,14 +507,25 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
+        f"with_base_link_crop:={bool_to_launch(args.with_base_link_crop)}",
+        f"crop_box_frame:={args.crop_box_frame}",
+        f"crop_min_x:={args.crop_min_x}",
+        f"crop_max_x:={args.crop_max_x}",
+        f"crop_min_y:={args.crop_min_y}",
+        f"crop_max_y:={args.crop_max_y}",
+        f"crop_min_z:={args.crop_min_z}",
+        f"crop_max_z:={args.crop_max_z}",
         f"pbstream_file:={pbstream_path}",
         f"map_yaml:={yaml_path}",
+        f"with_semantic_map:={bool_to_launch(with_semantic_map)}",
         f"with_nav2_rviz:={bool_to_launch(args.with_nav2_rviz)}",
     ]
     if args.ekf_params_file:
         command.append(f"ekf_params_file:={Path(args.ekf_params_file)}")
     if args.nav2_params_file:
         command.append(f"nav2_params_file:={Path(args.nav2_params_file)}")
+    if args.semantic_map_file:
+        command.append(f"semantic_map_file:={Path(args.semantic_map_file)}")
     return command
 
 
@@ -674,12 +701,20 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--host-set-frecho-filter", type=parse_bool, default=False)
     stack_common.add_argument("--host-set-lfp-angle-range-filter", type=parse_bool, default=False)
     stack_common.add_argument("--host-set-lfp-interval-filter", type=parse_bool, default=False)
-    stack_common.add_argument("--lidar-x", type=float, default=0.254)
+    stack_common.add_argument("--lidar-x", type=float, default=0.2413)
     stack_common.add_argument("--lidar-y", type=float, default=0.0)
     stack_common.add_argument("--lidar-z", type=float, default=0.0)
     stack_common.add_argument("--lidar-roll", type=float, default=0.0)
     stack_common.add_argument("--lidar-pitch", type=float, default=0.0)
     stack_common.add_argument("--lidar-yaw", type=float, default=0.0)
+    stack_common.add_argument("--with-base-link-crop", type=parse_bool, default=True)
+    stack_common.add_argument("--crop-box-frame", default="base_link")
+    stack_common.add_argument("--crop-min-x", type=float, default=-0.2540)
+    stack_common.add_argument("--crop-max-x", type=float, default=0.1397)
+    stack_common.add_argument("--crop-min-y", type=float, default=-0.2794)
+    stack_common.add_argument("--crop-max-y", type=float, default=0.2794)
+    stack_common.add_argument("--crop-min-z", type=float, default=-1.0)
+    stack_common.add_argument("--crop-max-z", type=float, default=1.0)
     stack_common.add_argument("--dry-run", action="store_true")
 
     mapping_parser = subparsers.add_parser(
@@ -687,6 +722,7 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[stack_common],
         help="One-line mapping phase launch (LiDAR + Cartographer + serial bridge).",
     )
+    mapping_parser.set_defaults(with_base_link_crop=True)
     mapping_parser.add_argument("--with-collision", type=parse_bool, default=False)
     mapping_parser.add_argument("--with-rviz", type=parse_bool, default=False)
 
@@ -695,12 +731,24 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[stack_common],
         help="One-line localization + Nav2 launch.",
     )
+    localization_parser.set_defaults(
+        with_base_link_crop=False,
+        cmd_topics=DEFAULT_LOCALIZATION_CMD_TOPICS,
+    )
     localization_parser.add_argument("--maps-dir", default=DEFAULT_MAPS_DIR)
     localization_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
     localization_parser.add_argument("--pbstream-file", default="")
     localization_parser.add_argument("--map-yaml", default="")
     localization_parser.add_argument("--nav2-params-file", default="")
+    localization_parser.add_argument("--with-semantic-map", type=parse_bool, default=True)
+    localization_parser.add_argument("--semantic-map-file", default="")
     localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
+    localization_parser.add_argument("--bridge-max-linear-speed", type=float, default=3.0)
+    localization_parser.add_argument("--bridge-max-lateral-speed", type=float, default=3.0)
+    localization_parser.add_argument(
+        "--bridge-max-yaw-speed", type=float, default=4.0 * math.pi
+    )
+    localization_parser.add_argument("--bridge-axis-deadband", type=float, default=0.05)
 
     teleop_common = argparse.ArgumentParser(add_help=False)
     teleop_common.add_argument("--topic", default="/cmd_vel")

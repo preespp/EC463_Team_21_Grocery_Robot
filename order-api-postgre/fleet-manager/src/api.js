@@ -12,6 +12,15 @@ async function request(path, opts = {}) {
   return data
 }
 
+export async function fetchWithAuth(path, opts = {}) {
+  const token = localStorage.getItem('fleet_token')
+  const headers = {
+    ...(opts.headers || {})
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  return fetch(path, { ...opts, headers })
+}
+
 export const api = {
   employeeLogin(payload) {
     return request('/api/employee/auth/login', {
@@ -21,6 +30,18 @@ export const api = {
   },
   inventoryReport() {
     return request('/api/employee/inventory/report')
+  },
+  semanticMap() {
+    return request('/api/maps/semantic/current')
+  },
+  saveSemanticMap(bundle, options = {}) {
+    return request('/api/maps/semantic/current', {
+      method: 'PUT',
+      body: JSON.stringify({
+        bundle,
+        change_summary: options.changeSummary || ''
+      })
+    })
   },
   inventoryOptions() {
     return request('/api/employee/inventory/options')
