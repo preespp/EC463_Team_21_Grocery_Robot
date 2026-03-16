@@ -19,6 +19,14 @@ const pool = new Pool({
   port: Number(process.env.PGPORT || 5432),
 });
 
+// ROBOT STATUS
+let robotStatus = {
+  robot_number: "RB-01",
+  status_key: "Available",
+  status_text: "Idle",
+  updated_at: new Date().toISOString()
+};
+
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
@@ -636,58 +644,10 @@ app.get("/api/employee/inventory/options", requireEmployeeAuth, async (_req, res
 });
 
 // EMPLOYEE ROBOT STATUS (placeholder source for dashboard UI)
+// EMPLOYEE ROBOT STATUS (real-time single robot)
 app.get("/api/employee/robot/status", requireEmployeeAuth, async (_req, res) => {
-  const now = new Date().toISOString();
-  let bundle = null;
-  try {
-    bundle = getSemanticMapBundle(REPO_ROOT);
-  } catch (_err) {
-    bundle = null;
-  }
-
-  const homePose = getAnchorPose(bundle, "home", { x: 0.0, y: 0.0, yaw: 0.0 });
-  const drinksPose = getAnchorPose(bundle, "drinks_anchor", { x: 1.0, y: 2.0, yaw: 0.0 });
-  const snacksPose = getAnchorPose(bundle, "snacks_anchor", { x: 9.0, y: 5.0, yaw: 0.0 });
-
   res.json({
-    robots: [
-      {
-        robot_number: "RB-01",
-        battery_level: 86,
-        status_key: "customer",
-        status_text: "Operate for Customer",
-        map_name: bundle?.map?.name ?? "testmapMain",
-        x: homePose.x,
-        y: homePose.y,
-        yaw: homePose.yaw,
-        anchor_id: "home",
-        updated_at: now
-      },
-      {
-        robot_number: "RB-02",
-        battery_level: 62,
-        status_key: "restock",
-        status_text: "Operate for Restock",
-        map_name: bundle?.map?.name ?? "testmapMain",
-        x: drinksPose.x,
-        y: drinksPose.y,
-        yaw: drinksPose.yaw,
-        anchor_id: "drinks_anchor",
-        updated_at: now
-      },
-      {
-        robot_number: "RB-03",
-        battery_level: 100,
-        status_key: "charged",
-        status_text: "Charged",
-        map_name: bundle?.map?.name ?? "testmapMain",
-        x: snacksPose.x,
-        y: snacksPose.y,
-        yaw: snacksPose.yaw,
-        anchor_id: "snacks_anchor",
-        updated_at: now
-      }
-    ]
+    robots: [robotStatus]
   });
 });
 
@@ -737,6 +697,10 @@ app.post("/api/employee/restock/submit", requireEmployeeAuth, async (req, res) =
       [restock_ID, employee_ID]
     );
     await client.query("COMMIT");
+
+    robotStatus.status_key = "restock_in_progress";
+    robotStatus.status_text = "Operate for Restock";
+    robotStatus.updated_at = new Date().toISOString();
 
     res.json({ status: "RECEIVED", restock_ID });
   } catch (e) {
@@ -893,6 +857,11 @@ app.post("/api/order/customer", async (req, res) => {
       );
     }
 
+    robotStatus.status_key = "customer_order_received";
+    robotStatus.status_text = "Operate for Customer Order";
+    robotStatus.updated_at = new Date().toISOString();
+
+
     res.json({ status: "RECEIVED", order_id: order_ID });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1014,6 +983,10 @@ app.post("/api/order/complete", async (req, res) => {
     const ok = resultRaw.toUpperCase().includes("SUCCESS");
     const status = ok ? "DONE" : "FAILED";
     const result = ok ? "SUCCESS" : "FAILED";
+
+    robotStatus.status_key = "Available";
+    robotStatus.status_text = "Idle";
+    robotStatus.updated_at = new Date().toISOString();
 
     if (!order_ID) {
       return res.status(400).json({ error: "order_id is required" });
@@ -1162,6 +1135,104 @@ app.post("/order/complete", async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/api/customer/ai/ask", async (req,res)=>{
+
+  const question = String(req.body?.question || "")
+
+  const inv = await pool.query(
+    `SELECT product_name, category_name
+     FROM inventory`
+  )
+
+  const prompt = `
+You are a grocery store assistant.
+
+Products available:
+${JSON.stringify(inv.rows)}
+
+Rules:
+- only answer product questions
+- recommend products
+- do NOT reveal stock numbers
+- do NOT discuss internal operations
+
+Customer question:
+${question}
+`
+
+  const r = await fetch("http://localhost:11434/api/generate",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"phi3",
+      prompt,
+      stream:false,
+      options:{
+        num_predict:150,
+        temperature:0.3
+      }
+    }),
+  })
+
+  const data = await r.json()
+
+  res.json({answer:data.response})
+});
+
+app.post("/api/employee/ai/ask", requireEmployeeAuth, async (req,res)=>{
+  try{
+
+    const question = String(req.body?.question || "")
+
+    const inv = await pool.query(
+      `SELECT product_name, category_name, stock
+       FROM inventory`
+    )
+
+    const inventory = inv.rows
+
+    const prompt = `
+You are a grocery robot fleet manager assistant.
+
+Inventory:
+${JSON.stringify(inventory)}
+
+Answer questions about:
+- inventory
+- stock
+- categories
+- restocking suggestions
+
+Question:
+${question}
+`
+
+    const r = await fetch("http://localhost:11434/api/generate",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"phi3",
+        prompt,
+        stream:false,
+        options:{
+          num_predict:150,
+          temperature:0.3
+        }
+      })
+    })
+
+    const data = await r.json()
+
+    res.json({answer:data.response})
+
+  }catch(e){
+    res.status(500).json({error:e.message})
+  }
+})
+
+app.listen(3000, () =>
+  console.log("Server running: http://localhost:3000")
+);
 const PORT = Number(process.env.PORT || 3000);
 
 ensureSemanticVersionTable()
