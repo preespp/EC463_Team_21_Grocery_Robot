@@ -141,8 +141,8 @@ SELECT * FROM semantic_map_versions ORDER BY version_seq DESC;
 
 `SlamMapView` in the fleet UI uses an adapted copy of `ros_web_gui_app`.
 
-- Original upstream repository: `chengyangkj/ros_web_gui_app`
-- Fork used by this repository: `StarLionJiang/ros_web_gui_app`
+- Original upstream repository: https://github.com/chengyangkj/ros_web_gui_app
+- Fork used by this repository: https://github.com/StarLionJiang/ros_web_gui_app
 - Local adaptation in this repository: English localization and embedded integration for the Grocery Robot web dashboard
 - Vendored source location: `third_party/ros_web_gui_app`
 

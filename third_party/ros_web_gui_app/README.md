@@ -25,6 +25,33 @@
 
 </div>
 
+## Local Integration Note
+
+This note is added by the Grocery Robot repository for attribution and license clarity.
+The original README content from the upstream project remains below.
+
+`SlamMapView` in the fleet UI uses an adapted copy of `ros_web_gui_app`.
+
+- Original upstream repository: https://github.com/chengyangkj/ros_web_gui_app
+- Fork used by this repository: https://github.com/StarLionJiang/ros_web_gui_app
+- Local adaptation in this repository: English localization and embedded integration for the Grocery Robot web dashboard
+- Vendored source location: `third_party/ros_web_gui_app`
+
+License summary for this embedded ROS Web GUI component:
+
+- License: `CC BY-NC-SA 4.0`
+- Allowed: study, research, and personal use
+- Allowed: modification and redistribution, provided the original project attribution is preserved
+- Not allowed: commercial use
+- Required: derivative works must remain under the same license and include a link to the original project
+
+For full license terms, see [LICENSE](./LICENSE).
+
+Acknowledgements:
+
+- Special thanks to the Lichtblick project for the open-source visualization and message-processing ecosystem, especially `@lichtblick/rosmsg` and `@lichtblick/rosmsg-serialization`.
+- Thanks to all contributors and users of the original project and this adapted version.
+
 ## 📖 简介
 
 本项目基于 React + TypeScript + Vite 构建，通过 rosbridge WebSocket 协议连接 ROS 1 或 ROS 2 系统，提供实时地图可视化、拓扑地图编辑、机器人位置跟踪等功能。所有功能均为自行绘制实现，可在浏览器中直接运行，无需安装额外软件。
