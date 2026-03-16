@@ -25,10 +25,8 @@
           <div class="map-toolbar-copy">
             <h2>{{ t('slam_map') }}</h2>
             <p class="muted map-subtitle">
-              Embedded ROS visualization workspace built from the vendored
-              `StarLionJiang/ros_web_gui_app` fork. The full React + Three.js toolset runs
-              inside this panel, including map layers, relocalization, manual control,
-              topology inspection, and map editing.
+              Embedded ROS visualization workspace with map layers, relocalization,
+              manual control, topology inspection, and map editing inside this panel.
             </p>
           </div>
 
@@ -39,9 +37,6 @@
               </button>
               <button class="btn ghost small" type="button" @click="openStandaloneApp">
                 Open Standalone
-              </button>
-              <button class="btn ghost small" type="button" @click="openReferenceRepo">
-                Open Source Repo
               </button>
             </div>
 
@@ -99,33 +94,25 @@
             <span>Topic-driven layers</span>
           </div>
           <div class="muted tiny slam-help-copy">
-            This is the reference app itself running as a child app, not a visual imitation of it.
+            This embedded workspace runs as a child app, not as a screenshot or static mockup.
           </div>
         </div>
 
         <div class="panel map-inspector">
-          <h3>Integration Notes</h3>
+          <h3>Runtime Notes</h3>
           <div class="map-kv-grid">
             <div>
               <span class="muted tiny">Embedded URL</span>
               <strong>{{ embeddedAppPath }}</strong>
             </div>
             <div>
-              <span class="muted tiny">Reference Repo</span>
-              <strong>StarLionJiang/ros_web_gui_app</strong>
-            </div>
-            <div>
               <span class="muted tiny">Connection Style</span>
               <strong>rosbridge in iframe</strong>
             </div>
-            <div>
-              <span class="muted tiny">Vendored Source</span>
-              <strong>/third_party/ros_web_gui_app</strong>
-            </div>
           </div>
           <div class="muted tiny slam-help-copy">
-            The embedded build is regenerated from the vendored source and served by the main Vue
-            app from <code>/embedded/ros-web-gui/index.html</code>.
+            The embedded build is served by the main Vue app from
+            <code>/embedded/ros-web-gui/index.html</code>.
           </div>
         </div>
       </aside>
@@ -142,7 +129,6 @@ const frameKey = ref(0)
 const frameLoaded = ref(false)
 
 const embeddedAppPath = '/embedded/ros-web-gui/index.html'
-const sourceRepoUrl = 'https://github.com/StarLionJiang/ros_web_gui_app'
 
 const iframeSrc = computed(() => `${embeddedAppPath}?embed=1&v=${frameKey.value}`)
 const defaultBridgeUrl = computed(() => {
@@ -161,9 +147,5 @@ function reloadEmbeddedApp() {
 
 function openStandaloneApp() {
   window.open(iframeSrc.value, '_blank', 'noopener,noreferrer')
-}
-
-function openReferenceRepo() {
-  window.open(sourceRepoUrl, '_blank', 'noopener,noreferrer')
 }
 </script>

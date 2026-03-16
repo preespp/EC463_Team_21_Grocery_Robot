@@ -137,6 +137,34 @@ SELECT * FROM inventory;
 SELECT * FROM semantic_map_versions ORDER BY version_seq DESC;
 ```
 
+## Embedded ROS Web GUI Attribution
+
+`SlamMapView` in the fleet UI uses an adapted copy of `ros_web_gui_app`.
+
+- Original upstream repository: `chengyangkj/ros_web_gui_app`
+- Fork used by this repository: `StarLionJiang/ros_web_gui_app`
+- Local adaptation in this repository: English localization and embedded integration for the Grocery Robot web dashboard
+- Vendored source location: `third_party/ros_web_gui_app`
+
+License summary for the embedded ROS Web GUI component:
+
+- License: `CC BY-NC-SA 4.0`
+- Allowed: study, research, and personal use
+- Allowed: modification and redistribution, provided the original project attribution is preserved
+- Not allowed: commercial use
+- Required: derivative works must remain under the same license and include a link to the original project
+
+For full license terms, see `third_party/ros_web_gui_app/LICENSE`.
+
+Acknowledgements:
+
+- Special thanks to the Lichtblick project for the open-source visualization and message-processing ecosystem, especially `@lichtblick/rosmsg` and `@lichtblick/rosmsg-serialization`.
+- Thanks to all contributors and users of the original project and this adapted version.
+
+Original upstream markdown preserved in the vendor tree:
+
+- `third_party/ros_web_gui_app/README.md`
+
 ## Notes
 
 - The map pages require employee login because the API uses bearer auth.
