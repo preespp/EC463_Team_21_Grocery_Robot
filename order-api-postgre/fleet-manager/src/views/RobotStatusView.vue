@@ -4,7 +4,6 @@
     <div class="cards-grid">
       <div v-for="rb in robots" :key="rb.robot_number" class="metric-card robot-card">
         <div class="label">{{ rb.robot_number }}</div>
-        <div class="value">{{ rb.battery_level }}%</div>
         <div class="robot-status" :class="rb.status_key">{{ rb.status_text }}</div>
         <div class="muted tiny">{{ t('updated') }} {{ rb.updated_at }}</div>
       </div>
