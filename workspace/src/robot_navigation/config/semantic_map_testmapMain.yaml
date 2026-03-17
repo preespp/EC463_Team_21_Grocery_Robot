@@ -67,12 +67,12 @@ slots:
     product_ids: ["1"]
     product_names: ["Milk"]
     nav_pose:
-      x: 1.762289
-      y: 0.1618
+      x: 3.4
+      y: 0.119
       yaw: 0.0
     service_pose:
-      x: 1.762289
-      y: 0.1618
+      x: 3.4
+      y: 0.119
       z: 0.55
       yaw: 0.0
   - id: drinks_water_slot
