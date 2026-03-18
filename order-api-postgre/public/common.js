@@ -1,4 +1,4 @@
-const API = "http://localhost:3000";
+const API = window.location.origin;
 
 function setSession(user) {
   sessionStorage.setItem("user", JSON.stringify(user));

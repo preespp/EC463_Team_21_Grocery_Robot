@@ -192,6 +192,7 @@ endif()
 install(PROGRAMS
   scripts/vx300_quick_move.py
   scripts/vx300_hardware_diagnostics.py
+  scripts/vision_auto_pick.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

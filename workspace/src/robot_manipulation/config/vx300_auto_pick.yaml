@@ -1,0 +1,40 @@
+vision_auto_pick:
+  ros__parameters:
+    detections_topic: "/detections_json"
+    action_name: "/pick_viperx"
+    base_frame: "vx300/base_link"
+    ee_link: ""
+    ee_orientation_frame: "vx300/ee_gripper_link"
+    use_current_ee_orientation: true
+
+    # Pick only bottles for now.
+    target_class: "bottle"
+    min_confidence: 0.60
+    min_depth_m: 0.08
+    max_depth_m: 0.70
+
+    # Keep targets within a conservative front workspace.
+    workspace_min_x: -0.50
+    workspace_max_x: 0.80
+    workspace_min_y: -0.80
+    workspace_max_y: 0.80
+    workspace_min_z: -0.20
+    workspace_max_z: 0.80
+
+    pregrasp_offset_z_m: 0.08
+    grasp_offset_z_m: 0.00
+    lift_offset_z_m: 0.12
+    place_offset_z_m: 0.00
+    close_gripper_position: 0.045
+    put_back_after_pick: true
+
+    target_stability_count: 1
+    target_match_distance_m: 0.20
+    cooldown_sec: 3.0
+    goal_timeout_sec: 15.0
+    pick_once: true
+    enable_auto_pick: true
+    dry_run: false
+
+    # Used only when use_current_ee_orientation is false.
+    fixed_orientation_xyzw: "0.0,0.0,0.0,1.0"

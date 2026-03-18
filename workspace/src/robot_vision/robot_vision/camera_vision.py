@@ -30,6 +30,44 @@ def median_depth(depth_frame, x, y, k=5):
     return float(np.median(vals)) if vals else 0.0
 
 
+def robust_bbox_depth(depth_frame, x1, y1, x2, y2):
+    """
+    Get a robust depth estimate from a bbox.
+    1) Try median depth at bbox center.
+    2) If invalid, scan inside bbox for nearest valid depth.
+    """
+    cx = int((x1 + x2) * 0.5)
+    cy = int((y1 + y2) * 0.5)
+    center_depth = median_depth(depth_frame, cx, cy, k=7)
+    if center_depth > 0.0:
+        return center_depth, cx, cy
+
+    h, w = depth_frame.get_height(), depth_frame.get_width()
+    bx1 = max(0, min(w - 1, x1))
+    by1 = max(0, min(h - 1, y1))
+    bx2 = max(0, min(w - 1, x2))
+    by2 = max(0, min(h - 1, y2))
+    if bx2 <= bx1 or by2 <= by1:
+        return 0.0, cx, cy
+
+    step = 2
+    best_depth = float("inf")
+    best_x = cx
+    best_y = cy
+    for yy in range(by1, by2 + 1, step):
+        for xx in range(bx1, bx2 + 1, step):
+            d = depth_frame.get_distance(xx, yy)
+            if 0.08 < d < 3.0 and d < best_depth:
+                best_depth = d
+                best_x = xx
+                best_y = yy
+
+    if best_depth != float("inf"):
+        return float(best_depth), int(best_x), int(best_y)
+
+    return 0.0, cx, cy
+
+
 def euler_to_quat(roll, pitch, yaw):
     cr = math.cos(roll * 0.5)
     sr = math.sin(roll * 0.5)
@@ -99,10 +137,17 @@ class CameraVision(Node):
         self.declare_parameter("conf", 0.5)
         self.declare_parameter("use_cuda", True)
         self.declare_parameter("publish_image", True)
+        self.declare_parameter("use_imu", False)
+        self.declare_parameter("depth_width", 848)
+        self.declare_parameter("depth_height", 480)
+        self.declare_parameter("depth_fps", 30)
+        self.declare_parameter("color_width", 1280)
+        self.declare_parameter("color_height", 720)
+        self.declare_parameter("color_fps", 30)
         self.declare_parameter("parent_frame", "ee_link")
         self.declare_parameter("camera_feedback_frame", "camera_feedback")
         self.declare_parameter("object_frame_prefix", "object")
-        self.declare_parameter("mount_xyz", "0.0,0.0,0.0")
+        self.declare_parameter("mount_xyz", "-0.0635,0.0,0.0635")
         self.declare_parameter("mount_rpy_deg", "0.0,0.0,0.0")
         self.declare_parameter("max_objects_tf", 5)
 
@@ -110,6 +155,13 @@ class CameraVision(Node):
         self.conf_thres = float(self.get_parameter("conf").value)
         use_cuda = bool(self.get_parameter("use_cuda").value)
         self.publish_image = bool(self.get_parameter("publish_image").value)
+        self.use_imu = bool(self.get_parameter("use_imu").value)
+        self.depth_width = int(self.get_parameter("depth_width").value)
+        self.depth_height = int(self.get_parameter("depth_height").value)
+        self.depth_fps = int(self.get_parameter("depth_fps").value)
+        self.color_width = int(self.get_parameter("color_width").value)
+        self.color_height = int(self.get_parameter("color_height").value)
+        self.color_fps = int(self.get_parameter("color_fps").value)
         self.parent_frame = str(self.get_parameter("parent_frame").value)
         self.camera_feedback_frame = str(self.get_parameter("camera_feedback_frame").value)
         self.object_frame_prefix = str(self.get_parameter("object_frame_prefix").value)
@@ -139,11 +191,35 @@ class CameraVision(Node):
 
         self.pipeline = rs.pipeline()
         cfg = rs.config()
-        cfg.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, 30)
-        cfg.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
-        cfg.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
-        cfg.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, 200)
-        self.pipeline.start(cfg)
+        cfg.enable_stream(
+            rs.stream.depth,
+            self.depth_width,
+            self.depth_height,
+            rs.format.z16,
+            self.depth_fps,
+        )
+        cfg.enable_stream(
+            rs.stream.color,
+            self.color_width,
+            self.color_height,
+            rs.format.bgr8,
+            self.color_fps,
+        )
+        if self.use_imu:
+            cfg.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 200)
+            cfg.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, 200)
+        try:
+            self.pipeline.start(cfg)
+        except RuntimeError as exc:
+            self.get_logger().warn(
+                "Primary RealSense profile failed (%s). Falling back to 640x480@30 without IMU.",
+                str(exc),
+            )
+            cfg = rs.config()
+            cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+            cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+            self.pipeline.start(cfg)
+            self.use_imu = False
         self.align_to_color = rs.align(rs.stream.color)
 
         self.imu_fusion = SimpleIMUFusion(alpha=0.98)
@@ -215,7 +291,8 @@ class CameraVision(Node):
             self.get_logger().error(f"RealSense capture error: {e}")
             return
 
-        self._update_imu(frames)
+        if self.use_imu:
+            self._update_imu(frames)
         aligned = self.align_to_color.process(frames)
         depth = aligned.get_depth_frame()
         color = aligned.get_color_frame()
@@ -241,9 +318,7 @@ class CameraVision(Node):
                 conf = float(box.conf[0].cpu().numpy())
                 name = names.get(cls_id, str(cls_id))
 
-                cx = int((x1 + x2) * 0.5)
-                cy = int((y1 + y2) * 0.5)
-                dist_m = median_depth(depth, cx, cy, k=5)
+                dist_m, cx, cy = robust_bbox_depth(depth, x1, y1, x2, y2)
                 if dist_m > 0.0:
                     X, Y, Z = rs.rs2_deproject_pixel_to_point(
                         depth_intrin, [float(cx), float(cy)], float(dist_m)
@@ -259,6 +334,7 @@ class CameraVision(Node):
                     "center_px": [cx, cy],
                     "distance_m": float(dist_m),
                     "point_m": [float(X), float(Y), float(Z)],
+                    "grasp_px": [cx, cy],
                 }
                 detections_out.append(det)
 

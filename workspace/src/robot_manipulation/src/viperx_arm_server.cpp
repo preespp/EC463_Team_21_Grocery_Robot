@@ -1,10 +1,14 @@
 #include <atomic>
+#include <cmath>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "moveit_msgs/msg/display_trajectory.hpp"
+#include "moveit/robot_state/conversions.h"
 #include "moveit/move_group_interface/move_group_interface.h"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -34,6 +38,8 @@ public:
     planning_time_sec_ = this->declare_parameter<double>("planning_time_sec", 3.0);
     max_velocity_scaling_ = this->declare_parameter<double>("max_velocity_scaling", 0.2);
     max_acceleration_scaling_ = this->declare_parameter<double>("max_acceleration_scaling", 0.2);
+    preview_only_ = this->declare_parameter<bool>("preview_only", false);
+    preview_step_delay_sec_ = this->declare_parameter<double>("preview_step_delay_sec", 1.0);
     open_gripper_pos_ = this->declare_parameter<double>("open_gripper_pos", 0.035);
     closed_gripper_pos_ = this->declare_parameter<double>("closed_gripper_pos", 0.0);
     open_gripper_named_target_ = this->declare_parameter<std::string>(
@@ -49,8 +55,15 @@ public:
       std::bind(&ViperXArmServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
       std::bind(&ViperXArmServer::handle_cancel, this, std::placeholders::_1),
       std::bind(&ViperXArmServer::handle_accepted, this, std::placeholders::_1));
+    display_traj_pub_ = this->create_publisher<moveit_msgs::msg::DisplayTrajectory>(
+      "/display_planned_path",
+      rclcpp::QoS(1).reliable().transient_local());
 
-    RCLCPP_INFO(this->get_logger(), "viperx_arm_server ready on action '%s'", action_name_.c_str());
+    RCLCPP_INFO(
+      this->get_logger(),
+      "viperx_arm_server ready on action '%s' (preview_only=%s)",
+      action_name_.c_str(),
+      preview_only_ ? "true" : "false");
   }
 
   void initialize_moveit()
@@ -136,7 +149,34 @@ private:
     if (!ok) {
       return false;
     }
+    if (preview_only_) {
+      publish_preview(plan);
+      return true;
+    }
     return arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+  }
+
+  void publish_preview(const moveit::planning_interface::MoveGroupInterface::Plan & plan)
+  {
+    moveit_msgs::msg::DisplayTrajectory display_msg;
+    display_msg.model_id = arm_move_group_->getRobotModel()->getName();
+    if (const auto current_state = arm_move_group_->getCurrentState(0.5)) {
+      moveit::core::robotStateToRobotStateMsg(*current_state, display_msg.trajectory_start);
+    }
+    display_msg.trajectory.push_back(plan.trajectory_);
+    display_traj_pub_->publish(display_msg);
+    RCLCPP_INFO(this->get_logger(), "Published preview trajectory on /display_planned_path");
+  }
+
+  void maybe_preview_delay() const
+  {
+    if (!preview_only_) {
+      return;
+    }
+    if (preview_step_delay_sec_ <= 0.0) {
+      return;
+    }
+    std::this_thread::sleep_for(std::chrono::duration<double>(preview_step_delay_sec_));
   }
 
   bool execute_gripper_named(const std::string & named_target)
@@ -145,28 +185,63 @@ private:
       return false;
     }
     if (!gripper_move_group_->setNamedTarget(named_target)) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to set gripper named target '%s'.",
+        named_target.c_str());
       return false;
     }
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     const bool ok = gripper_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!ok) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to plan gripper named target '%s'.",
+        named_target.c_str());
       return false;
+    }
+    if (preview_only_) {
+      publish_preview(plan);
+      return true;
     }
     return gripper_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
   }
 
   bool execute_gripper_position(double target_pos)
   {
-    auto joint_values = gripper_move_group_->getCurrentJointValues();
-    if (joint_values.empty()) {
+    const auto active_joints = gripper_move_group_->getActiveJoints();
+    if (active_joints.empty()) {
+      RCLCPP_WARN(this->get_logger(), "Gripper group has no active joints.");
       return false;
     }
-    joint_values[0] = target_pos;
-    gripper_move_group_->setJointValueTarget(joint_values);
+
+    std::map<std::string, double> joint_targets;
+    for (const auto & joint_name : active_joints) {
+      if (joint_name.find("left_finger") != std::string::npos) {
+        joint_targets[joint_name] = std::abs(target_pos);
+      } else if (joint_name.find("right_finger") != std::string::npos) {
+        joint_targets[joint_name] = -std::abs(target_pos);
+      } else {
+        joint_targets[joint_name] = target_pos;
+      }
+    }
+
+    if (!gripper_move_group_->setJointValueTarget(joint_targets)) {
+      RCLCPP_WARN(this->get_logger(), "Failed to set gripper joint value target.");
+      return false;
+    }
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     const bool ok = gripper_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!ok) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to plan gripper joint value target at %.4f.",
+        target_pos);
       return false;
+    }
+    if (preview_only_) {
+      publish_preview(plan);
+      return true;
     }
     return gripper_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
   }
@@ -228,6 +303,7 @@ private:
         result->success = true;
         result->message = "Gripper command complete";
         result->final_position_error_m = 0.0f;
+        maybe_preview_delay();
         goal_handle->succeed(result);
         goal_active_.store(false);
         return;
@@ -265,6 +341,7 @@ private:
       result->success = true;
       result->message = "ViperX motion complete";
       result->final_position_error_m = 0.0f;
+      maybe_preview_delay();
       goal_handle->succeed(result);
     } catch (const std::exception & ex) {
       result->success = false;
@@ -285,6 +362,8 @@ private:
   double planning_time_sec_;
   double max_velocity_scaling_;
   double max_acceleration_scaling_;
+  bool preview_only_;
+  double preview_step_delay_sec_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
 
@@ -293,6 +372,7 @@ private:
 
   std::unique_ptr<moveit::planning_interface::MoveGroupInterface> arm_move_group_;
   std::unique_ptr<moveit::planning_interface::MoveGroupInterface> gripper_move_group_;
+  rclcpp::Publisher<moveit_msgs::msg::DisplayTrajectory>::SharedPtr display_traj_pub_;
 
   std::atomic<bool> goal_active_;
   rclcpp_action::Server<PickArm>::SharedPtr action_server_;

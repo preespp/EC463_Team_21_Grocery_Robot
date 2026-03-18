@@ -91,6 +91,76 @@ function translateWithDeepTranslator(texts, targetLang) {
   });
 }
 
+function loadGeminiConfigFromFile() {
+  const defaultPath = path.join(__dirname, "config", "gemini.json");
+  const configPath = defaultPath;
+  if (!configPath || !fs.existsSync(configPath)) {
+    throw new Error(`Gemini config file not found at ${configPath}`);
+  }
+
+  try {
+    const raw = fs.readFileSync(configPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Gemini config JSON must be an object");
+    }
+    return parsed;
+  } catch (err) {
+    throw new Error(`Failed to read Gemini config at ${configPath}: ${err.message}`);
+  }
+}
+
+async function generateWithGemini(prompt) {
+  const geminiConfig = loadGeminiConfigFromFile();
+  const apiKey = String(
+    geminiConfig.apiKey ||
+    ""
+  ).trim();
+  if (!apiKey) {
+    throw new Error("Gemini apiKey is missing in config/gemini.json");
+  }
+
+  const model = String(
+    geminiConfig.model ||
+    "gemini-2.0-flash"
+  ).trim();
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 300,
+      },
+    }),
+  });
+
+  const data = await r.json();
+  if (!r.ok) {
+    const detail = data?.error?.message || `Gemini request failed with status ${r.status}`;
+    throw new Error(detail);
+  }
+
+  const answer = (data?.candidates?.[0]?.content?.parts || [])
+    .map((p) => String(p?.text || ""))
+    .join("")
+    .trim();
+
+  if (!answer) {
+    throw new Error("Gemini returned an empty response");
+  }
+
+  return answer;
+}
+
 function memberIdToOrdinal(memberId) {
   const s = String(memberId || "").trim().toUpperCase();
   if (!/^[A-Z]{3}[0-9]{3}$/.test(s)) return null;
@@ -1137,14 +1207,18 @@ app.post("/order/complete", async (req, res) => {
 
 app.post("/api/customer/ai/ask", async (req,res)=>{
 
-  const question = String(req.body?.question || "")
+  try {
+    const question = String(req.body?.question || "").trim();
+    if (!question) {
+      return res.status(400).json({ error: "Question is required" });
+    }
 
-  const inv = await pool.query(
-    `SELECT product_name, category_name
-     FROM inventory`
-  )
+    const inv = await pool.query(
+      `SELECT product_name, category_name
+       FROM inventory`
+    );
 
-  const prompt = `
+    const prompt = `
 You are a grocery store assistant.
 
 Products available:
@@ -1158,31 +1232,22 @@ Rules:
 
 Customer question:
 ${question}
-`
+`;
 
-  const r = await fetch("http://localhost:11434/api/generate",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json"},
-    body:JSON.stringify({
-      model:"phi3",
-      prompt,
-      stream:false,
-      options:{
-        num_predict:150,
-        temperature:0.3
-      }
-    }),
-  })
-
-  const data = await r.json()
-
-  res.json({answer:data.response})
+    const answer = await generateWithGemini(prompt);
+    res.json({ answer });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post("/api/employee/ai/ask", requireEmployeeAuth, async (req,res)=>{
   try{
 
-    const question = String(req.body?.question || "")
+    const question = String(req.body?.question || "").trim();
+    if (!question) {
+      return res.status(400).json({ error: "Question is required" });
+    }
 
     const inv = await pool.query(
       `SELECT product_name, category_name, stock
@@ -1207,23 +1272,8 @@ Question:
 ${question}
 `
 
-    const r = await fetch("http://localhost:11434/api/generate",{
-      method:"POST",
-      headers:{ "Content-Type":"application/json"},
-      body:JSON.stringify({
-        model:"phi3",
-        prompt,
-        stream:false,
-        options:{
-          num_predict:150,
-          temperature:0.3
-        }
-      })
-    })
-
-    const data = await r.json()
-
-    res.json({answer:data.response})
+    const answer = await generateWithGemini(prompt);
+    res.json({ answer });
 
   }catch(e){
     res.status(500).json({error:e.message})
@@ -1233,7 +1283,7 @@ ${question}
 app.listen(3000, () =>
   console.log("Server running: http://localhost:3000")
 );
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3001);
 
 ensureSemanticVersionTable()
   .then(() => migrateLegacySemanticIds())

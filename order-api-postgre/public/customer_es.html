@@ -23,6 +23,24 @@
     </div>
   </div>
 
+  <div id="ai-chat">
+
+    <div id="ai-header">
+      🤖 Asistente IA
+      <span id="ai-close">✕</span>
+    </div>
+
+    <div id="ai-messages"></div>
+
+    <div id="ai-input-area">
+      <input id="ai-input" placeholder="Pregúntame algo..." />
+      <button id="ai-send">Enviar</button>
+    </div>
+
+  </div>
+
+  <button id="ai-toggle">🤖</button>
+
   <div class="container">
     <h1>Tienda</h1>
     <p class="muted">Seleccione cantidad del inventario.</p>
@@ -129,6 +147,55 @@
       renderInventory();
     };
     setCartVisible(true);
+
+    const chat = document.getElementById("ai-chat")
+    const toggle = document.getElementById("ai-toggle")
+    const closeBtn = document.getElementById("ai-close")
+    const messages = document.getElementById("ai-messages")
+
+    toggle.onclick = ()=>{
+      chat.style.display = "flex"
+    }
+
+    closeBtn.onclick = ()=>{
+      chat.style.display = "none"
+    }
+
+    function addMessage(role,text){
+
+      const row = document.createElement("div")
+      row.className = "ai-row " + role
+
+      const bubble = document.createElement("div")
+      bubble.className = "ai-bubble"
+      bubble.textContent = text
+
+      row.appendChild(bubble)
+      messages.appendChild(row)
+
+      messages.scrollTop = messages.scrollHeight
+    }
+
+    document.getElementById("ai-send").onclick = async ()=>{
+
+      const input = document.getElementById("ai-input")
+      const q = input.value.trim()
+      if(!q) return
+
+      addMessage("user",q)
+      input.value=""
+
+      const r = await fetch("/api/customer/ai/ask",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json"},
+        body:JSON.stringify({ question:q })
+      })
+
+      const data = await r.json()
+
+      addMessage("bot",data.answer)
+
+    }
 
 function categoryKeyForItem(it) {
   if (it.category_id !== null && it.category_id !== undefined && it.category_id !== "") {

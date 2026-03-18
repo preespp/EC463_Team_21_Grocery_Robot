@@ -7,11 +7,13 @@ viperx_arm_server:
     planning_time_sec: 3.0
     max_velocity_scaling: 0.2
     max_acceleration_scaling: 0.2
+    preview_only: false
+    preview_step_delay_sec: 1.0
 
     # Fallback values used if named targets are not available in the SRDF.
     open_gripper_pos: 0.035
-    closed_gripper_pos: 0.0
+    closed_gripper_pos: 0.045
 
     # Interbotix SRDF defaults for gripper group states.
     open_gripper_named_target: "Released"
-    close_gripper_named_target: "Grasping"
+    close_gripper_named_target: ""

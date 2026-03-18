@@ -19,6 +19,12 @@ Starts the VX300 bringup and runs a short demo motion after startup. Use `use_si
 
 `vx300_moveit.launch.py`
 Launches the real VX300 or VX300S with the official Interbotix MoveIt stack, ros2_control trajectory controllers, and the MoveIt RViz window.
+Supports opt-in vision auto-pick via `use_auto_pick:=true`.
+
+`vx300_auto_pick.launch.py`
+Launches `vx300_moveit.launch.py` with auto-pick enabled by default.
+Optionally starts `robot_vision/camera_vision` with `launch_camera_vision:=true`.
+Full handoff and operation guide: `workspace/src/robot_manipulation/README_VX300_CAMERA_AUTOPICK.md`
 
 `viperx_arm_server.launch.py`
 Launches a BT-facing action server (`/pick_viperx`) that accepts `robot_interfaces/action/PickArm` goals, executes ViperX end-effector pose goals through MoveIt, and handles `open_gripper` / `close_gripper` commands.
@@ -34,6 +40,39 @@ ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300 motor_p
 
 This launch should open the MoveIt RViz window automatically.
 It now also starts `viperx_arm_server` by default (`use_viperx_arm_server:=true`), exposing `/pick_viperx` for BT action clients.
+
+## Camera-Triggered Auto Pick (Detection -> Pick)
+
+1. Start MoveIt + ViperX action server + auto-pick bridge:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
+ros2 launch robot_manipulation vx300_auto_pick.launch.py robot_model:=vx300 motor_port:=/dev/ttyUSB1
+```
+
+2. If `camera_vision` is not already running, launch it in another terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
+ros2 run robot_vision camera_vision --ros-args -p parent_frame:=vx300/ee_gripper_link -p camera_feedback_frame:=camera_feedback
+```
+
+3. Optional safety/debug mode first (`dry_run=true`, no arm motion):
+
+```bash
+ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300 motor_port:=/dev/ttyUSB1 use_auto_pick:=true \
+  auto_pick_config:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_manipulation/config/vx300_auto_pick.yaml
+```
+
+Then edit `/workspace/src/robot_manipulation/config/vx300_auto_pick.yaml` and set:
+- `dry_run: true`
+- `target_class: "bottle"` (or your product class)
+
+When stable detections arrive on `/detections_json`, `vision_auto_pick` sends a safe 4-stage sequence:
+`open_gripper -> move_pregrasp -> move_grasp_and_close -> lift`.
 
 ## Git Notes
 
