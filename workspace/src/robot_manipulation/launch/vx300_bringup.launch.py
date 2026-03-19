@@ -98,7 +98,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "robot_model",
-            default_value="vx300",
+            default_value="vx300s",
             description="Interbotix robot model. Supported values: vx300, vx300s.",
         ),
         DeclareLaunchArgument(

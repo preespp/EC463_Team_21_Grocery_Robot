@@ -42,7 +42,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument("robot_model", default_value="vx300"),
+        DeclareLaunchArgument("robot_model", default_value="vx300s"),
         DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
         DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB0"),
         DeclareLaunchArgument("use_sim", default_value="false"),

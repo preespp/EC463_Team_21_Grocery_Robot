@@ -296,8 +296,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--robot-name",
-        default="vx300",
-        help="Robot namespace used by xs_sdk. Defaults to vx300.",
+        default="vx300s",
+        help="Robot namespace used by xs_sdk. Defaults to vx300s.",
     )
     parser.add_argument(
         "--arm-group",

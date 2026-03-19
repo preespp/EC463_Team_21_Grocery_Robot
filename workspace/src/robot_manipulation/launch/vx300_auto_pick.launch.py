@@ -39,7 +39,8 @@ def generate_launch_description():
                 "model_path": LaunchConfiguration("vision_model_path"),
                 "conf": LaunchConfiguration("vision_confidence"),
                 "parent_frame": LaunchConfiguration("vision_parent_frame"),
-                "camera_feedback_frame": LaunchConfiguration("vision_camera_frame"),
+                "camera_mount_frame": LaunchConfiguration("vision_camera_mount_frame"),
+                "camera_optical_frame": LaunchConfiguration("vision_camera_optical_frame"),
                 "publish_image": LaunchConfiguration("vision_publish_image"),
             }
         ],
@@ -47,7 +48,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        DeclareLaunchArgument("robot_model", default_value="vx300"),
+        DeclareLaunchArgument("robot_model", default_value="vx300s"),
         DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
         DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB0"),
         DeclareLaunchArgument("use_moveit_rviz", default_value="true"),
@@ -57,8 +58,12 @@ def generate_launch_description():
         DeclareLaunchArgument("launch_camera_vision", default_value="false"),
         DeclareLaunchArgument("vision_model_path", default_value="yolov8n.pt"),
         DeclareLaunchArgument("vision_confidence", default_value="0.50"),
-        DeclareLaunchArgument("vision_parent_frame", default_value="vx300/ee_gripper_link"),
-        DeclareLaunchArgument("vision_camera_frame", default_value="camera_feedback"),
+        DeclareLaunchArgument("vision_parent_frame", default_value="vx300s/ee_gripper_link"),
+        DeclareLaunchArgument("vision_camera_mount_frame", default_value="camera_mount_frame"),
+        DeclareLaunchArgument(
+            "vision_camera_optical_frame",
+            default_value="camera_color_optical_frame",
+        ),
         DeclareLaunchArgument("vision_publish_image", default_value="true"),
         moveit_launch,
         camera_node,

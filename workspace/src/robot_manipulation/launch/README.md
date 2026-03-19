@@ -29,13 +29,13 @@ Full handoff and operation guide: `workspace/src/robot_manipulation/README_VX300
 `viperx_arm_server.launch.py`
 Launches a BT-facing action server (`/pick_viperx`) that accepts `robot_interfaces/action/PickArm` goals, executes ViperX end-effector pose goals through MoveIt, and handles `open_gripper` / `close_gripper` commands.
 
-Working VX300 MoveIt launch on this machine:
+Working VX300S MoveIt launch on this machine:
 
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
-ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300 motor_port:=/dev/ttyUSB1
+ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s motor_port:=/dev/ttyUSB1
 ```
 
 This launch should open the MoveIt RViz window automatically.
@@ -49,7 +49,7 @@ It now also starts `viperx_arm_server` by default (`use_viperx_arm_server:=true`
 source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
-ros2 launch robot_manipulation vx300_auto_pick.launch.py robot_model:=vx300 motor_port:=/dev/ttyUSB1
+ros2 launch robot_manipulation vx300_auto_pick.launch.py robot_model:=vx300s motor_port:=/dev/ttyUSB1
 ```
 
 2. If `camera_vision` is not already running, launch it in another terminal:
@@ -57,13 +57,16 @@ ros2 launch robot_manipulation vx300_auto_pick.launch.py robot_model:=vx300 moto
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
-ros2 run robot_vision camera_vision --ros-args -p parent_frame:=vx300/ee_gripper_link -p camera_feedback_frame:=camera_feedback
+ros2 run robot_vision camera_vision --ros-args \
+  -p parent_frame:=vx300s/ee_gripper_link \
+  -p camera_mount_frame:=camera_mount_frame \
+  -p camera_optical_frame:=camera_color_optical_frame
 ```
 
 3. Optional safety/debug mode first (`dry_run=true`, no arm motion):
 
 ```bash
-ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300 motor_port:=/dev/ttyUSB1 use_auto_pick:=true \
+ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s motor_port:=/dev/ttyUSB1 use_auto_pick:=true \
   auto_pick_config:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_manipulation/config/vx300_auto_pick.yaml
 ```
 

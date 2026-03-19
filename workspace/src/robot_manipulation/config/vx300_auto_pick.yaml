@@ -2,9 +2,9 @@ vision_auto_pick:
   ros__parameters:
     detections_topic: "/detections_json"
     action_name: "/pick_viperx"
-    base_frame: "vx300/base_link"
+    base_frame: "vx300s/base_link"
     ee_link: ""
-    ee_orientation_frame: "vx300/ee_gripper_link"
+    ee_orientation_frame: "vx300s/ee_gripper_link"
     use_current_ee_orientation: true
 
     # Pick only bottles for now.

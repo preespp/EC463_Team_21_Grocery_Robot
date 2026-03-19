@@ -26,9 +26,9 @@ class VisionAutoPick(Node):
 
         self.declare_parameter("detections_topic", "/detections_json")
         self.declare_parameter("action_name", "/pick_viperx")
-        self.declare_parameter("base_frame", "vx300/base_link")
+        self.declare_parameter("base_frame", "vx300s/base_link")
         self.declare_parameter("ee_link", "")
-        self.declare_parameter("ee_orientation_frame", "vx300/ee_gripper_link")
+        self.declare_parameter("ee_orientation_frame", "vx300s/ee_gripper_link")
         self.declare_parameter("use_current_ee_orientation", True)
         self.declare_parameter("target_class", "")
         self.declare_parameter("min_confidence", 0.60)
@@ -160,7 +160,10 @@ class VisionAutoPick(Node):
             self.get_logger().warn(f"Ignoring invalid detections_json payload: {exc}")
             return
 
-        camera_frame = str(payload.get("camera_feedback_frame", "camera_feedback"))
+        camera_frame = str(payload.get("camera_optical_frame", "")).strip()
+        if not camera_frame:
+            self.get_logger().warn("Ignoring detections_json payload without camera_optical_frame")
+            return
         detections = payload.get("detections", [])
         if not isinstance(detections, list) or not detections:
             self.stable_count = 0
@@ -216,7 +219,7 @@ class VisionAutoPick(Node):
             if depth_m <= 0.0 or depth_m < self.min_depth_m or depth_m > self.max_depth_m:
                 continue
 
-            point_m = det.get("point_m", [])
+            point_m = det.get("point_camera_optical_m", [])
             if not isinstance(point_m, list) or len(point_m) != 3:
                 continue
 

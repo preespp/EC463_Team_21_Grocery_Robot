@@ -150,7 +150,7 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
     If nearest object distance > threshold, update bb.pose with a corrected goal pose.
 
     Note:
-      camera_vision publishes object points in camera_feedback frame. Without TF usage here,
+      camera_vision publishes object points in the camera optical frame. Without TF usage here,
       this node applies a best-effort scalar correction by shifting goal x in its own frame.
     """
 

@@ -17,8 +17,9 @@ This document summarizes today's integration work for:
   - Filters detections and transforms into arm base frame
   - Sends pick-place sequence goals to `/pick_viperx`
 - `camera_vision` (`robot_vision/robot_vision/camera_vision.py`)
-  - Publishes detections with depth point in `camera_feedback` frame
-  - Broadcasts camera/object TFs
+  - Publishes detections with depth points in `camera_color_optical_frame`
+  - Broadcasts `ee_gripper_link -> camera_mount_frame -> camera_color_optical_frame`
+  - Broadcasts object TFs in the optical frame
 
 ## 2) Important Config Files
 
@@ -59,7 +60,10 @@ Optional: also launch camera in same launch:
 ```bash
 ros2 launch robot_manipulation vx300_auto_pick.launch.py \
   robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 \
-  launch_camera_vision:=true vision_parent_frame:=vx300s/ee_gripper_link
+  launch_camera_vision:=true \
+  vision_parent_frame:=vx300s/ee_gripper_link \
+  vision_camera_mount_frame:=camera_mount_frame \
+  vision_camera_optical_frame:=camera_color_optical_frame
 ```
 
 ## 5) Preview Mode (No Hardware Motion)
@@ -114,11 +118,14 @@ This is a relatively open close target. If grasp is weak, reduce toward `0.028 ~
 Current assumption:
 
 - `parent_frame = vx300s/ee_gripper_link`
-- `camera_feedback_frame = camera_feedback`
+- `camera_mount_frame = camera_mount_frame`
+- `camera_optical_frame = camera_color_optical_frame`
 - `mount_xyz = (-0.0635, 0.0, 0.0635)` meters
-- `mount_rpy_deg = (0, 0, 0)`
+- `mount_rpy_deg = (0, 0, 0)` for the mount/body frame
+- `optical_frame_rpy_deg = (-90, 0, -90)` for the fixed optical-frame rotation
 
-If pick location is systematically wrong, tune `mount_xyz/mount_rpy_deg`.
+Tune `mount_xyz/mount_rpy_deg` if the camera is rigidly mounted but the pose is off.
+Leave `optical_frame_rpy_deg` at the standard value unless you intentionally redefine the optical frame.
 
 ## 9) Success Indicators
 

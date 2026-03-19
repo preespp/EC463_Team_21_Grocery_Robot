@@ -145,10 +145,12 @@ class CameraVision(Node):
         self.declare_parameter("color_height", 720)
         self.declare_parameter("color_fps", 30)
         self.declare_parameter("parent_frame", "ee_link")
-        self.declare_parameter("camera_feedback_frame", "camera_feedback")
+        self.declare_parameter("camera_mount_frame", "camera_mount_frame")
+        self.declare_parameter("camera_optical_frame", "camera_color_optical_frame")
         self.declare_parameter("object_frame_prefix", "object")
         self.declare_parameter("mount_xyz", "-0.0635,0.0,0.0635")
         self.declare_parameter("mount_rpy_deg", "0.0,0.0,0.0")
+        self.declare_parameter("optical_frame_rpy_deg", "-90.0,0.0,-90.0")
         self.declare_parameter("max_objects_tf", 5)
 
         model_path = self.get_parameter("model_path").value
@@ -163,7 +165,8 @@ class CameraVision(Node):
         self.color_height = int(self.get_parameter("color_height").value)
         self.color_fps = int(self.get_parameter("color_fps").value)
         self.parent_frame = str(self.get_parameter("parent_frame").value)
-        self.camera_feedback_frame = str(self.get_parameter("camera_feedback_frame").value)
+        self.camera_mount_frame = str(self.get_parameter("camera_mount_frame").value)
+        self.camera_optical_frame = str(self.get_parameter("camera_optical_frame").value)
         self.object_frame_prefix = str(self.get_parameter("object_frame_prefix").value)
         self.max_objects_tf = int(self.get_parameter("max_objects_tf").value)
 
@@ -174,6 +177,14 @@ class CameraVision(Node):
         self.mount_quat = euler_to_quat(
             math.radians(roll_deg), math.radians(pitch_deg), math.radians(yaw_deg)
         )
+        optical_roll_deg, optical_pitch_deg, optical_yaw_deg = self._parse_vec3(
+            str(self.get_parameter("optical_frame_rpy_deg").value)
+        )
+        self.optical_quat = euler_to_quat(
+            math.radians(optical_roll_deg),
+            math.radians(optical_pitch_deg),
+            math.radians(optical_yaw_deg),
+        )
 
         self.pub_detections = self.create_publisher(String, "detections_json", 10)
         self.pub_point = self.create_publisher(PointStamped, "detection_point", 10)
@@ -181,6 +192,10 @@ class CameraVision(Node):
             self.pub_image = self.create_publisher(Image, "camera/color/image_raw", 10)
             self.bridge = CvBridge()
         self.tf_broadcaster = TransformBroadcaster(self)
+        self.get_logger().info(
+            f"Camera TF: parent={self.parent_frame} "
+            f"mount={self.camera_mount_frame} optical={self.camera_optical_frame}"
+        )
 
         self.get_logger().info(f"Loading YOLO model: {model_path}")
         self.model = YOLO(model_path)
@@ -212,8 +227,8 @@ class CameraVision(Node):
             self.pipeline.start(cfg)
         except RuntimeError as exc:
             self.get_logger().warn(
-                "Primary RealSense profile failed (%s). Falling back to 640x480@30 without IMU.",
-                str(exc),
+                f"Primary RealSense profile failed ({exc}). "
+                "Falling back to 640x480@30 without IMU."
             )
             cfg = rs.config()
             cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
@@ -250,34 +265,49 @@ class CameraVision(Node):
         if self.latest_accel is not None and self.latest_gyro is not None:
             self.imu_fusion.update(self.latest_accel, self.latest_gyro)
 
-    def _broadcast_camera_feedback_tf(self, stamp):
+    def _broadcast_camera_frames_tf(self, stamp):
         imu_quat = euler_to_quat(
             self.imu_fusion.roll, self.imu_fusion.pitch, self.imu_fusion.yaw
         )
-        q = quat_multiply(self.mount_quat, imu_quat)
+        mount_quat = quat_multiply(self.mount_quat, imu_quat)
 
-        t = TransformStamped()
-        t.header.stamp = stamp
-        t.header.frame_id = self.parent_frame
-        t.child_frame_id = self.camera_feedback_frame
-        t.transform.translation.x = float(self.mount_xyz[0])
-        t.transform.translation.y = float(self.mount_xyz[1])
-        t.transform.translation.z = float(self.mount_xyz[2])
-        t.transform.rotation.x = float(q[0])
-        t.transform.rotation.y = float(q[1])
-        t.transform.rotation.z = float(q[2])
-        t.transform.rotation.w = float(q[3])
-        self.tf_broadcaster.sendTransform(t)
+        mount_tf = TransformStamped()
+        mount_tf.header.stamp = stamp
+        mount_tf.header.frame_id = self.parent_frame
+        mount_tf.child_frame_id = self.camera_mount_frame
+        mount_tf.transform.translation.x = float(self.mount_xyz[0])
+        mount_tf.transform.translation.y = float(self.mount_xyz[1])
+        mount_tf.transform.translation.z = float(self.mount_xyz[2])
+        mount_tf.transform.rotation.x = float(mount_quat[0])
+        mount_tf.transform.rotation.y = float(mount_quat[1])
+        mount_tf.transform.rotation.z = float(mount_quat[2])
+        mount_tf.transform.rotation.w = float(mount_quat[3])
+
+        optical_tf = TransformStamped()
+        optical_tf.header.stamp = stamp
+        optical_tf.header.frame_id = self.camera_mount_frame
+        optical_tf.child_frame_id = self.camera_optical_frame
+        optical_tf.transform.translation.x = 0.0
+        optical_tf.transform.translation.y = 0.0
+        optical_tf.transform.translation.z = 0.0
+        optical_tf.transform.rotation.x = float(self.optical_quat[0])
+        optical_tf.transform.rotation.y = float(self.optical_quat[1])
+        optical_tf.transform.rotation.z = float(self.optical_quat[2])
+        optical_tf.transform.rotation.w = float(self.optical_quat[3])
+
+        self.tf_broadcaster.sendTransform(mount_tf)
+        self.tf_broadcaster.sendTransform(optical_tf)
 
     def _broadcast_object_tf(self, stamp, detections):
         for i, det in enumerate(detections[: self.max_objects_tf]):
             t = TransformStamped()
             t.header.stamp = stamp
-            t.header.frame_id = self.camera_feedback_frame
+            t.header.frame_id = self.camera_optical_frame
             t.child_frame_id = f"{self.object_frame_prefix}_{i}"
-            t.transform.translation.x = float(det["point_m"][0])
-            t.transform.translation.y = float(det["point_m"][1])
-            t.transform.translation.z = float(det["point_m"][2])
+            point_camera_optical_m = det["point_camera_optical_m"]
+            t.transform.translation.x = float(point_camera_optical_m[0])
+            t.transform.translation.y = float(point_camera_optical_m[1])
+            t.transform.translation.z = float(point_camera_optical_m[2])
             t.transform.rotation.x = 0.0
             t.transform.rotation.y = 0.0
             t.transform.rotation.z = 0.0
@@ -320,11 +350,15 @@ class CameraVision(Node):
 
                 dist_m, cx, cy = robust_bbox_depth(depth, x1, y1, x2, y2)
                 if dist_m > 0.0:
+                    # RealSense deprojection returns a 3D point in the camera optical frame:
+                    # x right, y down, z forward.
                     X, Y, Z = rs.rs2_deproject_pixel_to_point(
                         depth_intrin, [float(cx), float(cy)], float(dist_m)
                     )
                 else:
                     X = Y = Z = 0.0
+
+                point_camera_optical_m = [float(X), float(Y), float(Z)]
 
                 det = {
                     "class_id": cls_id,
@@ -333,14 +367,14 @@ class CameraVision(Node):
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
                     "center_px": [cx, cy],
                     "distance_m": float(dist_m),
-                    "point_m": [float(X), float(Y), float(Z)],
+                    "point_camera_optical_m": point_camera_optical_m,
                     "grasp_px": [cx, cy],
                 }
                 detections_out.append(det)
 
                 pt_msg = PointStamped()
                 pt_msg.header.stamp = self.get_clock().now().to_msg()
-                pt_msg.header.frame_id = self.camera_feedback_frame
+                pt_msg.header.frame_id = self.camera_optical_frame
                 pt_msg.point.x = float(X)
                 pt_msg.point.y = float(Y)
                 pt_msg.point.z = float(Z)
@@ -360,13 +394,14 @@ class CameraVision(Node):
                     )
 
         stamp = self.get_clock().now().to_msg()
-        self._broadcast_camera_feedback_tf(stamp)
+        self._broadcast_camera_frames_tf(stamp)
         if detections_out:
             self._broadcast_object_tf(stamp, detections_out)
 
         payload = {
             "timestamp": time.time(),
-            "camera_feedback_frame": self.camera_feedback_frame,
+            "camera_optical_frame": self.camera_optical_frame,
+            "camera_mount_frame": self.camera_mount_frame,
             "imu_rpy_rad": [
                 float(self.imu_fusion.roll),
                 float(self.imu_fusion.pitch),
@@ -379,7 +414,7 @@ class CameraVision(Node):
         if self.publish_image:
             ros_img = self.bridge.cv2_to_imgmsg(color_img, encoding="bgr8")
             ros_img.header.stamp = stamp
-            ros_img.header.frame_id = self.camera_feedback_frame
+            ros_img.header.frame_id = self.camera_optical_frame
             self.pub_image.publish(ros_img)
 
         now = time.time()
