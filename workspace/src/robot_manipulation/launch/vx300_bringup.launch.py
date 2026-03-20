@@ -9,6 +9,13 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
+def resolve_model_config_path(pkg_dir: str, robot_model: str, suffix: str, fallback_name: str) -> str:
+    model_specific = os.path.join(pkg_dir, "config", f"{robot_model}{suffix}")
+    if os.path.exists(model_specific):
+        return model_specific
+    return os.path.join(pkg_dir, "config", fallback_name)
+
+
 def launch_setup(context, *args, **kwargs):
     del args
     del kwargs
@@ -34,7 +41,12 @@ def launch_setup(context, *args, **kwargs):
 
     pkg_dir = get_package_share_directory("robot_manipulation")
     motor_configs = os.path.join(pkg_dir, "config", f"{robot_model}.yaml")
-    mode_template = os.path.join(pkg_dir, "config", "vx300_xsarm_modes.yaml")
+    mode_template = resolve_model_config_path(
+        pkg_dir,
+        robot_model,
+        "_xsarm_modes.yaml",
+        "vx300_xsarm_modes.yaml",
+    )
     urdf_file = os.path.join(pkg_dir, "urdf", "interbotix_xsarm", f"{robot_model}.urdf.xacro")
 
     with open(mode_template, "r", encoding="utf-8") as template_file:

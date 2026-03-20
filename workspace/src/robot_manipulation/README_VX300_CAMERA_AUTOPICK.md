@@ -25,11 +25,16 @@ This document summarizes today's integration work for:
 
 - Auto-pick behavior:
   - `workspace/src/robot_manipulation/config/vx300_auto_pick.yaml`
+  - `workspace/src/robot_manipulation/config/vx300s_auto_pick.yaml`
 - Arm server behavior:
   - `workspace/src/robot_manipulation/config/viperx_arm_server.yaml`
 - Camera mount defaults:
   - `workspace/src/robot_vision/robot_vision/camera_vision.py`
   - default `mount_xyz` is set to `-0.0635,0.0,0.0635`
+
+Launch files now prefer model-specific config filenames when they exist. For VX300S, that means
+`vx300s_auto_pick.yaml`, `vx300s_moveit_modes.yaml`, and `vx300s_xsarm_modes.yaml` are used
+automatically instead of the older shared `vx300_*` names.
 
 ## 3) Build + Environment
 
@@ -161,4 +166,3 @@ ros2 daemon stop
 sleep 1
 ros2 daemon start
 ```
-
