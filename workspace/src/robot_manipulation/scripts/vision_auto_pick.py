@@ -52,8 +52,11 @@ class VisionAutoPick(Node):
         self.declare_parameter("goal_timeout_sec", 15.0)
         self.declare_parameter("pick_once", False)
         self.declare_parameter("enable_auto_pick", True)
+        self.declare_parameter("return_after_sequence", False)
         self.declare_parameter("dry_run", False)
         self.declare_parameter("fixed_orientation_xyzw", "0.0,0.0,0.0,1.0")
+        self.declare_parameter("lock_initial_ee_orientation", True)
+        self.declare_parameter("diagnostics_log_period_sec", 2.0)
 
         self.detections_topic = str(self.get_parameter("detections_topic").value)
         self.action_name = str(self.get_parameter("action_name").value)
@@ -62,6 +65,7 @@ class VisionAutoPick(Node):
         self.ee_orientation_frame = str(self.get_parameter("ee_orientation_frame").value)
         self.use_current_ee_orientation = bool(self.get_parameter("use_current_ee_orientation").value)
         self.target_class = str(self.get_parameter("target_class").value).strip().lower()
+        self.target_classes = self._parse_target_classes(self.target_class)
         self.min_confidence = float(self.get_parameter("min_confidence").value)
         self.min_depth_m = float(self.get_parameter("min_depth_m").value)
         self.max_depth_m = float(self.get_parameter("max_depth_m").value)
@@ -83,7 +87,14 @@ class VisionAutoPick(Node):
         self.goal_timeout_sec = float(self.get_parameter("goal_timeout_sec").value)
         self.pick_once = bool(self.get_parameter("pick_once").value)
         self.enable_auto_pick = bool(self.get_parameter("enable_auto_pick").value)
+        self.return_after_sequence = bool(self.get_parameter("return_after_sequence").value)
         self.dry_run = bool(self.get_parameter("dry_run").value)
+        self.lock_initial_ee_orientation = bool(
+            self.get_parameter("lock_initial_ee_orientation").value
+        )
+        self.diagnostics_log_period_sec = float(
+            self.get_parameter("diagnostics_log_period_sec").value
+        )
         self.fixed_orientation_xyzw = self._parse_quat(
             str(self.get_parameter("fixed_orientation_xyzw").value)
         )
@@ -103,6 +114,7 @@ class VisionAutoPick(Node):
         self.pending_pick_xyz: Optional[Tuple[float, float, float]] = None
         self.pending_pick_meta: Optional[Dict[str, float]] = None
         self.last_stable_xyz: Optional[Tuple[float, float, float]] = None
+        self.locked_pick_orientation_xyzw: Optional[Tuple[float, float, float, float]] = None
         self.stable_count = 0
 
         self.sequence: List[Tuple[str, PickArm.Goal]] = []
@@ -112,15 +124,26 @@ class VisionAutoPick(Node):
         self.result_future = None
         self.next_allowed_pick_time = self.get_clock().now()
         self.last_tf_error_log_time = self.get_clock().now()
+        self.last_diagnostics_log_time = self.get_clock().now()
+        self.last_detection_msg_time = None
 
         self.get_logger().info(
             "vision_auto_pick started: "
             f"detections_topic={self.detections_topic} "
             f"action_name={self.action_name} "
             f"base_frame={self.base_frame} "
-            f"target_class={self.target_class if self.target_class else '<any>'} "
+            f"target_class={','.join(sorted(self.target_classes)) if self.target_classes else '<any>'} "
             f"enable_auto_pick={self.enable_auto_pick} "
             f"dry_run={self.dry_run}"
+        )
+        self.get_logger().info(
+            "vision_auto_pick filters: "
+            f"min_conf={self.min_confidence:.2f} "
+            f"depth_range=({self.min_depth_m:.2f}, {self.max_depth_m:.2f}) "
+            f"workspace_x=({self.workspace_min_x:.2f}, {self.workspace_max_x:.2f}) "
+            f"workspace_y=({self.workspace_min_y:.2f}, {self.workspace_max_y:.2f}) "
+            f"workspace_z=({self.workspace_min_z:.2f}, {self.workspace_max_z:.2f}) "
+            f"stability={self.target_stability_count}"
         )
 
     @staticmethod
@@ -135,8 +158,34 @@ class VisionAutoPick(Node):
         return q[0] / norm, q[1] / norm, q[2] / norm, q[3] / norm
 
     @staticmethod
+    def _parse_target_classes(text: str) -> set[str]:
+        return {
+            part.strip().lower()
+            for part in text.split(",")
+            if part.strip()
+        }
+
+    @staticmethod
     def _distance(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:
         return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2)
+
+    @staticmethod
+    def _format_xyz(xyz: Tuple[float, float, float]) -> str:
+        return f"({xyz[0]:.3f}, {xyz[1]:.3f}, {xyz[2]:.3f})"
+
+    def _should_log_diagnostics(self, now) -> bool:
+        if self.diagnostics_log_period_sec <= 0.0:
+            return False
+        return (
+            now - self.last_diagnostics_log_time
+        ).nanoseconds >= int(self.diagnostics_log_period_sec * 1e9)
+
+    def _maybe_log_diagnostics(self, message: str) -> None:
+        now = self.get_clock().now()
+        if not self._should_log_diagnostics(now):
+            return
+        self.last_diagnostics_log_time = now
+        self.get_logger().info(message)
 
     def _within_workspace(self, xyz: Tuple[float, float, float]) -> bool:
         x, y, z = xyz
@@ -151,6 +200,7 @@ class VisionAutoPick(Node):
             return
 
         now = self.get_clock().now()
+        self.last_detection_msg_time = now
         if now < self.next_allowed_pick_time:
             return
 
@@ -168,12 +218,29 @@ class VisionAutoPick(Node):
         if not isinstance(detections, list) or not detections:
             self.stable_count = 0
             self.last_stable_xyz = None
+            self._maybe_log_diagnostics(
+                f"Auto-pick sees camera stream from {camera_frame}, but detections list is empty."
+            )
             return
 
-        best = self._select_best_detection(detections, camera_frame)
+        best, summary = self._select_best_detection(detections, camera_frame)
         if best is None:
             self.stable_count = 0
             self.last_stable_xyz = None
+            message = (
+                "Auto-pick rejected current detections: "
+                f"total={int(summary['total'])} "
+                f"class_mismatch={int(summary['class_mismatch'])} "
+                f"low_conf={int(summary['low_confidence'])} "
+                f"bad_depth={int(summary['bad_depth'])} "
+                f"bad_point={int(summary['bad_point'])} "
+                f"tf_fail={int(summary['tf_fail'])} "
+                f"out_of_workspace={int(summary['out_of_workspace'])}"
+            )
+            example_xyz = summary.get("example_workspace_xyz")
+            if isinstance(example_xyz, tuple):
+                message += f" example_base_xyz={self._format_xyz(example_xyz)}"
+            self._maybe_log_diagnostics(message)
             return
 
         xyz = best["xyz"]
@@ -185,6 +252,13 @@ class VisionAutoPick(Node):
             self.last_stable_xyz = xyz
 
         if self.stable_count < self.target_stability_count:
+            self._maybe_log_diagnostics(
+                "Candidate accepted but waiting for stability: "
+                f"{self.stable_count}/{self.target_stability_count} "
+                f"class={best['class_name']} "
+                f"conf={float(best['confidence']):.2f} "
+                f"base_xyz={self._format_xyz(xyz)}"
+            )
             return
 
         self.pending_pick_xyz = xyz
@@ -202,31 +276,50 @@ class VisionAutoPick(Node):
         self,
         detections: List[dict],
         camera_frame: str,
-    ) -> Optional[Dict[str, object]]:
+    ) -> Tuple[Optional[Dict[str, object]], Dict[str, object]]:
         candidates: List[Dict[str, object]] = []
+        summary: Dict[str, object] = {
+            "total": len(detections),
+            "class_mismatch": 0,
+            "low_confidence": 0,
+            "bad_depth": 0,
+            "bad_point": 0,
+            "tf_fail": 0,
+            "out_of_workspace": 0,
+            "example_workspace_xyz": None,
+        }
         for det in detections:
             if not isinstance(det, dict):
+                summary["bad_point"] = int(summary["bad_point"]) + 1
                 continue
             cls_name = str(det.get("class_name", "")).strip().lower()
-            if self.target_class and cls_name != self.target_class:
+            if self.target_classes and cls_name not in self.target_classes:
+                summary["class_mismatch"] = int(summary["class_mismatch"]) + 1
                 continue
 
             confidence = float(det.get("confidence", 0.0))
             if confidence < self.min_confidence:
+                summary["low_confidence"] = int(summary["low_confidence"]) + 1
                 continue
 
             depth_m = float(det.get("distance_m", 0.0))
             if depth_m <= 0.0 or depth_m < self.min_depth_m or depth_m > self.max_depth_m:
+                summary["bad_depth"] = int(summary["bad_depth"]) + 1
                 continue
 
             point_m = det.get("point_camera_optical_m", [])
             if not isinstance(point_m, list) or len(point_m) != 3:
+                summary["bad_point"] = int(summary["bad_point"]) + 1
                 continue
 
             transformed = self._transform_point_to_base(point_m, camera_frame)
             if transformed is None:
+                summary["tf_fail"] = int(summary["tf_fail"]) + 1
                 continue
             if not self._within_workspace(transformed):
+                summary["out_of_workspace"] = int(summary["out_of_workspace"]) + 1
+                if summary["example_workspace_xyz"] is None:
+                    summary["example_workspace_xyz"] = transformed
                 continue
 
             candidates.append({
@@ -237,9 +330,9 @@ class VisionAutoPick(Node):
             })
 
         if not candidates:
-            return None
+            return None, summary
         candidates.sort(key=lambda c: (float(c["depth_m"]), -float(c["confidence"])))
-        return candidates[0]
+        return candidates[0], summary
 
     def _transform_point_to_base(
         self,
@@ -278,6 +371,8 @@ class VisionAutoPick(Node):
     def _get_pick_orientation(self) -> Tuple[float, float, float, float]:
         if not self.use_current_ee_orientation:
             return self.fixed_orientation_xyzw
+        if self.lock_initial_ee_orientation and self.locked_pick_orientation_xyzw is not None:
+            return self.locked_pick_orientation_xyzw
         try:
             transform = self.tf_buffer.lookup_transform(
                 self.base_frame,
@@ -286,7 +381,14 @@ class VisionAutoPick(Node):
                 timeout=Duration(seconds=0.25),
             )
             q = transform.transform.rotation
-            return float(q.x), float(q.y), float(q.z), float(q.w)
+            quat = (float(q.x), float(q.y), float(q.z), float(q.w))
+            if self.lock_initial_ee_orientation and self.locked_pick_orientation_xyzw is None:
+                self.locked_pick_orientation_xyzw = quat
+                self.get_logger().info(
+                    "Locked pick orientation from current EE pose: "
+                    f"xyzw=({quat[0]:.4f}, {quat[1]:.4f}, {quat[2]:.4f}, {quat[3]:.4f})"
+                )
+            return quat
         except TransformException:
             return self.fixed_orientation_xyzw
 
@@ -295,6 +397,7 @@ class VisionAutoPick(Node):
         xyz: Tuple[float, float, float],
         quat_xyzw: Tuple[float, float, float, float],
         close_position: float = -1.0,
+        use_cartesian: bool = False,
     ) -> PickArm.Goal:
         goal = PickArm.Goal()
         goal.target_pose.header.frame_id = self.base_frame
@@ -311,10 +414,23 @@ class VisionAutoPick(Node):
         goal.pregrasp_offset_m = 0.0
         goal.retreat_offset_m = 0.0
         goal.gripper_close_position = float(close_position)
-        goal.use_cartesian_approach = False
+        goal.use_cartesian_approach = bool(use_cartesian)
         return goal
 
     def _make_gripper_goal(self, command: str) -> PickArm.Goal:
+        goal = PickArm.Goal()
+        goal.target_pose.header.frame_id = self.base_frame
+        goal.target_pose.header.stamp = self.get_clock().now().to_msg()
+        goal.target_pose.pose.orientation.w = 1.0
+        goal.planning_group = command
+        goal.ee_link = ""
+        goal.pregrasp_offset_m = 0.0
+        goal.retreat_offset_m = 0.0
+        goal.gripper_close_position = -1.0
+        goal.use_cartesian_approach = False
+        return goal
+
+    def _make_command_goal(self, command: str) -> PickArm.Goal:
         goal = PickArm.Goal()
         goal.target_pose.header.frame_id = self.base_frame
         goal.target_pose.header.stamp = self.get_clock().now().to_msg()
@@ -339,23 +455,27 @@ class VisionAutoPick(Node):
 
         sequence = [
             ("open_gripper", self._make_gripper_goal("open_gripper")),
-            ("move_pregrasp", self._make_arm_goal(pre_xyz, q, close_position=-1.0)),
-            ("move_grasp_and_close", self._make_arm_goal(grasp_xyz, q, close_position=self.close_gripper_position)),
-            ("lift", self._make_arm_goal(lift_xyz, q, close_position=-1.0)),
+            ("move_pregrasp", self._make_arm_goal(pre_xyz, q, close_position=-1.0, use_cartesian=False)),
+            (
+                "move_grasp_and_close",
+                self._make_arm_goal(
+                    grasp_xyz,
+                    q,
+                    close_position=self.close_gripper_position,
+                    use_cartesian=True,
+                ),
+            ),
+            ("lift", self._make_arm_goal(lift_xyz, q, close_position=-1.0, use_cartesian=True)),
         ]
 
         if self.put_back_after_pick:
-            place_z = min(
-                max(grasp_z + self.place_offset_z_m, self.workspace_min_z),
-                self.workspace_max_z,
-            )
-            place_xyz = (xyz[0], xyz[1], place_z)
             sequence.extend([
-                ("move_back_to_pregrasp", self._make_arm_goal(pre_xyz, q, close_position=-1.0)),
-                ("move_place", self._make_arm_goal(place_xyz, q, close_position=-1.0)),
+                ("move_to_place_pose", self._make_command_goal("place_arm_pose")),
                 ("open_gripper_place", self._make_gripper_goal("open_gripper")),
-                ("retreat_after_place", self._make_arm_goal(pre_xyz, q, close_position=-1.0)),
             ])
+
+        if self.return_after_sequence:
+            sequence.append(("return_arm_pose", self._make_command_goal("return_arm_pose")))
 
         return sequence
 
@@ -398,6 +518,22 @@ class VisionAutoPick(Node):
             self.get_logger().warn(message)
 
     def _tick_action_state(self) -> None:
+        if self.enable_auto_pick and self.state == "idle":
+            now = self.get_clock().now()
+            if self.last_detection_msg_time is None:
+                self._maybe_log_diagnostics(
+                    f"No detections_json messages received yet on {self.detections_topic}. "
+                    "Check that camera_vision is running."
+                )
+            elif (
+                now - self.last_detection_msg_time
+            ).nanoseconds >= int(max(5.0, self.diagnostics_log_period_sec) * 1e9):
+                self._maybe_log_diagnostics(
+                    f"No new detections_json messages for "
+                    f"{(now - self.last_detection_msg_time).nanoseconds / 1e9:.1f}s "
+                    f"on {self.detections_topic}."
+                )
+
         if self.state == "idle":
             if self.pending_pick_xyz is None:
                 return

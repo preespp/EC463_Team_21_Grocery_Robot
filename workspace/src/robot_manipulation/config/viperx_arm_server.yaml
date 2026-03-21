@@ -12,7 +12,11 @@ viperx_arm_server:
 
     # Fallback values used if named targets are not available in the SRDF.
     open_gripper_pos: 0.035
-    closed_gripper_pos: 0.045
+    closed_gripper_pos: 0.040
+    place_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    place_joint_positions: [1.81514242, -0.2268928, 1.53588974, 0.06981317, -1.34390352, -0.01745329]
+    return_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    return_joint_positions: [0.0, -1.85004901, 1.53588974, 0.0, 0.80285146, 0.0]
 
     # Interbotix SRDF defaults for gripper group states.
     open_gripper_named_target: "Released"

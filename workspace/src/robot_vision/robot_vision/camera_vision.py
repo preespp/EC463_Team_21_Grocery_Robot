@@ -148,10 +148,15 @@ class CameraVision(Node):
         self.declare_parameter("camera_mount_frame", "camera_mount_frame")
         self.declare_parameter("camera_optical_frame", "camera_color_optical_frame")
         self.declare_parameter("object_frame_prefix", "object")
-        self.declare_parameter("mount_xyz", "-0.0635,0.0,0.0635")
-        self.declare_parameter("mount_rpy_deg", "0.0,0.0,0.0")
+        # Trial 1 eye-in-hand calibration is saved as ee_gripper_link -> camera_color_optical_frame.
+        # These defaults are the equivalent ee_gripper_link -> camera_mount_frame pose so the
+        # existing camera_mount_frame -> camera_color_optical_frame optical-frame rotation still
+        # reconstructs the calibrated optical-frame transform.
+        self.declare_parameter("mount_xyz", "-0.98129,-0.256618,-0.0501378")
+        self.declare_parameter("mount_rpy_deg", "-0.4593975,0.2464277,8.1401713")
         self.declare_parameter("optical_frame_rpy_deg", "-90.0,0.0,-90.0")
         self.declare_parameter("max_objects_tf", 5)
+        self.declare_parameter("status_log_period_sec", 2.0)
 
         model_path = self.get_parameter("model_path").value
         self.conf_thres = float(self.get_parameter("conf").value)
@@ -169,6 +174,7 @@ class CameraVision(Node):
         self.camera_optical_frame = str(self.get_parameter("camera_optical_frame").value)
         self.object_frame_prefix = str(self.get_parameter("object_frame_prefix").value)
         self.max_objects_tf = int(self.get_parameter("max_objects_tf").value)
+        self.status_log_period_sec = float(self.get_parameter("status_log_period_sec").value)
 
         self.mount_xyz = self._parse_vec3(str(self.get_parameter("mount_xyz").value))
         roll_deg, pitch_deg, yaw_deg = self._parse_vec3(
@@ -242,6 +248,7 @@ class CameraVision(Node):
         self.latest_gyro = None
         self.fps_hist = deque(maxlen=20)
         self.last_t = time.time()
+        self.last_status_log_time = 0.0
 
         self.timer = self.create_timer(0.02, self.timer_cb)
 
@@ -313,6 +320,33 @@ class CameraVision(Node):
             t.transform.rotation.z = 0.0
             t.transform.rotation.w = 1.0
             self.tf_broadcaster.sendTransform(t)
+
+    def _maybe_log_status(self, detections):
+        if self.status_log_period_sec <= 0.0:
+            return
+        now = time.time()
+        if (now - self.last_status_log_time) < self.status_log_period_sec:
+            return
+        self.last_status_log_time = now
+
+        if detections:
+            first = detections[0]
+            point = first["point_camera_optical_m"]
+            class_names = list(dict.fromkeys(str(det["class_name"]) for det in detections))
+            self.get_logger().info(
+                "camera_vision status: "
+                f"detections={len(detections)} "
+                f"first_class={first['class_name']} "
+                f"conf={float(first['confidence']):.2f} "
+                f"depth_m={float(first['distance_m']):.3f} "
+                f"optical_xyz=({float(point[0]):.3f}, {float(point[1]):.3f}, {float(point[2]):.3f})"
+            )
+            self.get_logger().info(
+                "camera_vision detected_classes: "
+                + ", ".join(class_names)
+            )
+        else:
+            self.get_logger().info("camera_vision status: frames OK, detections=0")
 
     def timer_cb(self):
         try:
@@ -397,6 +431,7 @@ class CameraVision(Node):
         self._broadcast_camera_frames_tf(stamp)
         if detections_out:
             self._broadcast_object_tf(stamp, detections_out)
+        self._maybe_log_status(detections_out)
 
         payload = {
             "timestamp": time.time(),

@@ -41,6 +41,11 @@ def generate_launch_description():
                 "parent_frame": LaunchConfiguration("vision_parent_frame"),
                 "camera_mount_frame": LaunchConfiguration("vision_camera_mount_frame"),
                 "camera_optical_frame": LaunchConfiguration("vision_camera_optical_frame"),
+                "mount_xyz": LaunchConfiguration("vision_mount_xyz"),
+                "mount_rpy_deg": LaunchConfiguration("vision_mount_rpy_deg"),
+                "optical_frame_rpy_deg": LaunchConfiguration(
+                    "vision_optical_frame_rpy_deg"
+                ),
                 "publish_image": LaunchConfiguration("vision_publish_image"),
             }
         ],
@@ -63,6 +68,18 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "vision_camera_optical_frame",
             default_value="camera_color_optical_frame",
+        ),
+        DeclareLaunchArgument(
+            "vision_mount_xyz",
+            default_value="-0.98129,-0.256618,-0.0501378",
+        ),
+        DeclareLaunchArgument(
+            "vision_mount_rpy_deg",
+            default_value="-0.4593975,0.2464277,8.1401713",
+        ),
+        DeclareLaunchArgument(
+            "vision_optical_frame_rpy_deg",
+            default_value="-90.0,0.0,-90.0",
         ),
         DeclareLaunchArgument("vision_publish_image", default_value="true"),
         moveit_launch,

@@ -8,6 +8,7 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "moveit_msgs/msg/display_trajectory.hpp"
+#include "moveit_msgs/msg/robot_trajectory.hpp"
 #include "moveit/robot_state/conversions.h"
 #include "moveit/move_group_interface/move_group_interface.h"
 #include "rclcpp/rclcpp.hpp"
@@ -38,6 +39,8 @@ public:
     planning_time_sec_ = this->declare_parameter<double>("planning_time_sec", 3.0);
     max_velocity_scaling_ = this->declare_parameter<double>("max_velocity_scaling", 0.2);
     max_acceleration_scaling_ = this->declare_parameter<double>("max_acceleration_scaling", 0.2);
+    cartesian_eef_step_m_ = this->declare_parameter<double>("cartesian_eef_step_m", 0.01);
+    cartesian_min_fraction_ = this->declare_parameter<double>("cartesian_min_fraction", 0.9);
     preview_only_ = this->declare_parameter<bool>("preview_only", false);
     preview_step_delay_sec_ = this->declare_parameter<double>("preview_step_delay_sec", 1.0);
     open_gripper_pos_ = this->declare_parameter<double>("open_gripper_pos", 0.035);
@@ -48,6 +51,20 @@ public:
     close_gripper_named_target_ = this->declare_parameter<std::string>(
       "close_gripper_named_target",
       "Grasping");
+    return_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "return_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    return_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "return_joint_positions",
+      std::vector<double>{0.0, -1.85004901, 1.53588974, 0.0, 0.80285146, 0.0});
+    place_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "place_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    place_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_joint_positions",
+      std::vector<double>{1.81514242, -0.2268928, 1.53588974, 0.06981317, -1.34390352, -0.01745329});
 
     action_server_ = rclcpp_action::create_server<PickArm>(
       this,
@@ -102,7 +119,9 @@ private:
     }
 
     const auto command = goal->planning_group;
-    if (command != "open_gripper" && command != "close_gripper" &&
+    if (
+      command != "open_gripper" && command != "close_gripper" &&
+      command != "return_arm_pose" && command != "place_arm_pose" &&
       goal->target_pose.header.frame_id.empty())
     {
       RCLCPP_WARN(this->get_logger(), "ViperX goal rejected: target_pose.frame_id is empty");
@@ -136,18 +155,41 @@ private:
 
   bool plan_and_execute_arm(
     const geometry_msgs::msg::PoseStamped & target_pose,
-    const std::string & ee_link)
+    const std::string & ee_link,
+    bool use_cartesian)
   {
     moveit::planning_interface::MoveGroupInterface::Plan plan;
-    if (!ee_link.empty()) {
-      arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
+    if (use_cartesian) {
+      std::vector<geometry_msgs::msg::Pose> waypoints;
+      waypoints.push_back(target_pose.pose);
+
+      moveit_msgs::msg::RobotTrajectory robot_traj;
+      const double fraction = arm_move_group_->computeCartesianPath(
+        waypoints,
+        cartesian_eef_step_m_,
+        0.0,
+        robot_traj,
+        true);
+      if (fraction < cartesian_min_fraction_ || robot_traj.joint_trajectory.points.empty()) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Cartesian path fraction too low: %.3f < %.3f",
+          fraction,
+          cartesian_min_fraction_);
+        return false;
+      }
+      plan.trajectory_ = robot_traj;
     } else {
-      arm_move_group_->setPoseTarget(target_pose.pose);
-    }
-    const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
-    arm_move_group_->clearPoseTargets();
-    if (!ok) {
-      return false;
+      if (!ee_link.empty()) {
+        arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
+      } else {
+        arm_move_group_->setPoseTarget(target_pose.pose);
+      }
+      const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+      arm_move_group_->clearPoseTargets();
+      if (!ok) {
+        return false;
+      }
     }
     if (preview_only_) {
       publish_preview(plan);
@@ -268,6 +310,38 @@ private:
     return false;
   }
 
+  bool execute_arm_joint_target(
+    const std::vector<std::string> & joint_names,
+    const std::vector<double> & joint_positions)
+  {
+    if (joint_names.empty() || joint_names.size() != joint_positions.size()) {
+      RCLCPP_WARN(this->get_logger(), "Return arm joint target config is empty or mismatched.");
+      return false;
+    }
+
+    std::map<std::string, double> joint_targets;
+    for (size_t i = 0; i < joint_names.size(); ++i) {
+      joint_targets[joint_names[i]] = joint_positions[i];
+    }
+
+    if (!arm_move_group_->setJointValueTarget(joint_targets)) {
+      RCLCPP_WARN(this->get_logger(), "Failed to set arm joint value target for return pose.");
+      return false;
+    }
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    if (!ok) {
+      RCLCPP_WARN(this->get_logger(), "Failed to plan configured return arm pose.");
+      return false;
+    }
+    if (preview_only_) {
+      publish_preview(plan);
+      return true;
+    }
+    return arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+  }
+
   void execute(const std::shared_ptr<GoalHandlePickArm> goal_handle)
   {
     auto result = std::make_shared<PickArm::Result>();
@@ -309,12 +383,43 @@ private:
         return;
       }
 
+      if (command == "return_arm_pose" || command == "place_arm_pose") {
+        feedback->stage = command;
+        feedback->position_error_m = 0.0f;
+        goal_handle->publish_feedback(feedback);
+
+        const auto & joint_names = (command == "place_arm_pose") ? place_joint_names_ : return_joint_names_;
+        const auto & joint_positions =
+          (command == "place_arm_pose") ? place_joint_positions_ : return_joint_positions_;
+
+        if (!execute_arm_joint_target(joint_names, joint_positions)) {
+          result->success = false;
+          result->message =
+            (command == "place_arm_pose") ?
+            "Failed to execute configured place arm pose" :
+            "Failed to execute configured return arm pose";
+          result->final_position_error_m = -1.0f;
+          goal_handle->abort(result);
+          goal_active_.store(false);
+          return;
+        }
+
+        result->success = true;
+        result->message =
+          (command == "place_arm_pose") ? "Place arm pose complete" : "Return arm pose complete";
+        result->final_position_error_m = 0.0f;
+        maybe_preview_delay();
+        goal_handle->succeed(result);
+        goal_active_.store(false);
+        return;
+      }
+
       feedback->stage = "planning_arm";
       feedback->position_error_m = 0.0f;
       goal_handle->publish_feedback(feedback);
 
       const auto target_pose = transform_pose_to_planning_frame(goal->target_pose);
-      if (!plan_and_execute_arm(target_pose, goal->ee_link)) {
+      if (!plan_and_execute_arm(target_pose, goal->ee_link, goal->use_cartesian_approach)) {
         result->success = false;
         result->message = "Failed to plan/execute arm pose";
         result->final_position_error_m = -1.0f;
@@ -362,10 +467,16 @@ private:
   double planning_time_sec_;
   double max_velocity_scaling_;
   double max_acceleration_scaling_;
+  double cartesian_eef_step_m_;
+  double cartesian_min_fraction_;
   bool preview_only_;
   double preview_step_delay_sec_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
+  std::vector<std::string> return_joint_names_;
+  std::vector<double> return_joint_positions_;
+  std::vector<std::string> place_joint_names_;
+  std::vector<double> place_joint_positions_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;

@@ -5,11 +5,11 @@ vision_auto_pick:
     base_frame: "vx300s/base_link"
     ee_link: ""
     ee_orientation_frame: "vx300s/ee_gripper_link"
-    use_current_ee_orientation: true
+    use_current_ee_orientation: false
 
-    # Pick only bottles for now.
-    target_class: "bottle"
-    min_confidence: 0.60
+    # Accept both bottle and cup since the current model often labels bottles as cups.
+    target_class: "bottle,cup"
+    min_confidence: 0.50
     min_depth_m: 0.08
     max_depth_m: 0.70
 
@@ -23,9 +23,9 @@ vision_auto_pick:
 
     pregrasp_offset_z_m: 0.08
     grasp_offset_z_m: 0.00
-    lift_offset_z_m: 0.12
+    lift_offset_z_m: 0.20
     place_offset_z_m: 0.00
-    close_gripper_position: 0.045
+    close_gripper_position: 0.040
     put_back_after_pick: true
 
     target_stability_count: 1
@@ -34,7 +34,9 @@ vision_auto_pick:
     goal_timeout_sec: 15.0
     pick_once: true
     enable_auto_pick: true
+    return_after_sequence: true
     dry_run: false
 
-    # Used only when use_current_ee_orientation is false.
+    # Keep ee_gripper_link level and parallel to the table for side grasping.
     fixed_orientation_xyzw: "0.0,0.0,0.0,1.0"
+    lock_initial_ee_orientation: false
