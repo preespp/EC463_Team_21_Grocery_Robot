@@ -288,8 +288,10 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/se
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/setup.bash
 
 ros2 launch robot_manipulation vx300_moveit.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 use_moveit_rviz:=true
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB0 use_moveit_rviz:=true
 ```
+
+** Need to check port of robotic arm every time you run the setup
 
 ### Preferred camera launch for calibration
 
