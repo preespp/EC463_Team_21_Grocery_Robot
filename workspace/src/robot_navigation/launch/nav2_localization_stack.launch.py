@@ -6,6 +6,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Time
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from nav2_common.launch import RewrittenYaml
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -43,6 +44,21 @@ def generate_launch_description():
     default_nav2_params = str(package_share / "config" / "nav2_params_smac_mppi_omni.yaml")
     default_ekf_params = str(package_share / "config" / "ekf_odom_base_imu.yaml")
     default_semantic_map = str(package_share / "config" / "semantic_map_testmapMain.yaml")
+    default_nav_to_pose_bt = str(
+        package_share / "config" / "navigate_to_pose_w_smart_backup_recovery.xml"
+    )
+    default_nav_through_poses_bt = str(
+        package_share / "config" / "navigate_through_poses_w_smart_backup_recovery.xml"
+    )
+
+    nav2_params_with_bt = RewrittenYaml(
+        source_file=LaunchConfiguration("nav2_params_file"),
+        param_rewrites={
+            "default_nav_to_pose_bt_xml": default_nav_to_pose_bt,
+            "default_nav_through_poses_bt_xml": default_nav_through_poses_bt,
+        },
+        convert_types=True,
+    )
 
     # sick_picoscan.launch.py forwards sys.argv directly to sick_generic_caller.
     # Launching the caller node directly guarantees these args are applied.
@@ -254,7 +270,7 @@ def generate_launch_description():
             "namespace": LaunchConfiguration("nav2_namespace"),
             "use_sim_time": "false",
             "autostart": "true",
-            "params_file": LaunchConfiguration("nav2_params_file"),
+            "params_file": nav2_params_with_bt,
         }.items(),
     )
 

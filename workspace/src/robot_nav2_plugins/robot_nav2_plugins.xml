@@ -1,0 +1,10 @@
+<class_libraries>
+  <library path="robot_nav2_plugins">
+    <class
+      name="robot_nav2_plugins/SmartBackUp"
+      type="robot_nav2_plugins::SmartBackUp"
+      base_class_type="nav2_core::Behavior">
+      <description>Chooses a short holonomic retreat direction using the local costmap.</description>
+    </class>
+  </library>
+</class_libraries>

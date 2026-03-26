@@ -49,7 +49,9 @@ bt_navigator:
     bt_loop_duration: 10
     default_server_timeout: 20
     wait_for_service_timeout: 1000
-    # 'default_nav_through_poses_bt_xml' and 'default_nav_to_pose_bt_xml' use Nav2 defaults.
+    # Rewritten at launch to absolute package-share XML paths.
+    default_nav_to_pose_bt_xml: ""
+    default_nav_through_poses_bt_xml: ""
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -362,7 +364,14 @@ behavior_server:
     spin:
       plugin: "nav2_behaviors/Spin"
     backup:
-      plugin: "nav2_behaviors/BackUp"
+      plugin: "robot_nav2_plugins/SmartBackUp"
+      robot_radius: 0.40
+      max_radius: 1.00
+      service_name: "local_costmap/get_costmap"
+      cost_threshold: 253.0
+      sample_step: 0.05
+      min_free_distance: 0.20
+      visualization: False
     drive_on_heading:
       plugin: "nav2_behaviors/DriveOnHeading"
     wait:
