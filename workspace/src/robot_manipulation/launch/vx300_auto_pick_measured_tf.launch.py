@@ -28,12 +28,9 @@ def generate_launch_description():
             "vision_parent_frame": "vx300s/ee_gripper_link",
             "vision_camera_mount_frame": "camera_mount_frame",
             "vision_camera_optical_frame": "camera_color_optical_frame",
-            #"vision_mount_xyz": "-0.0635,0.0,0.0635",
+            "vision_mount_xyz": "-0.0635,0.0,0.0635",
             "vision_mount_rpy_deg": "0.0,0.0,0.0",
             "vision_optical_frame_rpy_deg": "-90.0,0.0,-90.0",
-            "vision_mount_xyz": "-0.0463943,0.0290953,0.0549267",
-            # "vision_mount_rpy_deg": "0.7645,0.4427,1.1135",
-            # "vision_optical_frame_rpy_deg": "-90.0,0.0,-90.0",
             "vision_publish_image": LaunchConfiguration("vision_publish_image"),
         }.items(),
     )

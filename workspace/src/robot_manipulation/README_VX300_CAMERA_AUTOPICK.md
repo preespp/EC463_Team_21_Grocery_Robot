@@ -32,8 +32,11 @@ This document summarizes today's integration work for:
   - `workspace/src/robot_manipulation/config/viperx_arm_server.yaml`
 - Camera mount / measured TF:
   - `workspace/src/robot_vision/robot_vision/camera_vision.py`
-  - `workspace/src/robot_manipulation/config/camera_to_arm_tf_measured.launch.py`
+  - `workspace/src/robot_manipulation/launch/camera_to_arm_tf_measured.launch.py`
   - `workspace/src/robot_manipulation/launch/vx300_auto_pick_measured_tf.launch.py`
+- Camera mount / calibrated TF:
+  - `workspace/src/robot_manipulation/launch/camera_pose_correct2.launch.py`
+  - `workspace/src/robot_manipulation/launch/vx300_auto_pick.launch.py`
 
 Launch files now prefer model-specific config filenames when they exist. For VX300S, that means
 `vx300s_auto_pick.yaml`, `vx300s_moveit_modes.yaml`, and `vx300s_xsarm_modes.yaml` are used
@@ -62,7 +65,7 @@ cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
 colcon build --base-paths src --packages-select robot_manipulation robot_vision
 ```
 
-## 4) Launch (Main Entry For Current Runtime)
+## 4) Launch With Measured TF (Known Stable)
 
 ```bash
 ros2 launch robot_manipulation vx300_auto_pick_measured_tf.launch.py \
@@ -79,10 +82,38 @@ This starts:
   - `ee_gripper_link -> camera_mount_frame = (-0.0635, 0.0, 0.0635)`
   - `camera_mount_frame -> camera_color_optical_frame = (-90, 0, -90)` degrees
 
+Use this path when you want the older hand-measured TF that was stable in previous testing.
+
+## 5) Launch With Calibrated TF (`correct2`)
+
+```bash
+ros2 launch robot_manipulation vx300_auto_pick.launch.py \
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 \
+  launch_camera_vision:=true
+```
+
+This launch now uses the current `correct2` calibration values by default in converted
+`camera_vision` mount form:
+
+- `vision_mount_xyz = (-0.0463943, -0.0110000, 0.0549267)`
+- `vision_mount_rpy_deg = (0.7645, 0.4427, 1.1135)` degrees
+- `vision_optical_frame_rpy_deg = (-90, 0, -90)` degrees
+
+Important note:
+
+- `camera_pose_correct2.launch.py` is the saved direct TF from `ee_gripper_link` to
+  `camera_color_optical_frame`
+- `vx300_auto_pick.launch.py` does **not** launch that file directly
+- instead, it uses the converted mount parameters above because `camera_vision` publishes
+  `ee_gripper_link -> camera_mount_frame -> camera_color_optical_frame`
+
 Do **not** launch `realsense2_camera` separately for auto-pick. The auto-pick launch already starts
 the custom `camera_vision` node and opens the RealSense directly.
 
-## 5) Launch Without Auto Pick
+Do **not** launch `camera_pose_correct2.launch.py` or `camera_to_arm_tf_measured.launch.py`
+at the same time as auto-pick, because `camera_vision` is already publishing the camera TF chain.
+
+## 6) Launch Without Auto Pick
 
 Use this when you only want the arm, MoveIt, and RViz:
 
@@ -92,7 +123,7 @@ ros2 launch robot_manipulation vx300_moveit.launch.py \
   use_moveit_rviz:=true
 ```
 
-## 6) Preview Mode (No Hardware Motion)
+## 7) Preview Mode (No Hardware Motion)
 
 Use preview mode when validating trajectories:
 
@@ -111,7 +142,7 @@ Preview trajectory topic:
 
 - `/display_planned_path`
 
-## 7) Current Auto-Pick Behavior
+## 8) Current Auto-Pick Behavior
 
 The current runtime behavior is no longer "pick it up and put it back at the same detected spot."
 It now does this:
@@ -133,7 +164,7 @@ Important runtime choices:
 - Current YOLO confidence threshold is `0.50`
 - `pick_once: true`, so one successful cycle disables auto-pick
 
-## 8) Current Place Pose And Home Pose
+## 9) Current Place Pose And Home Pose
 
 Current left-side place pose in degrees:
 
@@ -158,7 +189,7 @@ These are stored in radians in `workspace/src/robot_manipulation/config/viperx_a
 - `place_joint_positions`
 - `return_joint_positions`
 
-## 9) Real Hardware Test (Safe First Pass)
+## 10) Real Hardware Test (Safe First Pass)
 
 Set in `vx300s_auto_pick.yaml`:
 
@@ -178,7 +209,7 @@ Recommended conservative workspace for initial test:
 
 Start one-bottle test with clear table and emergency stop ready.
 
-## 10) Gripper Close Behavior
+## 11) Gripper Close Behavior
 
 Current close target is configured as:
 
@@ -187,9 +218,9 @@ Current close target is configured as:
 
 Smaller values mean a tighter grip on this gripper. If grasp is still weak, reduce gradually.
 
-## 11) Camera Mount Assumption
+## 12) Camera Mount Assumption
 
-Current assumption:
+Measured runtime assumption:
 
 - `parent_frame = vx300s/ee_gripper_link`
 - `camera_mount_frame = camera_mount_frame`
@@ -198,9 +229,19 @@ Current assumption:
 - `mount_rpy_deg = (0, 0, 0)` for the mount/body frame
 - `optical_frame_rpy_deg = (-90, 0, -90)` for the fixed optical-frame rotation
 
-This measured TF replaced the unusable calibration result for runtime picking.
+Calibrated `correct2` runtime assumption:
 
-## 12) Success Indicators
+- `parent_frame = vx300s/ee_gripper_link`
+- `camera_mount_frame = camera_mount_frame`
+- `camera_optical_frame = camera_color_optical_frame`
+- `mount_xyz = (-0.0463943, -0.0110000, 0.0549267)` meters
+- `mount_rpy_deg = (0.7645, 0.4427, 1.1135)` degrees
+- `optical_frame_rpy_deg = (-90, 0, -90)` degrees
+
+Use the measured set if you want the older known stable runtime. Use the `correct2` set only
+through `vx300_auto_pick.launch.py`, not by manually launching the saved calibration TF file.
+
+## 13) Success Indicators
 
 Normal auto-pick logs:
 
@@ -213,10 +254,10 @@ If `pick_once: true`, expect:
 
 - `pick_once=true -> auto-pick disabled after successful pick`
 
-## 13) Common Issues + Fixes
+## 14) Common Issues + Fixes
 
 - `Action servers: 0` for `/pick_viperx`:
-  - Launch stack with `vx300_auto_pick_measured_tf.launch.py` or `vx300_moveit.launch.py`.
+  - Launch stack with `vx300_auto_pick_measured_tf.launch.py`, `vx300_auto_pick.launch.py`, or `vx300_moveit.launch.py`.
 - Camera node error `Couldn't resolve requests`:
   - Replug RealSense and retry; use conservative stream settings if needed.
 - Detection exists but no pick queued:
@@ -226,7 +267,7 @@ If `pick_once: true`, expect:
 - Arm motion looks wrong:
   - Stop immediately and retune camera mount transform and workspace constraints before retry.
 
-## 14) MoveIt Hand-Eye Calibration Notes
+## 15) MoveIt Hand-Eye Calibration Notes
 
 This workspace can run the MoveIt hand-eye calibration RViz plugin, but there are two different
 camera paths:

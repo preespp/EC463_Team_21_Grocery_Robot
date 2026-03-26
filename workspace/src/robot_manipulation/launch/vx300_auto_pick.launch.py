@@ -71,11 +71,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "vision_mount_xyz",
-            default_value="-0.98129,-0.256618,-0.0501378",
+            default_value="-0.0463943,-0.0110000,0.0549267",
         ),
         DeclareLaunchArgument(
             "vision_mount_rpy_deg",
-            default_value="-0.4593975,0.2464277,8.1401713",
+            default_value="0.7645,0.4427,1.1135",
         ),
         DeclareLaunchArgument(
             "vision_optical_frame_rpy_deg",
