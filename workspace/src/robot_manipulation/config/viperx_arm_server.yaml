@@ -21,7 +21,11 @@ viperx_arm_server:
     startup_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
     startup_joint_positions: [0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0]
     place_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
-    place_joint_positions: [1.81514242, -0.2268928, 1.53588974, 0.06981317, -1.34390352, -0.01745329]
+    place_joint_positions: [1.81514242, -0.40142573, 1.51843645, 0.08726646, -1.13446401, -0.03490659]
+    post_place_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    post_place_joint_positions: [1.81514242, -1.06465084, 1.16937060, 0.43633231, -0.15707963, -0.41887902]
+    pre_return_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    pre_return_joint_positions: [0.0, -1.37881011, 1.20427718, 0.0, 0.27925268, 0.0]
     return_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
     return_joint_positions: [0.0, -1.85004901, 1.53588974, 0.0, 0.80285146, 0.0]
 

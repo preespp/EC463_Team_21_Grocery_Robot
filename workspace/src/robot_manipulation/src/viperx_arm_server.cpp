@@ -88,7 +88,21 @@ public:
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     place_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "place_joint_positions",
-      std::vector<double>{1.81514242, -0.2268928, 1.53588974, 0.06981317, -1.34390352, -0.01745329});
+      std::vector<double>{1.81514242, -0.40142573, 1.51843645, 0.08726646, -1.13446401, -0.03490659});
+    post_place_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "post_place_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    post_place_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "post_place_joint_positions",
+      std::vector<double>{1.81514242, -1.06465084, 1.16937060, 0.43633231, -0.15707963, -0.41887902});
+    pre_return_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "pre_return_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    pre_return_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "pre_return_joint_positions",
+      std::vector<double>{0.0, -1.37881011, 1.20427718, 0.0, 0.27925268, 0.0});
 
     action_server_ = rclcpp_action::create_server<PickArm>(
       this,
@@ -146,7 +160,8 @@ private:
     if (
       command != "open_gripper" && command != "close_gripper" &&
       command != "startup_arm_pose" && command != "return_arm_pose" &&
-      command != "place_arm_pose" &&
+      command != "place_arm_pose" && command != "post_place_arm_pose" &&
+      command != "pre_return_arm_pose" &&
       goal->target_pose.header.frame_id.empty())
     {
       RCLCPP_WARN(this->get_logger(), "ViperX goal rejected: target_pose.frame_id is empty");
@@ -363,7 +378,7 @@ private:
     const std::vector<double> & joint_positions)
   {
     if (joint_names.empty() || joint_names.size() != joint_positions.size()) {
-      RCLCPP_WARN(this->get_logger(), "Return arm joint target config is empty or mismatched.");
+      RCLCPP_WARN(this->get_logger(), "Arm joint target config is empty or mismatched.");
       return false;
     }
 
@@ -373,14 +388,14 @@ private:
     }
 
     if (!arm_move_group_->setJointValueTarget(joint_targets)) {
-      RCLCPP_WARN(this->get_logger(), "Failed to set arm joint value target for return pose.");
+      RCLCPP_WARN(this->get_logger(), "Failed to set arm joint value target.");
       return false;
     }
 
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!ok) {
-      RCLCPP_WARN(this->get_logger(), "Failed to plan configured return arm pose.");
+      RCLCPP_WARN(this->get_logger(), "Failed to plan configured arm pose.");
       return false;
     }
     if (preview_only_) {
@@ -431,17 +446,25 @@ private:
         return;
       }
 
-      if (command == "startup_arm_pose" || command == "return_arm_pose" || command == "place_arm_pose") {
+      if (
+        command == "startup_arm_pose" || command == "return_arm_pose" ||
+        command == "place_arm_pose" || command == "post_place_arm_pose" ||
+        command == "pre_return_arm_pose")
+      {
         feedback->stage = command;
         feedback->position_error_m = 0.0f;
         goal_handle->publish_feedback(feedback);
 
         const auto & joint_names =
           (command == "startup_arm_pose") ? startup_joint_names_ :
-          ((command == "place_arm_pose") ? place_joint_names_ : return_joint_names_);
+          ((command == "place_arm_pose") ? place_joint_names_ :
+          ((command == "post_place_arm_pose") ? post_place_joint_names_ :
+          ((command == "pre_return_arm_pose") ? pre_return_joint_names_ : return_joint_names_)));
         const auto & joint_positions =
           (command == "startup_arm_pose") ? startup_joint_positions_ :
-          ((command == "place_arm_pose") ? place_joint_positions_ : return_joint_positions_);
+          ((command == "place_arm_pose") ? place_joint_positions_ :
+          ((command == "post_place_arm_pose") ? post_place_joint_positions_ :
+          ((command == "pre_return_arm_pose") ? pre_return_joint_positions_ : return_joint_positions_)));
 
         if (!execute_arm_joint_target(joint_names, joint_positions)) {
           result->success = false;
@@ -450,6 +473,10 @@ private:
             "Failed to execute configured startup arm pose" :
             (command == "place_arm_pose") ?
             "Failed to execute configured place arm pose" :
+            (command == "post_place_arm_pose") ?
+            "Failed to execute configured post-place arm pose" :
+            (command == "pre_return_arm_pose") ?
+            "Failed to execute configured pre-return arm pose" :
             "Failed to execute configured return arm pose";
           result->final_position_error_m = -1.0f;
           goal_handle->abort(result);
@@ -460,7 +487,10 @@ private:
         result->success = true;
         result->message =
           (command == "startup_arm_pose") ? "Startup arm pose complete" :
-          (command == "place_arm_pose") ? "Place arm pose complete" : "Return arm pose complete";
+          (command == "place_arm_pose") ? "Place arm pose complete" :
+          (command == "post_place_arm_pose") ? "Post-place arm pose complete" :
+          (command == "pre_return_arm_pose") ? "Pre-return arm pose complete" :
+          "Return arm pose complete";
         result->final_position_error_m = 0.0f;
         maybe_preview_delay();
         goal_handle->succeed(result);
@@ -538,6 +568,10 @@ private:
   std::vector<double> return_joint_positions_;
   std::vector<std::string> place_joint_names_;
   std::vector<double> place_joint_positions_;
+  std::vector<std::string> post_place_joint_names_;
+  std::vector<double> post_place_joint_positions_;
+  std::vector<std::string> pre_return_joint_names_;
+  std::vector<double> pre_return_joint_positions_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;

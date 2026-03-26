@@ -546,6 +546,13 @@ class VisionAutoPick(Node):
             ])
 
         if self.return_after_sequence:
+            if self.put_back_after_pick:
+                sequence.append(
+                    ("move_post_place_pose", self._make_command_goal("post_place_arm_pose"))
+                )
+                sequence.append(
+                    ("move_pre_return_pose", self._make_command_goal("pre_return_arm_pose"))
+                )
             sequence.append(("return_arm_pose", self._make_command_goal("return_arm_pose")))
 
         return sequence
