@@ -25,6 +25,22 @@ def setup_blackboard():
     bb.pose = None # Placeholder for current pose of the arm
     bb.goal_pose = None # Preferred BT arm target pose key for ViperX flow
 
+    # For basket management (3 bottle slots + 1 random slot)
+    bb.basket_poses = [
+        None,  # Bottle slot 1
+        None,  # Bottle slot 2
+        None,  # Bottle slot 3
+        None,  # Random items slot
+    ]
+    bb.basket_bottle_count = 0  # Track how many bottles have been picked
+    
+    # For shelf height (3 levels - to be filled during testing)
+    bb.shelf_height = None  # Height parameter for shelf level (will be set to 1, 2, or 3)
+    bb.shelf_pose = None  # Shelf pose with x,y empty (only z/height will be used)
+
+    # For object detection results
+    bb.detected_object_pose = None  # Pose returned from vision service
+
     # For rack levels
     bb.current_rack = 1
     bb.rack_goal = 1

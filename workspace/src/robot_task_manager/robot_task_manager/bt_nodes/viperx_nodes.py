@@ -1,4 +1,5 @@
 import json
+import time
 from copy import deepcopy
 from typing import Optional
 
@@ -7,6 +8,7 @@ import rclpy
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseStamped
 from rclpy.action import ActionClient
+from rclpy.client import Client
 from robot_interfaces.action import PickArm
 from std_msgs.msg import String
 
@@ -146,107 +148,189 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
 
 class VerifyViperXPosition(py_trees.behaviour.Behaviour):
     """
-    Verify object distance using camera detections.
-    If nearest object distance > threshold, update bb.pose with a corrected goal pose.
-
-    Note:
-      camera_vision publishes object points in the camera optical frame. Without TF usage here,
-      this node applies a best-effort scalar correction by shifting goal x in its own frame.
+    Detect object via camera subscription and verify it matches expected product.
+    
+    Uses blackboard to:
+    1. Get expected product name (bb.current_item.name)
+    2. Filter detections by product match, confidence, depth
+    3. Store best detection in bb.detected_object_pose
+    
+    Communication: Subscribes to /detections_json (published by robot_vision)
     """
 
     def __init__(
         self,
-        camera_topic: str = "/detections_json",
-        max_distance_m: float = 0.22,
-        max_step_m: float = 0.08,
-        fallback_goal_key: str = "pose",
+        detections_topic: str = "/detections_json",
+        min_confidence: float = 0.60,
+        min_depth_m: float = 0.08,
+        max_depth_m: float = 0.70,
     ):
         super().__init__("VerifyViperXPosition")
         self.bb = py_trees.blackboard.Blackboard()
-        self.camera_topic = camera_topic
-        self.max_distance_m = max_distance_m
-        self.max_step_m = max_step_m
-        self.fallback_goal_key = fallback_goal_key
+        self.detections_topic = detections_topic
+        self.min_confidence = min_confidence
+        self.min_depth_m = min_depth_m
+        self.max_depth_m = max_depth_m
 
         self.node = None
-        self.last_json_payload = None
         self.sub = None
+        self.last_detections_json = None
+        self.detection_timeout_sec = 2.0
+        self.last_detection_time = None
 
     def setup(self, **kwargs):
         if not rclpy.ok():
             return False
-        node_name = f"bt_viperx_verify_{id(self) & 0xFFFF:x}"
+        node_name = f"bt_verify_viperx_{id(self) & 0xFFFF:x}"
         self.node = rclpy.create_node(node_name)
         self.sub = self.node.create_subscription(
             String,
-            self.camera_topic,
+            self.detections_topic,
             self._on_detections,
             10,
         )
         return True
 
     def _on_detections(self, msg: String):
-        self.last_json_payload = msg.data
+        """Callback when camera publishes detections."""
+        self.last_detections_json = msg.data
+        self.last_detection_time = time.time()
 
-    def _closest_distance(self):
-        if not self.last_json_payload:
+    def _get_expected_product_names(self) -> list:
+        """Get expected product name from blackboard."""
+        current_item = getattr(self.bb, "current_item", None)
+        if current_item is None:
+            return []
+        
+        item_name = str(getattr(current_item, "name", "")).lower().strip()
+        return [item_name] if item_name else []
+
+    def _fuzzy_match_product(self, detected_name: str, expected_names: list) -> bool:
+        """
+        Check if detected product matches expected product.
+        Supports variations like "water_bottle" vs "water bottle".
+        """
+        detected = detected_name.lower().strip()
+        
+        for expected in expected_names:
+            expected_clean = expected.lower().strip()
+            
+            # Exact match
+            if detected == expected_clean:
+                return True
+            
+            # Fuzzy: normalize underscores/spaces and check word overlap
+            detected_words = set(detected.replace("_", " ").split())
+            expected_words = set(expected_clean.replace("_", " ").split())
+            
+            if expected_words and detected_words:
+                overlap = detected_words & expected_words
+                # 80% word overlap = match
+                if len(overlap) >= len(expected_words) * 0.8:
+                    return True
+        
+        return False
+
+    def _filter_detections(self, detections: list) -> dict:
+        """
+        Filter detections by:
+        1. Product name match (using bb.current_item)
+        2. Confidence threshold
+        3. Depth range
+        Returns best detection or None.
+        """
+        expected_names = self._get_expected_product_names()
+        if not expected_names:
+            self.feedback_message = "No expected product in bb.current_item"
             return None
-        try:
-            payload = json.loads(self.last_json_payload)
-            detections = payload.get("detections", [])
-            distances = [
-                float(det.get("distance_m", 0.0))
-                for det in detections
-                if float(det.get("distance_m", 0.0)) > 0.0
-            ]
-            if not distances:
-                return None
-            return min(distances)
-        except Exception:
+
+        best_detection = None
+        best_confidence = 0.0
+        rejection_stats = {
+            "product_mismatch": 0,
+            "low_confidence": 0,
+            "bad_depth": 0,
+        }
+
+        for det in detections:
+            if not isinstance(det, dict):
+                continue
+
+            # 1. Product name match
+            class_name = str(det.get("class_name", "")).lower()
+            if not self._fuzzy_match_product(class_name, expected_names):
+                rejection_stats["product_mismatch"] += 1
+                continue
+
+            # 2. Confidence check
+            confidence = float(det.get("confidence", 0.0))
+            if confidence < self.min_confidence:
+                rejection_stats["low_confidence"] += 1
+                continue
+
+            # 3. Depth range check
+            distance_m = float(det.get("distance_m", 0.0))
+            if distance_m <= 0 or distance_m < self.min_depth_m or distance_m > self.max_depth_m:
+                rejection_stats["bad_depth"] += 1
+                continue
+
+            # Select best (highest confidence)
+            if confidence > best_confidence:
+                best_confidence = confidence
+                best_detection = det
+
+        if best_detection is None:
+            reasons = ", ".join(f"{k}={v}" for k, v in rejection_stats.items() if v > 0)
+            self.feedback_message = f"Detection filtered out: {reasons or 'none passed'}"
             return None
 
-    def _update_blackboard_goal(self, delta_m: float):
-        source_pose = getattr(self.bb, "pose", None)
-        if source_pose is None:
-            source_pose = getattr(self.bb, self.fallback_goal_key, None)
-        if not isinstance(source_pose, dict):
-            return False
-
-        new_pose = deepcopy(source_pose)
-        if "position" in new_pose and isinstance(new_pose["position"], dict):
-            new_pose["position"]["x"] = float(new_pose["position"].get("x", 0.0)) + delta_m
-        elif "x" in new_pose:
-            new_pose["x"] = float(new_pose.get("x", 0.0)) + delta_m
-        else:
-            return False
-
-        self.bb.pose = new_pose
-        self.feedback_message = f"Adjusted bb.pose by +{delta_m:.3f} m (x-axis heuristic)"
-        return True
+        return best_detection
 
     def update(self):
         rclpy.spin_once(self.node, timeout_sec=0.05)
 
-        nearest = self._closest_distance()
-        if nearest is None:
-            self.feedback_message = "No camera detection yet; skipping distance verify"
-            return py_trees.common.Status.SUCCESS
+        if self.last_detections_json is None:
+            self.feedback_message = "Waiting for camera detections..."
+            return py_trees.common.Status.RUNNING
 
-        if nearest <= self.max_distance_m:
-            self.feedback_message = (
-                f"Object in range: {nearest:.3f} m <= {self.max_distance_m:.3f} m"
-            )
-            return py_trees.common.Status.SUCCESS
-
-        delta = min(nearest - self.max_distance_m, self.max_step_m)
-        updated = self._update_blackboard_goal(delta)
-        if updated:
+        # Check if detections are stale
+        if time.time() - self.last_detection_time > self.detection_timeout_sec:
+            self.feedback_message = "Detection stream stale (timeout)"
             return py_trees.common.Status.FAILURE
 
+        try:
+            payload = json.loads(self.last_detections_json)
+            detections = payload.get("detections", [])
+        except (json.JSONDecodeError, TypeError):
+            self.feedback_message = "Failed to parse detection JSON"
+            return py_trees.common.Status.FAILURE
+
+        if not detections:
+            self.feedback_message = "Camera sees no objects"
+            return py_trees.common.Status.FAILURE
+
+        # Filter and select best detection
+        best_detection = self._filter_detections(detections)
+        if best_detection is None:
+            return py_trees.common.Status.FAILURE
+
+        # Store in blackboard for next node
+        self.bb.detected_object_pose = {
+            "x": float(best_detection["point_camera_optical_m"][0]),
+            "y": float(best_detection["point_camera_optical_m"][1]),
+            "z": float(best_detection["point_camera_optical_m"][2]),
+            "distance_m": float(best_detection["distance_m"]),
+            "frame_id": "camera_optical_frame",
+            "class_name": str(best_detection["class_name"]),
+            "confidence": float(best_detection["confidence"]),
+        }
+
         self.feedback_message = (
-            "Object too far and no mutable bb pose available for correction"
+            f"Detected '{best_detection['class_name']}' "
+            f"distance={best_detection['distance_m']:.3f}m "
+            f"confidence={best_detection['confidence']:.2f}"
         )
-        return py_trees.common.Status.FAILURE
+        return py_trees.common.Status.SUCCESS
 
     def terminate(self, new_status):
         del new_status
@@ -257,7 +341,7 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
                 pass
         self.node = None
         self.sub = None
-        self.last_json_payload = None
+        self.last_detections_json = None
 
 
 class MoveViperXGripper(py_trees.behaviour.Behaviour):
@@ -333,6 +417,158 @@ class MoveViperXGripper(py_trees.behaviour.Behaviour):
             if wrapped.status == GoalStatus.STATUS_SUCCEEDED:
                 return py_trees.common.Status.SUCCESS
             self.feedback_message = f"Gripper failed with status={wrapped.status}"
+            return py_trees.common.Status.FAILURE
+
+        return py_trees.common.Status.RUNNING
+
+    def terminate(self, new_status):
+        del new_status
+        if self.node is not None:
+            try:
+                self.node.destroy_node()
+            except Exception:
+                pass
+        self.node = None
+        self.client = None
+        self.send_future = None
+        self.goal_handle = None
+        self.result_future = None
+
+
+class SelectBasketSlot(py_trees.behaviour.Behaviour):
+    """
+    Selects the appropriate basket slot based on item type and bottle count.
+    
+    For bottles: Uses slots 0, 1, 2 (one per bottle) - increments bb.basket_bottle_count
+    For non-bottles: Uses slot 3 (random items slot)
+    
+    Sets bb.basket_pose to the selected basket pose from bb.basket_poses.
+    """
+
+    def __init__(self):
+        super().__init__("SelectBasketSlot")
+        self.bb = py_trees.blackboard.Blackboard()
+
+    def update(self):
+        current_item = getattr(self.bb, "current_item", None)
+        if current_item is None:
+            self.feedback_message = "No current item set"
+            return py_trees.common.Status.FAILURE
+
+        # Get item type/name to determine if it's a bottle
+        item_name = str(getattr(current_item, "name", "")).lower()
+        is_bottle = "bottle" in item_name or "water" in item_name
+
+        basket_poses = getattr(self.bb, "basket_poses", [None, None, None, None])
+        bottle_count = getattr(self.bb, "basket_bottle_count", 0)
+
+        if is_bottle:
+            # Use bottle slots 0, 1, 2
+            if bottle_count >= 3:
+                self.feedback_message = "All bottle slots full"
+                return py_trees.common.Status.FAILURE
+            
+            selected_slot = bottle_count
+            self.bb.basket_pose = basket_poses[selected_slot]
+            self.bb.basket_bottle_count = bottle_count + 1
+            self.feedback_message = f"Selected bottle slot {selected_slot + 1}/3"
+        else:
+            # Use random items slot (slot 3)
+            selected_slot = 3
+            self.bb.basket_pose = basket_poses[selected_slot]
+            self.feedback_message = "Selected random items slot"
+
+        if self.bb.basket_pose is None:
+            self.feedback_message = (
+                f"Basket pose not initialized at slot {selected_slot}"
+            )
+            return py_trees.common.Status.FAILURE
+
+        return py_trees.common.Status.SUCCESS
+
+
+class MoveToDetectedPose(py_trees.behaviour.Behaviour):
+    """
+    Moves arm to the detected object pose (stored in bb.detected_object_pose by VerifyViperXPosition).
+    Uses the RepositionViperXArm action with the detected pose.
+    """
+
+    def __init__(self, action_name: str = "/pick_viperx"):
+        super().__init__("MoveToDetectedPose")
+        self.action_name = action_name
+        self.bb = py_trees.blackboard.Blackboard()
+
+        self.node = None
+        self.client: Optional[ActionClient] = None
+        self.send_future = None
+        self.goal_handle = None
+        self.result_future = None
+
+    def setup(self, **kwargs):
+        if not rclpy.ok():
+            return False
+        node_name = f"bt_viperx_move_detected_{id(self) & 0xFFFF:x}"
+        self.node = rclpy.create_node(node_name)
+        self.client = ActionClient(self.node, PickArm, self.action_name)
+        return True
+
+    def initialise(self):
+        target_pose = getattr(self.bb, "detected_object_pose", None)
+        if target_pose is None:
+            self.feedback_message = "No detected pose available (bb.detected_object_pose is None)"
+            self.send_future = None
+            return
+
+        if not self.client.wait_for_server(timeout_sec=2.0):
+            self.feedback_message = f"Action server unavailable: {self.action_name}"
+            self.send_future = None
+            return
+
+        goal_msg = PickArm.Goal()
+        goal_msg.planning_group = "arm"
+        goal_msg.ee_link = ""
+        goal_msg.pregrasp_offset_m = 0.0
+        goal_msg.retreat_offset_m = 0.0
+        goal_msg.gripper_close_position = -1.0
+        goal_msg.use_cartesian_approach = False
+
+        # Convert detected pose to PoseStamped
+        pose_msg = PoseStamped()
+        pose_msg.header.frame_id = target_pose.get("frame_id", "vx300/base_link")
+        pose_msg.pose.position.x = float(target_pose.get("x", 0.0))
+        pose_msg.pose.position.y = float(target_pose.get("y", 0.0))
+        pose_msg.pose.position.z = float(target_pose.get("z", 0.0))
+        pose_msg.pose.orientation.w = 1.0
+
+        goal_msg.target_pose = pose_msg
+        goal_msg.target_pose.header.stamp = self.node.get_clock().now().to_msg()
+        self.send_future = self.client.send_goal_async(goal_msg)
+        self.feedback_message = "Moving to detected object pose"
+
+    def update(self):
+        if self.send_future is None:
+            return py_trees.common.Status.FAILURE
+
+        rclpy.spin_once(self.node, timeout_sec=0.05)
+
+        if self.goal_handle is None and self.send_future.done():
+            self.goal_handle = self.send_future.result()
+            if self.goal_handle is None or not self.goal_handle.accepted:
+                self.feedback_message = "Move goal rejected"
+                return py_trees.common.Status.FAILURE
+            self.result_future = self.goal_handle.get_result_async()
+            self.feedback_message = "Move goal accepted, executing"
+            return py_trees.common.Status.RUNNING
+
+        if self.result_future is not None and self.result_future.done():
+            wrapped = self.result_future.result()
+            if wrapped is None:
+                self.feedback_message = "Move result missing"
+                return py_trees.common.Status.FAILURE
+            if wrapped.status == GoalStatus.STATUS_SUCCEEDED:
+                self.feedback_message = "Successfully moved to detected object pose"
+                return py_trees.common.Status.SUCCESS
+            self.feedback_message = f"Move failed with status={wrapped.status}"
             return py_trees.common.Status.FAILURE
 
         return py_trees.common.Status.RUNNING
