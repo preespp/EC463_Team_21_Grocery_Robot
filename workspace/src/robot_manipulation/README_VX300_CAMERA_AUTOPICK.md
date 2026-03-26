@@ -35,7 +35,7 @@ This document summarizes today's integration work for:
   - `workspace/src/robot_manipulation/launch/camera_to_arm_tf_measured.launch.py`
   - `workspace/src/robot_manipulation/launch/vx300_auto_pick_measured_tf.launch.py`
 - Camera mount / calibrated TF:
-  - `workspace/src/robot_manipulation/launch/camera_pose_correct2.launch.py`
+  - `workspace/src/robot_manipulation/launch/camera_pose_correct4.launch.py`
   - `workspace/src/robot_manipulation/launch/vx300_auto_pick.launch.py`
 
 Launch files now prefer model-specific config filenames when they exist. For VX300S, that means
@@ -84,7 +84,7 @@ This starts:
 
 Use this path when you want the older hand-measured TF that was stable in previous testing.
 
-## 5) Launch With Calibrated TF (`correct2`)
+## 5) Launch With Calibrated TF (`correct4`)
 
 ```bash
 ros2 launch robot_manipulation vx300_auto_pick.launch.py \
@@ -92,16 +92,16 @@ ros2 launch robot_manipulation vx300_auto_pick.launch.py \
   launch_camera_vision:=true
 ```
 
-This launch now uses the current `correct2` calibration values by default in converted
+This launch now uses the current `correct4` calibration values by default in converted
 `camera_vision` mount form:
 
-- `vision_mount_xyz = (-0.0463943, -0.0110000, 0.0549267)`
-- `vision_mount_rpy_deg = (0.7645, 0.4427, 1.1135)` degrees
+- `vision_mount_xyz = (-0.0462321, 0.0292076, 0.0590980)`
+- `vision_mount_rpy_deg = (1.1719, 0.6432, 1.4275)` degrees
 - `vision_optical_frame_rpy_deg = (-90, 0, -90)` degrees
 
 Important note:
 
-- `camera_pose_correct2.launch.py` is the saved direct TF from `ee_gripper_link` to
+- `camera_pose_correct4.launch.py` is the saved direct TF from `ee_gripper_link` to
   `camera_color_optical_frame`
 - `vx300_auto_pick.launch.py` does **not** launch that file directly
 - instead, it uses the converted mount parameters above because `camera_vision` publishes
@@ -110,7 +110,7 @@ Important note:
 Do **not** launch `realsense2_camera` separately for auto-pick. The auto-pick launch already starts
 the custom `camera_vision` node and opens the RealSense directly.
 
-Do **not** launch `camera_pose_correct2.launch.py` or `camera_to_arm_tf_measured.launch.py`
+Do **not** launch `camera_pose_correct4.launch.py` or `camera_to_arm_tf_measured.launch.py`
 at the same time as auto-pick, because `camera_vision` is already publishing the camera TF chain.
 
 ## 6) Launch Without Auto Pick
@@ -229,16 +229,16 @@ Measured runtime assumption:
 - `mount_rpy_deg = (0, 0, 0)` for the mount/body frame
 - `optical_frame_rpy_deg = (-90, 0, -90)` for the fixed optical-frame rotation
 
-Calibrated `correct2` runtime assumption:
+Calibrated `correct4` runtime assumption:
 
 - `parent_frame = vx300s/ee_gripper_link`
 - `camera_mount_frame = camera_mount_frame`
 - `camera_optical_frame = camera_color_optical_frame`
-- `mount_xyz = (-0.0463943, -0.0110000, 0.0549267)` meters
-- `mount_rpy_deg = (0.7645, 0.4427, 1.1135)` degrees
+- `mount_xyz = (-0.0462321, 0.0292076, 0.0590980)` meters
+- `mount_rpy_deg = (1.1719, 0.6432, 1.4275)` degrees
 - `optical_frame_rpy_deg = (-90, 0, -90)` degrees
 
-Use the measured set if you want the older known stable runtime. Use the `correct2` set only
+Use the measured set if you want the older known stable runtime. Use the `correct4` set only
 through `vx300_auto_pick.launch.py`, not by manually launching the saved calibration TF file.
 
 ## 13) Success Indicators

@@ -148,12 +148,12 @@ class CameraVision(Node):
         self.declare_parameter("camera_mount_frame", "camera_mount_frame")
         self.declare_parameter("camera_optical_frame", "camera_color_optical_frame")
         self.declare_parameter("object_frame_prefix", "object")
-        # Default to the current corrected eye-in-hand runtime TF.
+        # Default to the current corrected eye-in-hand runtime TF (correct4).
         # These values represent ee_gripper_link -> camera_mount_frame so the existing
         # camera_mount_frame -> camera_color_optical_frame optical-frame rotation still
         # reconstructs the calibrated optical-frame transform.
-        self.declare_parameter("mount_xyz", "-0.0463943,-0.0110000,0.0549267")
-        self.declare_parameter("mount_rpy_deg", "0.7645,0.4427,1.1135")
+        self.declare_parameter("mount_xyz", "-0.0462321,0.0292076,0.0590980")
+        self.declare_parameter("mount_rpy_deg", "1.1719,0.6432,1.4275")
         self.declare_parameter("optical_frame_rpy_deg", "-90.0,0.0,-90.0")
         self.declare_parameter("max_objects_tf", 5)
         self.declare_parameter("status_log_period_sec", 2.0)
