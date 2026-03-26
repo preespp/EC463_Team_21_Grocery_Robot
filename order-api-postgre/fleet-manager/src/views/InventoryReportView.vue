@@ -43,11 +43,19 @@
         </table>
       </div>
     </div>
+
+    <div class="panel mt16">
+      <h3>{{ t('download_report') }}</h3>
+      <button @click="downloadReport" :disabled="downloading" class="btn-primary">
+        {{ downloading ? t('downloading') : t('download_csv') }}
+      </button>
+      <p v-if="downloadMessage" :class="downloadError ? 'error' : 'success'">{{ downloadMessage }}</p>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { api } from '../api'
 import { t } from '../i18n'
 
@@ -64,8 +72,34 @@ const report = reactive({
   items: []
 })
 
+const email = ref('')
+const senderEmail = ref('')
+const senderPassword = ref('')
+const receiverEmail = ref('')
+const sending = ref(false)
+const sendMessage = ref('')
+const sendError = ref(false)
+const downloading = ref(false)
+const downloadMessage = ref('')
+const downloadError = ref(false)
+
 onMounted(async () => {
   const data = await api.inventoryReport()
   Object.assign(report, data)
 })
+
+async function downloadReport() {
+  downloading.value = true
+  downloadMessage.value = ''
+  downloadError.value = false
+  try {
+    await api.downloadInventoryReport()
+    downloadMessage.value = t('report_downloaded')
+  } catch (e) {
+    downloadError.value = true
+    downloadMessage.value = e.message || t('download_failed')
+  } finally {
+    downloading.value = false
+  }
+}
 </script>

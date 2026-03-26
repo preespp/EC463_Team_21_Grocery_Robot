@@ -121,11 +121,6 @@ ros_ws/log/
 #/workspace/interbotix_ws/src/interbotix_ros_core/
 #/workspace/interbotix_ws/src/interbotix_ros_manipulators/
 #/workspace/interbotix_ws/src/interbotix_ros_toolboxes/
-
-/order-api-postgre/package.json
-/order-api-postgre/package-lock.json
-/order-api-postgre/fleet-manager/package.json
-/order-api-postgre/fleet-manager/package-lock.json
 /order-api-postgre/config/gemini.json
 
 .vite/

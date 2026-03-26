@@ -31,6 +31,21 @@ export const api = {
   inventoryReport() {
     return request('/api/employee/inventory/report')
   },
+  downloadInventoryReport() {
+    return fetchWithAuth('/api/employee/inventory/download-report')
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.href = url;
+        a.download = `inventory_report_${timestamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      });
+  },
   semanticMap() {
     return request('/api/maps/semantic/current')
   },
