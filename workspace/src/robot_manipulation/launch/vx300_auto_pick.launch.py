@@ -46,7 +46,12 @@ def generate_launch_description():
                 "optical_frame_rpy_deg": LaunchConfiguration(
                     "vision_optical_frame_rpy_deg"
                 ),
+                "grasp_depth_offset_m": LaunchConfiguration(
+                    "vision_grasp_depth_offset_m"
+                ),
                 "publish_image": LaunchConfiguration("vision_publish_image"),
+                "show_live_window": LaunchConfiguration("vision_show_live_window"),
+                "live_window_name": LaunchConfiguration("vision_live_window_name"),
             }
         ],
         condition=IfCondition(LaunchConfiguration("launch_camera_vision")),
@@ -81,7 +86,13 @@ def generate_launch_description():
             "vision_optical_frame_rpy_deg",
             default_value="-90.0,0.0,-90.0",
         ),
+        DeclareLaunchArgument("vision_grasp_depth_offset_m", default_value="0.02"),
         DeclareLaunchArgument("vision_publish_image", default_value="true"),
+        DeclareLaunchArgument("vision_show_live_window", default_value="true"),
+        DeclareLaunchArgument(
+            "vision_live_window_name",
+            default_value="VX300 Camera Vision",
+        ),
         moveit_launch,
         camera_node,
     ])

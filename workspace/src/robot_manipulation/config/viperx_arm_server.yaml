@@ -7,12 +7,19 @@ viperx_arm_server:
     planning_time_sec: 3.0
     max_velocity_scaling: 0.2
     max_acceleration_scaling: 0.2
+    enforce_orientation_path_constraint: true
+    orientation_constraint_x_tolerance_rad: 0.12
+    orientation_constraint_y_tolerance_rad: 0.12
+    orientation_constraint_z_tolerance_rad: 0.20
+    orientation_constraint_weight: 1.0
     preview_only: false
     preview_step_delay_sec: 1.0
 
     # Fallback values used if named targets are not available in the SRDF.
     open_gripper_pos: 0.035
     closed_gripper_pos: 0.040
+    startup_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    startup_joint_positions: [0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0]
     place_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
     place_joint_positions: [1.81514242, -0.2268928, 1.53588974, 0.06981317, -1.34390352, -0.01745329]
     return_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]

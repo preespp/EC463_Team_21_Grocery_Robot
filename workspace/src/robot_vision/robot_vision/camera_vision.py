@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import time
 from collections import deque
 
@@ -32,9 +33,14 @@ def median_depth(depth_frame, x, y, k=5):
 
 def robust_bbox_depth(depth_frame, x1, y1, x2, y2):
     """
-    Get a robust depth estimate from a bbox.
+    Get a robust depth estimate near the center of a bbox.
     1) Try median depth at bbox center.
-    2) If invalid, scan inside bbox for nearest valid depth.
+    2) If invalid, find the nearest valid depth pixel in a centered inner window.
+    3) If still invalid, find the nearest valid depth pixel in the whole bbox.
+
+    This keeps the grasp target centered when possible, but avoids the physically
+    inconsistent case of using the center pixel with depth borrowed from somewhere
+    else in the box.
     """
     cx = int((x1 + x2) * 0.5)
     cy = int((y1 + y2) * 0.5)
@@ -50,20 +56,42 @@ def robust_bbox_depth(depth_frame, x1, y1, x2, y2):
     if bx2 <= bx1 or by2 <= by1:
         return 0.0, cx, cy
 
-    step = 2
-    best_depth = float("inf")
-    best_x = cx
-    best_y = cy
-    for yy in range(by1, by2 + 1, step):
-        for xx in range(bx1, bx2 + 1, step):
-            d = depth_frame.get_distance(xx, yy)
-            if 0.08 < d < 3.0 and d < best_depth:
-                best_depth = d
-                best_x = xx
-                best_y = yy
+    def nearest_valid_pixel(x_start, y_start, x_end, y_end, target_x, target_y, step=2):
+        best_pixel = None
+        best_score = None
+        for yy in range(y_start, y_end + 1, step):
+            for xx in range(x_start, x_end + 1, step):
+                d = depth_frame.get_distance(xx, yy)
+                if not (0.08 < d < 3.0):
+                    continue
+                depth_local = median_depth(depth_frame, xx, yy, k=5)
+                if depth_local <= 0.0:
+                    continue
+                score = (xx - target_x) ** 2 + (yy - target_y) ** 2
+                if best_score is None or score < best_score:
+                    best_score = score
+                    best_pixel = (xx, yy, depth_local)
+        return best_pixel
 
-    if best_depth != float("inf"):
-        return float(best_depth), int(best_x), int(best_y)
+    width = bx2 - bx1 + 1
+    height = by2 - by1 + 1
+
+    inner_half_w = max(2, width // 4)
+    inner_half_h = max(2, height // 4)
+    ix1 = max(bx1, cx - inner_half_w)
+    iy1 = max(by1, cy - inner_half_h)
+    ix2 = min(bx2, cx + inner_half_w)
+    iy2 = min(by2, cy + inner_half_h)
+
+    inner_pick = nearest_valid_pixel(ix1, iy1, ix2, iy2, cx, cy)
+    if inner_pick is not None:
+        px, py, depth_m = inner_pick
+        return depth_m, px, py
+
+    bbox_pick = nearest_valid_pixel(bx1, by1, bx2, by2, cx, cy)
+    if bbox_pick is not None:
+        px, py, depth_m = bbox_pick
+        return depth_m, px, py
 
     return 0.0, cx, cy
 
@@ -137,6 +165,7 @@ class CameraVision(Node):
         self.declare_parameter("conf", 0.5)
         self.declare_parameter("use_cuda", True)
         self.declare_parameter("publish_image", True)
+        self.declare_parameter("show_live_window", False)
         self.declare_parameter("use_imu", False)
         self.declare_parameter("depth_width", 848)
         self.declare_parameter("depth_height", 480)
@@ -155,13 +184,16 @@ class CameraVision(Node):
         self.declare_parameter("mount_xyz", "-0.0462321,0.0292076,0.0590980")
         self.declare_parameter("mount_rpy_deg", "1.1719,0.6432,1.4275")
         self.declare_parameter("optical_frame_rpy_deg", "-90.0,0.0,-90.0")
+        self.declare_parameter("grasp_depth_offset_m", 0.02)
         self.declare_parameter("max_objects_tf", 5)
         self.declare_parameter("status_log_period_sec", 2.0)
+        self.declare_parameter("live_window_name", "camera_vision_live")
 
         model_path = self.get_parameter("model_path").value
         self.conf_thres = float(self.get_parameter("conf").value)
         use_cuda = bool(self.get_parameter("use_cuda").value)
         self.publish_image = bool(self.get_parameter("publish_image").value)
+        self.show_live_window = bool(self.get_parameter("show_live_window").value)
         self.use_imu = bool(self.get_parameter("use_imu").value)
         self.depth_width = int(self.get_parameter("depth_width").value)
         self.depth_height = int(self.get_parameter("depth_height").value)
@@ -173,8 +205,10 @@ class CameraVision(Node):
         self.camera_mount_frame = str(self.get_parameter("camera_mount_frame").value)
         self.camera_optical_frame = str(self.get_parameter("camera_optical_frame").value)
         self.object_frame_prefix = str(self.get_parameter("object_frame_prefix").value)
+        self.grasp_depth_offset_m = float(self.get_parameter("grasp_depth_offset_m").value)
         self.max_objects_tf = int(self.get_parameter("max_objects_tf").value)
         self.status_log_period_sec = float(self.get_parameter("status_log_period_sec").value)
+        self.live_window_name = str(self.get_parameter("live_window_name").value)
 
         self.mount_xyz = self._parse_vec3(str(self.get_parameter("mount_xyz").value))
         roll_deg, pitch_deg, yaw_deg = self._parse_vec3(
@@ -197,6 +231,15 @@ class CameraVision(Node):
         if self.publish_image:
             self.pub_image = self.create_publisher(Image, "camera/color/image_raw", 10)
             self.bridge = CvBridge()
+        self.live_window_enabled = self.show_live_window
+        self.live_window_created = False
+        self.latest_fps = 0.0
+        if self.live_window_enabled and not os.environ.get("DISPLAY"):
+            self.get_logger().warn(
+                "show_live_window was requested but DISPLAY is not set. "
+                "Disabling the live preview window."
+            )
+            self.live_window_enabled = False
         self.tf_broadcaster = TransformBroadcaster(self)
         self.get_logger().info(
             f"Camera TF: parent={self.parent_frame} "
@@ -348,6 +391,113 @@ class CameraVision(Node):
         else:
             self.get_logger().info("camera_vision status: frames OK, detections=0")
 
+    @staticmethod
+    def _draw_crosshair(image, x, y, color, radius=10, thickness=2):
+        cv2.circle(image, (x, y), radius, color, thickness)
+        cv2.line(image, (x - radius - 4, y), (x + radius + 4, y), color, thickness)
+        cv2.line(image, (x, y - radius - 4), (x, y + radius + 4), color, thickness)
+
+    @staticmethod
+    def _draw_text_block(image, lines, origin, fg_color=(255, 255, 255), bg_color=(24, 24, 24)):
+        if not lines:
+            return
+
+        x, y = origin
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        thickness = 1
+        padding = 6
+        line_gap = 6
+
+        sizes = [cv2.getTextSize(line, font, font_scale, thickness)[0] for line in lines]
+        width = max(size[0] for size in sizes) + padding * 2
+        line_height = max(size[1] for size in sizes)
+        height = len(lines) * line_height + (len(lines) - 1) * line_gap + padding * 2
+
+        top_left = (x, y)
+        bottom_right = (x + width, y + height)
+        cv2.rectangle(image, top_left, bottom_right, bg_color, -1)
+        cv2.rectangle(image, top_left, bottom_right, (80, 80, 80), 1)
+
+        baseline_y = y + padding + line_height
+        for line in lines:
+            cv2.putText(
+                image,
+                line,
+                (x + padding, baseline_y),
+                font,
+                font_scale,
+                fg_color,
+                thickness,
+                cv2.LINE_AA,
+            )
+            baseline_y += line_height + line_gap
+
+    def _annotate_preview(self, image, detections):
+        annotated = image.copy()
+        panel_lines = [
+            "camera_vision live",
+            f"fps={self.latest_fps:.1f}",
+            f"detections={len(detections)}",
+            f"frame={self.camera_optical_frame}",
+            "grasp target = center-first valid depth",
+            f"depth offset = {self.grasp_depth_offset_m:.3f}m",
+        ]
+        self._draw_text_block(annotated, panel_lines, (12, 12))
+
+        for index, det in enumerate(detections):
+            x1, y1, x2, y2 = det["bbox"]
+            cx, cy = det["grasp_px"]
+            X, Y, Z = det["point_camera_optical_m"]
+            depth_m = float(det["distance_m"])
+            conf = float(det["confidence"])
+            label_color = (0, 220, 0)
+            grasp_color = (0, 165, 255)
+
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), label_color, 2)
+            self._draw_crosshair(annotated, cx, cy, grasp_color)
+
+            label_lines = [
+                f"#{index} {det['class_name']} conf={conf:.2f}",
+                f"depth={depth_m:.3f}m px=({cx},{cy})",
+                f"opt_xyz=({float(X):.3f}, {float(Y):.3f}, {float(Z):.3f})",
+            ]
+            text_y = max(12, y1 - 74)
+            self._draw_text_block(
+                annotated,
+                label_lines,
+                (x1, text_y),
+                fg_color=(255, 255, 255),
+                bg_color=(24, 70, 24),
+            )
+
+        return annotated
+
+    def _show_live_preview(self, image):
+        if not self.live_window_enabled:
+            return
+
+        try:
+            if not self.live_window_created:
+                cv2.namedWindow(self.live_window_name, cv2.WINDOW_NORMAL)
+                self.live_window_created = True
+
+            cv2.imshow(self.live_window_name, image)
+            key = cv2.waitKey(1) & 0xFF
+            if key in (27, ord("q")):
+                self.get_logger().info(
+                    "Closing camera_vision live preview window; preview can be re-enabled on the next launch."
+                )
+                cv2.destroyWindow(self.live_window_name)
+                self.live_window_created = False
+                self.live_window_enabled = False
+        except cv2.error as exc:
+            self.get_logger().warn(
+                f"Disabling live preview window after OpenCV error: {exc}"
+            )
+            self.live_window_enabled = False
+            self.live_window_created = False
+
     def timer_cb(self):
         try:
             frames = self.pipeline.wait_for_frames(timeout_ms=3000)
@@ -383,7 +533,9 @@ class CameraVision(Node):
                 name = names.get(cls_id, str(cls_id))
 
                 dist_m, cx, cy = robust_bbox_depth(depth, x1, y1, x2, y2)
+                surface_dist_m = dist_m
                 if dist_m > 0.0:
+                    dist_m = max(0.0, dist_m + self.grasp_depth_offset_m)
                     # RealSense deprojection returns a 3D point in the camera optical frame:
                     # x right, y down, z forward.
                     X, Y, Z = rs.rs2_deproject_pixel_to_point(
@@ -401,6 +553,7 @@ class CameraVision(Node):
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
                     "center_px": [cx, cy],
                     "distance_m": float(dist_m),
+                    "surface_distance_m": float(surface_dist_m),
                     "point_camera_optical_m": point_camera_optical_m,
                     "grasp_px": [cx, cy],
                 }
@@ -413,19 +566,6 @@ class CameraVision(Node):
                 pt_msg.point.y = float(Y)
                 pt_msg.point.z = float(Z)
                 self.pub_point.publish(pt_msg)
-
-                if self.publish_image:
-                    cv2.rectangle(color_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    label = f"{name} {conf:.2f} {dist_m:.2f}m"
-                    cv2.putText(
-                        color_img,
-                        label,
-                        (x1, max(0, y1 - 8)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (0, 255, 0),
-                        2,
-                    )
 
         stamp = self.get_clock().now().to_msg()
         self._broadcast_camera_frames_tf(stamp)
@@ -446,19 +586,27 @@ class CameraVision(Node):
         }
         self.pub_detections.publish(String(data=json.dumps(payload)))
 
+        preview_img = None
+        if self.publish_image or self.live_window_enabled:
+            preview_img = self._annotate_preview(color_img, detections_out)
+
         if self.publish_image:
-            ros_img = self.bridge.cv2_to_imgmsg(color_img, encoding="bgr8")
+            ros_img = self.bridge.cv2_to_imgmsg(preview_img, encoding="bgr8")
             ros_img.header.stamp = stamp
             ros_img.header.frame_id = self.camera_optical_frame
             self.pub_image.publish(ros_img)
+
+        if preview_img is not None:
+            self._show_live_preview(preview_img)
 
         now = time.time()
         fps = 1.0 / max(1e-6, now - self.last_t)
         self.last_t = now
         self.fps_hist.append(fps)
+        self.latest_fps = sum(self.fps_hist) / len(self.fps_hist)
         if len(self.fps_hist) == self.fps_hist.maxlen:
             self.get_logger().debug(
-                f"FPS={sum(self.fps_hist)/len(self.fps_hist):.1f}, "
+                f"FPS={self.latest_fps:.1f}, "
                 f"detections={len(detections_out)}"
             )
 
@@ -467,6 +615,11 @@ class CameraVision(Node):
             self.pipeline.stop()
         except Exception:
             pass
+        if self.live_window_created:
+            try:
+                cv2.destroyWindow(self.live_window_name)
+            except cv2.error:
+                pass
         super().destroy_node()
 
 

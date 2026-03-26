@@ -31,7 +31,12 @@ def generate_launch_description():
             "vision_mount_xyz": "-0.0635,0.0,0.0635",
             "vision_mount_rpy_deg": "0.0,0.0,0.0",
             "vision_optical_frame_rpy_deg": "-90.0,0.0,-90.0",
+            "vision_grasp_depth_offset_m": LaunchConfiguration(
+                "vision_grasp_depth_offset_m"
+            ),
             "vision_publish_image": LaunchConfiguration("vision_publish_image"),
+            "vision_show_live_window": LaunchConfiguration("vision_show_live_window"),
+            "vision_live_window_name": LaunchConfiguration("vision_live_window_name"),
         }.items(),
     )
 
@@ -47,7 +52,13 @@ def generate_launch_description():
             DeclareLaunchArgument("launch_camera_vision", default_value="true"),
             DeclareLaunchArgument("vision_model_path", default_value="yolov8n.pt"),
             DeclareLaunchArgument("vision_confidence", default_value="0.50"),
+            DeclareLaunchArgument("vision_grasp_depth_offset_m", default_value="0.02"),
             DeclareLaunchArgument("vision_publish_image", default_value="true"),
+            DeclareLaunchArgument("vision_show_live_window", default_value="true"),
+            DeclareLaunchArgument(
+                "vision_live_window_name",
+                default_value="VX300 Camera Vision",
+            ),
             auto_pick_launch,
         ]
     )

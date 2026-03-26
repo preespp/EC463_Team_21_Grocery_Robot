@@ -54,6 +54,8 @@ class VisionAutoPick(Node):
         self.declare_parameter("enable_auto_pick", True)
         self.declare_parameter("return_after_sequence", False)
         self.declare_parameter("dry_run", False)
+        self.declare_parameter("startup_pose_on_launch", False)
+        self.declare_parameter("startup_pose_command", "startup_arm_pose")
         self.declare_parameter("fixed_orientation_xyzw", "0.0,0.0,0.0,1.0")
         self.declare_parameter("lock_initial_ee_orientation", True)
         self.declare_parameter("diagnostics_log_period_sec", 2.0)
@@ -89,6 +91,8 @@ class VisionAutoPick(Node):
         self.enable_auto_pick = bool(self.get_parameter("enable_auto_pick").value)
         self.return_after_sequence = bool(self.get_parameter("return_after_sequence").value)
         self.dry_run = bool(self.get_parameter("dry_run").value)
+        self.startup_pose_on_launch = bool(self.get_parameter("startup_pose_on_launch").value)
+        self.startup_pose_command = str(self.get_parameter("startup_pose_command").value).strip()
         self.lock_initial_ee_orientation = bool(
             self.get_parameter("lock_initial_ee_orientation").value
         )
@@ -114,6 +118,7 @@ class VisionAutoPick(Node):
         self.pending_pick_xyz: Optional[Tuple[float, float, float]] = None
         self.pending_pick_meta: Optional[Dict[str, float]] = None
         self.last_stable_xyz: Optional[Tuple[float, float, float]] = None
+        self.stable_xyz_samples: List[Tuple[float, float, float]] = []
         self.locked_pick_orientation_xyzw: Optional[Tuple[float, float, float, float]] = None
         self.stable_count = 0
 
@@ -122,6 +127,8 @@ class VisionAutoPick(Node):
         self.state = "idle"
         self.send_future = None
         self.result_future = None
+        self.startup_pose_pending = self.startup_pose_on_launch
+        self.startup_retry_after = self.get_clock().now()
         self.next_allowed_pick_time = self.get_clock().now()
         self.last_tf_error_log_time = self.get_clock().now()
         self.last_diagnostics_log_time = self.get_clock().now()
@@ -136,6 +143,10 @@ class VisionAutoPick(Node):
             f"enable_auto_pick={self.enable_auto_pick} "
             f"dry_run={self.dry_run}"
         )
+        if self.startup_pose_pending:
+            self.get_logger().info(
+                f"Startup arm pose is enabled: command={self.startup_pose_command}"
+            )
         self.get_logger().info(
             "vision_auto_pick filters: "
             f"min_conf={self.min_confidence:.2f} "
@@ -145,6 +156,11 @@ class VisionAutoPick(Node):
             f"workspace_z=({self.workspace_min_z:.2f}, {self.workspace_max_z:.2f}) "
             f"stability={self.target_stability_count}"
         )
+        if not self.ee_link and self.ee_orientation_frame:
+            self.ee_link = self.ee_orientation_frame
+            self.get_logger().info(
+                f"ee_link was empty; defaulting pick planning link to {self.ee_link}"
+            )
 
     @staticmethod
     def _parse_quat(text: str) -> Tuple[float, float, float, float]:
@@ -173,6 +189,17 @@ class VisionAutoPick(Node):
     def _format_xyz(xyz: Tuple[float, float, float]) -> str:
         return f"({xyz[0]:.3f}, {xyz[1]:.3f}, {xyz[2]:.3f})"
 
+    @staticmethod
+    def _average_xyz(samples: List[Tuple[float, float, float]]) -> Tuple[float, float, float]:
+        if not samples:
+            return 0.0, 0.0, 0.0
+        count = float(len(samples))
+        return (
+            sum(sample[0] for sample in samples) / count,
+            sum(sample[1] for sample in samples) / count,
+            sum(sample[2] for sample in samples) / count,
+        )
+
     def _should_log_diagnostics(self, now) -> bool:
         if self.diagnostics_log_period_sec <= 0.0:
             return False
@@ -196,7 +223,12 @@ class VisionAutoPick(Node):
         )
 
     def _on_detections(self, msg: String) -> None:
-        if not self.enable_auto_pick or self.state != "idle" or self.pending_pick_xyz is not None:
+        if (
+            not self.enable_auto_pick
+            or self.startup_pose_pending
+            or self.state != "idle"
+            or self.pending_pick_xyz is not None
+        ):
             return
 
         now = self.get_clock().now()
@@ -218,6 +250,7 @@ class VisionAutoPick(Node):
         if not isinstance(detections, list) or not detections:
             self.stable_count = 0
             self.last_stable_xyz = None
+            self.stable_xyz_samples = []
             self._maybe_log_diagnostics(
                 f"Auto-pick sees camera stream from {camera_frame}, but detections list is empty."
             )
@@ -227,6 +260,7 @@ class VisionAutoPick(Node):
         if best is None:
             self.stable_count = 0
             self.last_stable_xyz = None
+            self.stable_xyz_samples = []
             message = (
                 "Auto-pick rejected current detections: "
                 f"total={int(summary['total'])} "
@@ -247,29 +281,35 @@ class VisionAutoPick(Node):
         if self.last_stable_xyz is not None and self._distance(self.last_stable_xyz, xyz) <= self.target_match_distance_m:
             self.stable_count += 1
             self.last_stable_xyz = xyz
+            self.stable_xyz_samples.append(xyz)
         else:
             self.stable_count = 1
             self.last_stable_xyz = xyz
+            self.stable_xyz_samples = [xyz]
 
         if self.stable_count < self.target_stability_count:
+            averaged_xyz = self._average_xyz(self.stable_xyz_samples)
             self._maybe_log_diagnostics(
                 "Candidate accepted but waiting for stability: "
                 f"{self.stable_count}/{self.target_stability_count} "
                 f"class={best['class_name']} "
                 f"conf={float(best['confidence']):.2f} "
-                f"base_xyz={self._format_xyz(xyz)}"
+                f"base_xyz={self._format_xyz(averaged_xyz)}"
             )
             return
 
-        self.pending_pick_xyz = xyz
+        averaged_xyz = self._average_xyz(self.stable_xyz_samples)
+        best["xyz"] = averaged_xyz
+        self.pending_pick_xyz = averaged_xyz
         self.pending_pick_meta = best
         self.stable_count = 0
         self.last_stable_xyz = None
+        self.stable_xyz_samples = []
         self.get_logger().info(
             "Queued pick target "
             f"class={best['class_name']} "
             f"conf={float(best['confidence']):.2f} "
-            f"base_xyz=({xyz[0]:.3f}, {xyz[1]:.3f}, {xyz[2]:.3f})"
+            f"base_xyz=({averaged_xyz[0]:.3f}, {averaged_xyz[1]:.3f}, {averaged_xyz[2]:.3f})"
         )
 
     def _select_best_detection(
@@ -392,6 +432,37 @@ class VisionAutoPick(Node):
         except TransformException:
             return self.fixed_orientation_xyzw
 
+    def _lock_current_pick_orientation(self) -> None:
+        if not self.use_current_ee_orientation or not self.lock_initial_ee_orientation:
+            return
+        if self.locked_pick_orientation_xyzw is not None:
+            return
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.base_frame,
+                self.ee_orientation_frame,
+                rclpy.time.Time(),
+                timeout=Duration(seconds=0.25),
+            )
+        except TransformException as exc:
+            self.get_logger().warn(
+                f"Unable to lock current EE orientation after startup pose: {exc}"
+            )
+            return
+
+        q = transform.transform.rotation
+        self.locked_pick_orientation_xyzw = (
+            float(q.x),
+            float(q.y),
+            float(q.z),
+            float(q.w),
+        )
+        quat = self.locked_pick_orientation_xyzw
+        self.get_logger().info(
+            "Locked pick orientation from current EE pose: "
+            f"xyzw=({quat[0]:.4f}, {quat[1]:.4f}, {quat[2]:.4f}, {quat[3]:.4f})"
+        )
+
     def _make_arm_goal(
         self,
         xyz: Tuple[float, float, float],
@@ -501,6 +572,30 @@ class VisionAutoPick(Node):
         self.result_future = None
         self.state = "waiting_goal"
 
+    def _start_startup_pose(self) -> None:
+        now = self.get_clock().now()
+        if now < self.startup_retry_after:
+            return
+
+        if not self.startup_pose_command:
+            self.get_logger().warn("startup_pose_on_launch=true but startup_pose_command is empty")
+            self.startup_pose_pending = False
+            return
+
+        if not self.action_client.wait_for_server(timeout_sec=0.2):
+            self._maybe_log_diagnostics(
+                f"Waiting for action server {self.action_name} before startup arm pose."
+            )
+            self.startup_retry_after = now + Duration(seconds=1.0)
+            return
+
+        self.get_logger().info(f"Sending startup arm pose command: {self.startup_pose_command}")
+        self.send_future = self.action_client.send_goal_async(
+            self._make_command_goal(self.startup_pose_command)
+        )
+        self.result_future = None
+        self.state = "startup_waiting_goal"
+
     def _finish_sequence(self, success: bool, message: str) -> None:
         self.sequence = []
         self.step_index = 0
@@ -518,6 +613,57 @@ class VisionAutoPick(Node):
             self.get_logger().warn(message)
 
     def _tick_action_state(self) -> None:
+        if self.startup_pose_pending:
+            if self.state == "idle":
+                self._start_startup_pose()
+                return
+
+            if self.state == "startup_waiting_goal":
+                if self.send_future is None or not self.send_future.done():
+                    return
+                goal_handle = self.send_future.result()
+                if goal_handle is None or not goal_handle.accepted:
+                    self.get_logger().warn("Startup arm pose goal was rejected; retrying.")
+                    self.send_future = None
+                    self.result_future = None
+                    self.state = "idle"
+                    self.startup_retry_after = self.get_clock().now() + Duration(seconds=1.0)
+                    return
+                self.result_future = goal_handle.get_result_async()
+                self.state = "startup_waiting_result"
+                return
+
+            if self.state == "startup_waiting_result":
+                if self.result_future is None or not self.result_future.done():
+                    return
+                wrapped_result = self.result_future.result()
+                if wrapped_result is None:
+                    self.get_logger().warn("Startup arm pose returned no result; retrying.")
+                    self.send_future = None
+                    self.result_future = None
+                    self.state = "idle"
+                    self.startup_retry_after = self.get_clock().now() + Duration(seconds=1.0)
+                    return
+                if wrapped_result.status != GoalStatus.STATUS_SUCCEEDED or not wrapped_result.result.success:
+                    self.get_logger().warn(
+                        "Startup arm pose failed; retrying. "
+                        f"status={wrapped_result.status} "
+                        f"message={wrapped_result.result.message}"
+                    )
+                    self.send_future = None
+                    self.result_future = None
+                    self.state = "idle"
+                    self.startup_retry_after = self.get_clock().now() + Duration(seconds=1.0)
+                    return
+
+                self.get_logger().info("Startup arm pose complete. Auto-pick is now active.")
+                self._lock_current_pick_orientation()
+                self.startup_pose_pending = False
+                self.send_future = None
+                self.result_future = None
+                self.state = "idle"
+                return
+
         if self.enable_auto_pick and self.state == "idle":
             now = self.get_clock().now()
             if self.last_detection_msg_time is None:
