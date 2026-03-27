@@ -2,6 +2,7 @@ import math
 
 import py_trees
 import rclpy
+from geometry_msgs.msg import PoseStamped
 from robot_interfaces.srv import ResolveSemanticTarget
 
 
@@ -10,6 +11,20 @@ def _quaternion_to_yaw(orientation) -> float:
         2.0 * ((orientation.w * orientation.z) + (orientation.x * orientation.y)),
         1.0 - 2.0 * ((orientation.y * orientation.y) + (orientation.z * orientation.z)),
     )
+
+
+def _pose_stamped_to_dict(pose_stamped: PoseStamped, default_frame_id: str = "") -> dict:
+    frame_id = pose_stamped.header.frame_id or default_frame_id
+    return {
+        "frame_id": frame_id,
+        "x": float(pose_stamped.pose.position.x),
+        "y": float(pose_stamped.pose.position.y),
+        "z": float(pose_stamped.pose.position.z),
+        "qx": float(pose_stamped.pose.orientation.x),
+        "qy": float(pose_stamped.pose.orientation.y),
+        "qz": float(pose_stamped.pose.orientation.z),
+        "qw": float(pose_stamped.pose.orientation.w),
+    }
 
 
 class ResolveCurrentItemSemanticTarget(py_trees.behaviour.Behaviour):
@@ -152,3 +167,86 @@ class ResolveCurrentItemSemanticTarget(py_trees.behaviour.Behaviour):
         self.bb.semantic_id = response.semantic_id or None
         self.bb.semantic_target_label = response.target_label or None
         self.bb.nav_goal_source = response.resolved_by or "semantic_map"
+
+
+class ResolveCurrentItemSemanticTargetViperX(ResolveCurrentItemSemanticTarget):
+    """
+    Semantic target resolution for ViperX flows.
+
+    Uses the semantic service for base navigation, then converts semantic rack levels
+    into preset ViperX shelf commands instead of setting bb.rack_goal.
+    """
+
+    DEFAULT_SHELF_POSES = {
+        1: {"command": "shelf_level_1_pose"},
+        2: {"command": "shelf_level_2_pose"},
+        3: {"command": "shelf_level_3_pose"},
+    }
+
+    def __init__(
+        self,
+        bb,
+        service_name: str = "/semantic_map/resolve_target",
+        fallback_to_legacy: bool = True,
+        service_timeout_sec: float = 1.5,
+        shelf_poses: dict[int, dict] | None = None,
+    ):
+        super().__init__(
+            bb=bb,
+            service_name=service_name,
+            fallback_to_legacy=fallback_to_legacy,
+            service_timeout_sec=service_timeout_sec,
+        )
+        self.name = "ResolveCurrentItemSemanticTargetViperX"
+        self.shelf_poses = dict(shelf_poses or self.DEFAULT_SHELF_POSES)
+
+    def _legacy_or_failure(self, item, reason: str):
+        if not self.fallback_to_legacy or item is None:
+            return py_trees.common.Status.FAILURE
+
+        self.bb.slot_id = None
+        self.bb.anchor_id = None
+        self.bb.rack_id = None
+        self.bb.semantic_id = None
+        self.bb.semantic_target_label = None
+        self.bb.nav_goal_source = "legacy"
+
+        rack_level = int(getattr(item, "shelf_level", 0) or 0)
+        x = float(getattr(item, "aisle", 0.0) or 0.0)
+        y = float(getattr(item, "rack", 0.0) or 0.0)
+        self.bb.nav_goal = (x, y, 0.0)
+        self._set_viperx_arm_targets(rack_level)
+        self.feedback_message = f"{reason}; falling back to legacy coordinates"
+        return py_trees.common.Status.SUCCESS
+
+    def _apply_response(self, response: ResolveSemanticTarget.Response):
+        nav_pose = response.nav_pose
+        nav_yaw = _quaternion_to_yaw(nav_pose.pose.orientation)
+
+        self.bb.nav_goal = (
+            float(nav_pose.pose.position.x),
+            float(nav_pose.pose.position.y),
+            float(nav_yaw),
+        )
+        self._set_viperx_arm_targets(int(response.rack_level), response.service_pose)
+        self.bb.slot_id = response.slot_id or None
+        self.bb.anchor_id = response.anchor_id or None
+        self.bb.rack_id = response.rack_id or None
+        self.bb.semantic_id = response.semantic_id or None
+        self.bb.semantic_target_label = response.target_label or None
+        self.bb.nav_goal_source = response.resolved_by or "semantic_map"
+
+    def _set_viperx_arm_targets(
+        self,
+        rack_level: int,
+        service_pose: PoseStamped | None = None,
+    ):
+        self.bb.shelf_height = rack_level if rack_level > 0 else None
+
+        configured_shelf_poses = getattr(self.bb, "shelf_poses", None) or self.shelf_poses
+        shelf_pose = configured_shelf_poses.get(rack_level)
+        self.bb.shelf_pose = dict(shelf_pose) if isinstance(shelf_pose, dict) else shelf_pose
+
+        # Keep the observation pose as its blackboard-configured preset command.
+        # Do not overwrite bb.pose with a z-adjusted Cartesian pose anymore.
+        del service_pose

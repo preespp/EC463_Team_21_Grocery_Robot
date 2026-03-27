@@ -22,8 +22,8 @@ def create_customer_viperx_tree(bb):
         "DetectAndApproach",
         memory=True,
         children=[
-            bt_nodes.RepositionViperXArm(goal_key="pose"),  # Move to observation pose
-            bt_nodes.VerifyViperXPosition(),  # Detect object, store in bb.detected_object_pose
+            bt_nodes.RepositionViperXArm(goal_key="pose", bb=bb),  # Move to observation pose
+            bt_nodes.VerifyViperXPosition(bb=bb),  # Detect object, store in bb.detected_object_pose
         ],
     )
 
@@ -32,8 +32,8 @@ def create_customer_viperx_tree(bb):
         "PlaceInBasket",
         memory=True,
         children=[
-            bt_nodes.SelectBasketSlot(),  # Select basket slot based on item type
-            bt_nodes.RepositionViperXArm(goal_key="basket_pose"),  # Move to basket position
+            bt_nodes.SelectBasketSlot(bb=bb),  # Select basket slot based on item type
+            bt_nodes.RepositionViperXArm(goal_key="basket_pose", bb=bb),  # Move to basket position
             bt_nodes.MoveViperXGripper(command="open"),  # Release item
         ],
     )
@@ -45,22 +45,23 @@ def create_customer_viperx_tree(bb):
         children=[
             # Set current item and update blackboard
             bt_nodes.SetCurrentItem(bb),
+            bt_nodes.ResolveCurrentItemSemanticTargetViperX(bb),
 
             # Navigate to shelf location (x, y coordinates)
-            bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
+            bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
 
             # Detect object and verify positioning
             detect_and_approach,
 
             # Move to detected object pose and grab
-            bt_nodes.MoveToDetectedPose(),
+            bt_nodes.MoveToDetectedPose(bb=bb),
             bt_nodes.MoveViperXGripper(command="close"),
 
             # Place in basket with smart slot selection
             place_in_basket,
 
             # Return to home pose
-            bt_nodes.RepositionViperXArm(goal_key="home_pose"),
+            bt_nodes.RepositionViperXArm(goal_key="home_pose", bb=bb),
 
             # Update inventory
             bt_nodes.ChangeInventory(bb, mode="customer"),
@@ -87,7 +88,7 @@ def create_customer_viperx_tree(bb):
             
             # Go home after all items picked
             bt_nodes.SetHome(bb),
-            bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
+            bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
             bt_nodes.DebugPrint("Customer picking complete"),
         ],
     )

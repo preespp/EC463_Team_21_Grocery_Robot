@@ -15,28 +15,30 @@ def setup_blackboard():
     bb.num_current_item = 0
 
     # For manipulation
-
-    bb.goal_pose = None 
-    # I am not sure what this is for but to add to solve conflict
-
-
-    bb.home_pose = None # Home Pose for Arm to see the shelf, assign Constant in here
-    bb.basket_pose = None # Assign Constant in here
-    bb.pose = None # Placeholder for current pose of the arm
+    # Preset arm states are stored as BT command dictionaries.
+    # The corresponding raw joint values live in robot_manipulation config/server parameters.
+    bb.home_pose = {"command": "return_arm_pose"}
+    bb.basket_pose = {"command": "place_arm_pose"}
+    bb.pose = {"command": "startup_arm_pose"}
     bb.goal_pose = None # Preferred BT arm target pose key for ViperX flow
 
     # For basket management (3 bottle slots + 1 random slot)
     bb.basket_poses = [
-        None,  # Bottle slot 1
-        None,  # Bottle slot 2
-        None,  # Bottle slot 3
-        None,  # Random items slot
+        {"command": "place_arm_pose"},  # Bottle slot 1
+        {"command": "place_arm_pose"},  # Bottle slot 2
+        {"command": "place_arm_pose"},  # Bottle slot 3
+        {"command": "place_arm_pose"},  # Random items slot
     ]
     bb.basket_bottle_count = 0  # Track how many bottles have been picked
     
-    # For shelf height (3 levels - to be filled during testing)
-    bb.shelf_height = None  # Height parameter for shelf level (will be set to 1, 2, or 3)
-    bb.shelf_pose = None  # Shelf pose with x,y empty (only z/height will be used)
+    # For shelf level state selection (3 hardcoded shelf commands)
+    bb.shelf_height = None  # Semantic shelf level (1, 2, or 3)
+    bb.shelf_poses = {
+        1: {"command": "shelf_level_1_pose"},
+        2: {"command": "shelf_level_2_pose"},
+        3: {"command": "shelf_level_3_pose"},
+    }
+    bb.shelf_pose = None  # Selected preset shelf pose for the current level
 
     # For object detection results
     bb.detected_object_pose = None  # Pose returned from vision service

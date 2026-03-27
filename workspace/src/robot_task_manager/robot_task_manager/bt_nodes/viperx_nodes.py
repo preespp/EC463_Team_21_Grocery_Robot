@@ -5,28 +5,37 @@ from typing import Optional
 
 import py_trees
 import rclpy
+import tf2_geometry_msgs  # noqa: F401 - required to register PointStamped transforms
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped
 from rclpy.action import ActionClient
 from rclpy.client import Client
+from rclpy.duration import Duration
 from robot_interfaces.action import PickArm
 from std_msgs.msg import String
+from tf2_ros import Buffer, TransformException, TransformListener
 
 
 class RepositionViperXArm(py_trees.behaviour.Behaviour):
     """
-    Read a target pose from blackboard and send a PickArm action goal to ViperX.
+    Read a target from blackboard and send a PickArm action goal to ViperX.
+
     The target may be:
+      - dict with key command for a configured preset joint state
       - geometry_msgs.msg.PoseStamped
       - dict with keys frame_id, x, y, z, qx, qy, qz, qw
       - dict with keys frame_id, position{x,y,z}, orientation{x,y,z,w}
+
+    BT convention:
+      - preset arm states should be stored as {"command": "<preset_name>"}
+      - live Cartesian arm targets should be stored as pose dictionaries
     """
 
-    def __init__(self, goal_key: str, action_name: str = "/pick_viperx"):
+    def __init__(self, goal_key: str, bb=None, action_name: str = "/pick_viperx"):
         super().__init__(f"RepositionViperXArm[{goal_key}]")
         self.goal_key = goal_key
         self.action_name = action_name
-        self.bb = py_trees.blackboard.Blackboard()
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
 
         self.node = None
         self.client: Optional[ActionClient] = None
@@ -69,18 +78,20 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         )
         return pose_msg
 
-    def initialise(self):
-        target_pose = getattr(self.bb, self.goal_key, None)
-        if target_pose is None:
-            self.feedback_message = f"No pose found for bb.{self.goal_key}"
-            self.send_future = None
-            return
+    def _make_command_goal(self, command: str) -> PickArm.Goal:
+        goal_msg = PickArm.Goal()
+        goal_msg.target_pose.header.frame_id = "vx300/base_link"
+        goal_msg.target_pose.header.stamp = self.node.get_clock().now().to_msg()
+        goal_msg.target_pose.pose.orientation.w = 1.0
+        goal_msg.planning_group = command
+        goal_msg.ee_link = ""
+        goal_msg.pregrasp_offset_m = 0.0
+        goal_msg.retreat_offset_m = 0.0
+        goal_msg.gripper_close_position = -1.0
+        goal_msg.use_cartesian_approach = False
+        return goal_msg
 
-        if not self.client.wait_for_server(timeout_sec=2.0):
-            self.feedback_message = f"Action server unavailable: {self.action_name}"
-            self.send_future = None
-            return
-
+    def _make_pose_goal(self, target_pose) -> PickArm.Goal:
         goal_msg = PickArm.Goal()
         goal_msg.planning_group = "arm"
         goal_msg.ee_link = ""
@@ -91,10 +102,39 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
 
         if isinstance(target_pose, PoseStamped):
             goal_msg.target_pose = target_pose
-        elif isinstance(target_pose, dict):
-            goal_msg.target_pose = self._dict_to_pose_stamped(target_pose)
         else:
-            self.feedback_message = f"Unsupported pose type for bb.{self.goal_key}"
+            goal_msg.target_pose = self._dict_to_pose_stamped(target_pose)
+        return goal_msg
+
+    @staticmethod
+    def _is_command_target(target) -> bool:
+        return isinstance(target, dict) and isinstance(target.get("command"), str)
+
+    @staticmethod
+    def _is_pose_dict_target(target) -> bool:
+        return isinstance(target, dict) and "command" not in target
+
+    def initialise(self):
+        target = getattr(self.bb, self.goal_key, None)
+        if target is None:
+            self.feedback_message = f"No pose found for bb.{self.goal_key}"
+            self.send_future = None
+            return
+
+        if not self.client.wait_for_server(timeout_sec=2.0):
+            self.feedback_message = f"Action server unavailable: {self.action_name}"
+            self.send_future = None
+            return
+
+        if self._is_command_target(target):
+            goal_msg = self._make_command_goal(target["command"])
+        elif isinstance(target, PoseStamped) or self._is_pose_dict_target(target):
+            goal_msg = self._make_pose_goal(target)
+        else:
+            self.feedback_message = (
+                f"Unsupported target in bb.{self.goal_key}; expected "
+                "{'command': str}, PoseStamped, or pose dict"
+            )
             self.send_future = None
             return
 
@@ -160,29 +200,37 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
 
     def __init__(
         self,
+        bb=None,
         detections_topic: str = "/detections_json",
         min_confidence: float = 0.60,
         min_depth_m: float = 0.08,
         max_depth_m: float = 0.70,
+        target_frame: str = "vx300/base_link",
     ):
         super().__init__("VerifyViperXPosition")
-        self.bb = py_trees.blackboard.Blackboard()
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
         self.detections_topic = detections_topic
         self.min_confidence = min_confidence
         self.min_depth_m = min_depth_m
         self.max_depth_m = max_depth_m
+        self.target_frame = target_frame
 
         self.node = None
         self.sub = None
         self.last_detections_json = None
         self.detection_timeout_sec = 2.0
         self.last_detection_time = None
+        self.tf_buffer = None
+        self.tf_listener = None
+        self.last_tf_error_time = None
 
     def setup(self, **kwargs):
         if not rclpy.ok():
             return False
         node_name = f"bt_verify_viperx_{id(self) & 0xFFFF:x}"
         self.node = rclpy.create_node(node_name)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self.node)
         self.sub = self.node.create_subscription(
             String,
             self.detections_topic,
@@ -190,6 +238,40 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
             10,
         )
         return True
+
+    def _transform_point_to_target(
+        self,
+        point_m: list[float],
+        source_frame: str,
+    ) -> Optional[tuple[float, float, float]]:
+        point = PointStamped()
+        point.header.stamp.sec = 0
+        point.header.stamp.nanosec = 0
+        point.header.frame_id = source_frame
+        point.point.x = float(point_m[0])
+        point.point.y = float(point_m[1])
+        point.point.z = float(point_m[2])
+
+        try:
+            transformed = self.tf_buffer.transform(
+                point,
+                self.target_frame,
+                timeout=Duration(seconds=0.25),
+            )
+        except TransformException as exc:
+            now = time.time()
+            if self.last_tf_error_time is None or now - self.last_tf_error_time > 2.0:
+                self.last_tf_error_time = now
+                self.feedback_message = (
+                    f"TF transform failed {source_frame} -> {self.target_frame}: {exc}"
+                )
+            return None
+
+        return (
+            float(transformed.point.x),
+            float(transformed.point.y),
+            float(transformed.point.z),
+        )
 
     def _on_detections(self, msg: String):
         """Callback when camera publishes detections."""
@@ -301,6 +383,7 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
         try:
             payload = json.loads(self.last_detections_json)
             detections = payload.get("detections", [])
+            camera_frame = str(payload.get("camera_optical_frame", "")).strip()
         except (json.JSONDecodeError, TypeError):
             self.feedback_message = "Failed to parse detection JSON"
             return py_trees.common.Status.FAILURE
@@ -309,18 +392,32 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
             self.feedback_message = "Camera sees no objects"
             return py_trees.common.Status.FAILURE
 
+        if not camera_frame:
+            self.feedback_message = "detections_json missing camera_optical_frame"
+            return py_trees.common.Status.FAILURE
+
         # Filter and select best detection
         best_detection = self._filter_detections(detections)
         if best_detection is None:
             return py_trees.common.Status.FAILURE
 
+        raw_point = best_detection.get("point_camera_optical_m", [])
+        if not isinstance(raw_point, list) or len(raw_point) != 3:
+            self.feedback_message = "Detection missing point_camera_optical_m"
+            return py_trees.common.Status.FAILURE
+
+        target_xyz = self._transform_point_to_target(raw_point, camera_frame)
+        if target_xyz is None:
+            return py_trees.common.Status.FAILURE
+
         # Store in blackboard for next node
         self.bb.detected_object_pose = {
-            "x": float(best_detection["point_camera_optical_m"][0]),
-            "y": float(best_detection["point_camera_optical_m"][1]),
-            "z": float(best_detection["point_camera_optical_m"][2]),
+            "x": float(target_xyz[0]),
+            "y": float(target_xyz[1]),
+            "z": float(target_xyz[2]),
             "distance_m": float(best_detection["distance_m"]),
-            "frame_id": "camera_optical_frame",
+            "frame_id": self.target_frame,
+            "source_frame": camera_frame,
             "class_name": str(best_detection["class_name"]),
             "confidence": float(best_detection["confidence"]),
         }
@@ -342,6 +439,8 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
         self.node = None
         self.sub = None
         self.last_detections_json = None
+        self.tf_buffer = None
+        self.tf_listener = None
 
 
 class MoveViperXGripper(py_trees.behaviour.Behaviour):
@@ -445,9 +544,9 @@ class SelectBasketSlot(py_trees.behaviour.Behaviour):
     Sets bb.basket_pose to the selected basket pose from bb.basket_poses.
     """
 
-    def __init__(self):
+    def __init__(self, bb=None):
         super().__init__("SelectBasketSlot")
-        self.bb = py_trees.blackboard.Blackboard()
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
 
     def update(self):
         current_item = getattr(self.bb, "current_item", None)
@@ -493,10 +592,10 @@ class MoveToDetectedPose(py_trees.behaviour.Behaviour):
     Uses the RepositionViperXArm action with the detected pose.
     """
 
-    def __init__(self, action_name: str = "/pick_viperx"):
+    def __init__(self, bb=None, action_name: str = "/pick_viperx"):
         super().__init__("MoveToDetectedPose")
         self.action_name = action_name
-        self.bb = py_trees.blackboard.Blackboard()
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
 
         self.node = None
         self.client: Optional[ActionClient] = None
