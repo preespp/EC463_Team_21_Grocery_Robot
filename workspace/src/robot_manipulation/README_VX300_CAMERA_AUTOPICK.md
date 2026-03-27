@@ -278,6 +278,13 @@ camera paths:
 Important difference:
 
 - `camera_vision` publishes `/camera/color/image_raw`, detections, and TF.
+- By default, the auto-pick launches also open a live OpenCV preview window showing:
+  - bounding boxes
+  - grasp point crosshair
+  - depth
+  - optical-frame XYZ
+- You can disable the live preview window with:
+  - `vision_show_live_window:=false`
 - `camera_vision` does **not** publish `sensor_msgs/CameraInfo`.
 - The MoveIt calibration plugin expects a normal camera feed with both image and camera info.
 

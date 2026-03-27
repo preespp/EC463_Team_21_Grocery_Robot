@@ -6,7 +6,10 @@ SERVER = "http://localhost:3000"
 
 class ChangeInventory(py_trees.behaviour.Behaviour):
     """
-    Uses bb.current_item and decrements inventory in PostgreSQL API.
+    Uses bb.current_item and updates inventory in PostgreSQL API.
+
+    - mode='customer': decrement
+    - mode='restock': increment
     """
     def __init__(self, bb, mode):
         super().__init__("ChangeInventory")
@@ -23,9 +26,10 @@ class ChangeInventory(py_trees.behaviour.Behaviour):
         if not product_id or qty <= 0:
             return py_trees.common.Status.FAILURE
 
+        endpoint = "increment" if self.mode == "restock" else "decrement"
         try:
             r = requests.post(
-                f"{SERVER}/api/inventory/decrement",
+                f"{SERVER}/api/inventory/{endpoint}",
                 json={"product_id": product_id, "qty": qty},
                 timeout=1.0,
             )

@@ -161,6 +161,22 @@ async function generateWithGemini(prompt) {
   return answer;
 }
 
+function generateCSV(data, headers) {
+  const rows = [headers.join(',')];
+  for (const row of data) {
+    const csvRow = headers.map(header => {
+      const value = row[header] ?? '';
+      // Escape quotes and wrap in quotes if contains comma, quote, or newline
+      if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+        return '"' + value.replace(/"/g, '""') + '"';
+      }
+      return value;
+    });
+    rows.push(csvRow.join(','));
+  }
+  return rows.join('\n');
+}
+
 function memberIdToOrdinal(memberId) {
   const s = String(memberId || "").trim().toUpperCase();
   if (!/^[A-Z]{3}[0-9]{3}$/.test(s)) return null;
@@ -687,6 +703,72 @@ app.get("/api/employee/inventory/report", requireEmployeeAuth, async (_req, res)
       category_summary: [...categoryMap.values()].sort((a, b) => a.category.localeCompare(b.category)),
       items
     });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DOWNLOAD INVENTORY REPORT AS CSV
+app.get("/api/employee/inventory/download-report", requireEmployeeAuth, async (_req, res) => {
+  try {
+    // Get the same data as the report
+    const invResult = await pool.query(
+      `SELECT product_id, product_name, category_name, stock, x, y, z
+       FROM inventory
+       ORDER BY product_name`
+    );
+    const items = invResult.rows.map((r) => ({
+      product_id: r.product_id,
+      product_name: r.product_name ?? "",
+      category_name: r.category_name ?? "Uncategorized",
+      stock: Number(r.stock ?? 0),
+      x: r.x ?? null,
+      y: r.y ?? null,
+      z: r.z ?? null
+    }));
+
+    let unitsInStock = 0;
+    let occupiedProducts = 0;
+    let lowStockProducts = 0;
+    const categoryMap = new Map();
+
+    for (const it of items) {
+      unitsInStock += it.stock;
+      if (it.stock > 0) occupiedProducts += 1;
+      if (it.stock <= 5) lowStockProducts += 1;
+
+      const key = it.category_name || "Uncategorized";
+      const agg = categoryMap.get(key) || { category: key, products: 0, units: 0 };
+      agg.products += 1;
+      agg.units += it.stock;
+      categoryMap.set(key, agg);
+    }
+
+    const restockTodayResult = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM restock_id
+       WHERE DATE(timestamp) = CURRENT_DATE`
+    );
+    const restockRequestsToday = Number(restockTodayResult.rows[0]?.count ?? 0);
+
+    const categorySummary = [...categoryMap.values()].sort((a, b) => a.category.localeCompare(b.category));
+
+    // Generate CSV for inventory
+    const inventoryCSV = generateCSV(items, ['product_id', 'product_name', 'category_name', 'stock', 'x', 'y', 'z']);
+
+    // Generate CSV for category summary
+    const categoryCSV = generateCSV(categorySummary, ['category', 'products', 'units']);
+
+    // Combine into one CSV file with sections
+    const csvContent = `Inventory Details\n${inventoryCSV}\n\nCategory Summary\n${categoryCSV}`;
+
+    // Set headers for file download
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const filename = `inventory_report_${timestamp}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvContent);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

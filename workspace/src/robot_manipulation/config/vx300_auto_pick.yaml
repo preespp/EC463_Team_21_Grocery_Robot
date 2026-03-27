@@ -3,9 +3,9 @@ vision_auto_pick:
     detections_topic: "/detections_json"
     action_name: "/pick_viperx"
     base_frame: "vx300s/base_link"
-    ee_link: ""
+    ee_link: "vx300s/ee_gripper_link"
     ee_orientation_frame: "vx300s/ee_gripper_link"
-    use_current_ee_orientation: false
+    use_current_ee_orientation: true
 
     # Pick only bottles for now.
     target_class: "bottle"
@@ -28,8 +28,8 @@ vision_auto_pick:
     close_gripper_position: 0.040
     put_back_after_pick: true
 
-    target_stability_count: 1
-    target_match_distance_m: 0.20
+    target_stability_count: 4
+    target_match_distance_m: 0.03
     cooldown_sec: 3.0
     goal_timeout_sec: 15.0
     pick_once: true
@@ -39,4 +39,4 @@ vision_auto_pick:
 
     # Keep ee_gripper_link level and parallel to the table for side grasping.
     fixed_orientation_xyzw: "0.0,0.0,0.0,1.0"
-    lock_initial_ee_orientation: false
+    lock_initial_ee_orientation: true

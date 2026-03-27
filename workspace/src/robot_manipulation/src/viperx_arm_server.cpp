@@ -7,7 +7,9 @@
 #include <vector>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "moveit_msgs/msg/constraints.hpp"
 #include "moveit_msgs/msg/display_trajectory.hpp"
+#include "moveit_msgs/msg/orientation_constraint.hpp"
 #include "moveit_msgs/msg/robot_trajectory.hpp"
 #include "moveit/robot_state/conversions.h"
 #include "moveit/move_group_interface/move_group_interface.h"
@@ -41,6 +43,21 @@ public:
     max_acceleration_scaling_ = this->declare_parameter<double>("max_acceleration_scaling", 0.2);
     cartesian_eef_step_m_ = this->declare_parameter<double>("cartesian_eef_step_m", 0.01);
     cartesian_min_fraction_ = this->declare_parameter<double>("cartesian_min_fraction", 0.9);
+    enforce_orientation_path_constraint_ = this->declare_parameter<bool>(
+      "enforce_orientation_path_constraint",
+      true);
+    orientation_constraint_x_tolerance_rad_ = this->declare_parameter<double>(
+      "orientation_constraint_x_tolerance_rad",
+      0.12);
+    orientation_constraint_y_tolerance_rad_ = this->declare_parameter<double>(
+      "orientation_constraint_y_tolerance_rad",
+      0.12);
+    orientation_constraint_z_tolerance_rad_ = this->declare_parameter<double>(
+      "orientation_constraint_z_tolerance_rad",
+      0.20);
+    orientation_constraint_weight_ = this->declare_parameter<double>(
+      "orientation_constraint_weight",
+      1.0);
     preview_only_ = this->declare_parameter<bool>("preview_only", false);
     preview_step_delay_sec_ = this->declare_parameter<double>("preview_step_delay_sec", 1.0);
     open_gripper_pos_ = this->declare_parameter<double>("open_gripper_pos", 0.035);
@@ -51,6 +68,13 @@ public:
     close_gripper_named_target_ = this->declare_parameter<std::string>(
       "close_gripper_named_target",
       "Grasping");
+    startup_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "startup_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    startup_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "startup_joint_positions",
+      std::vector<double>{0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0});
     return_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "return_joint_names",
       std::vector<std::string>{
@@ -64,7 +88,21 @@ public:
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     place_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "place_joint_positions",
-      std::vector<double>{1.81514242, -0.2268928, 1.53588974, 0.06981317, -1.34390352, -0.01745329});
+      std::vector<double>{1.81514242, -0.40142573, 1.51843645, 0.08726646, -1.13446401, -0.03490659});
+    post_place_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "post_place_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    post_place_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "post_place_joint_positions",
+      std::vector<double>{1.81514242, -1.06465084, 1.16937060, 0.43633231, -0.15707963, -0.41887902});
+    pre_return_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "pre_return_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    pre_return_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "pre_return_joint_positions",
+      std::vector<double>{0.0, -1.37881011, 1.20427718, 0.0, 0.27925268, 0.0});
 
     action_server_ = rclcpp_action::create_server<PickArm>(
       this,
@@ -121,7 +159,9 @@ private:
     const auto command = goal->planning_group;
     if (
       command != "open_gripper" && command != "close_gripper" &&
-      command != "return_arm_pose" && command != "place_arm_pose" &&
+      command != "startup_arm_pose" && command != "return_arm_pose" &&
+      command != "place_arm_pose" && command != "post_place_arm_pose" &&
+      command != "pre_return_arm_pose" &&
       goal->target_pose.header.frame_id.empty())
     {
       RCLCPP_WARN(this->get_logger(), "ViperX goal rejected: target_pose.frame_id is empty");
@@ -180,6 +220,26 @@ private:
       }
       plan.trajectory_ = robot_traj;
     } else {
+      arm_move_group_->setStartStateToCurrentState();
+      const std::string target_link =
+        !ee_link.empty() ? ee_link : arm_move_group_->getEndEffectorLink();
+      bool path_constraints_set = false;
+      if (enforce_orientation_path_constraint_ && !target_link.empty()) {
+        moveit_msgs::msg::OrientationConstraint orientation_constraint;
+        orientation_constraint.header.frame_id = target_pose.header.frame_id;
+        orientation_constraint.link_name = target_link;
+        orientation_constraint.orientation = target_pose.pose.orientation;
+        orientation_constraint.absolute_x_axis_tolerance = orientation_constraint_x_tolerance_rad_;
+        orientation_constraint.absolute_y_axis_tolerance = orientation_constraint_y_tolerance_rad_;
+        orientation_constraint.absolute_z_axis_tolerance = orientation_constraint_z_tolerance_rad_;
+        orientation_constraint.weight = orientation_constraint_weight_;
+
+        moveit_msgs::msg::Constraints path_constraints;
+        path_constraints.orientation_constraints.push_back(orientation_constraint);
+        arm_move_group_->setPathConstraints(path_constraints);
+        path_constraints_set = true;
+      }
+
       if (!ee_link.empty()) {
         arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
       } else {
@@ -187,6 +247,9 @@ private:
       }
       const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
       arm_move_group_->clearPoseTargets();
+      if (path_constraints_set) {
+        arm_move_group_->clearPathConstraints();
+      }
       if (!ok) {
         return false;
       }
@@ -315,7 +378,7 @@ private:
     const std::vector<double> & joint_positions)
   {
     if (joint_names.empty() || joint_names.size() != joint_positions.size()) {
-      RCLCPP_WARN(this->get_logger(), "Return arm joint target config is empty or mismatched.");
+      RCLCPP_WARN(this->get_logger(), "Arm joint target config is empty or mismatched.");
       return false;
     }
 
@@ -325,14 +388,14 @@ private:
     }
 
     if (!arm_move_group_->setJointValueTarget(joint_targets)) {
-      RCLCPP_WARN(this->get_logger(), "Failed to set arm joint value target for return pose.");
+      RCLCPP_WARN(this->get_logger(), "Failed to set arm joint value target.");
       return false;
     }
 
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!ok) {
-      RCLCPP_WARN(this->get_logger(), "Failed to plan configured return arm pose.");
+      RCLCPP_WARN(this->get_logger(), "Failed to plan configured arm pose.");
       return false;
     }
     if (preview_only_) {
@@ -383,20 +446,37 @@ private:
         return;
       }
 
-      if (command == "return_arm_pose" || command == "place_arm_pose") {
+      if (
+        command == "startup_arm_pose" || command == "return_arm_pose" ||
+        command == "place_arm_pose" || command == "post_place_arm_pose" ||
+        command == "pre_return_arm_pose")
+      {
         feedback->stage = command;
         feedback->position_error_m = 0.0f;
         goal_handle->publish_feedback(feedback);
 
-        const auto & joint_names = (command == "place_arm_pose") ? place_joint_names_ : return_joint_names_;
+        const auto & joint_names =
+          (command == "startup_arm_pose") ? startup_joint_names_ :
+          ((command == "place_arm_pose") ? place_joint_names_ :
+          ((command == "post_place_arm_pose") ? post_place_joint_names_ :
+          ((command == "pre_return_arm_pose") ? pre_return_joint_names_ : return_joint_names_)));
         const auto & joint_positions =
-          (command == "place_arm_pose") ? place_joint_positions_ : return_joint_positions_;
+          (command == "startup_arm_pose") ? startup_joint_positions_ :
+          ((command == "place_arm_pose") ? place_joint_positions_ :
+          ((command == "post_place_arm_pose") ? post_place_joint_positions_ :
+          ((command == "pre_return_arm_pose") ? pre_return_joint_positions_ : return_joint_positions_)));
 
         if (!execute_arm_joint_target(joint_names, joint_positions)) {
           result->success = false;
           result->message =
+            (command == "startup_arm_pose") ?
+            "Failed to execute configured startup arm pose" :
             (command == "place_arm_pose") ?
             "Failed to execute configured place arm pose" :
+            (command == "post_place_arm_pose") ?
+            "Failed to execute configured post-place arm pose" :
+            (command == "pre_return_arm_pose") ?
+            "Failed to execute configured pre-return arm pose" :
             "Failed to execute configured return arm pose";
           result->final_position_error_m = -1.0f;
           goal_handle->abort(result);
@@ -406,7 +486,11 @@ private:
 
         result->success = true;
         result->message =
-          (command == "place_arm_pose") ? "Place arm pose complete" : "Return arm pose complete";
+          (command == "startup_arm_pose") ? "Startup arm pose complete" :
+          (command == "place_arm_pose") ? "Place arm pose complete" :
+          (command == "post_place_arm_pose") ? "Post-place arm pose complete" :
+          (command == "pre_return_arm_pose") ? "Pre-return arm pose complete" :
+          "Return arm pose complete";
         result->final_position_error_m = 0.0f;
         maybe_preview_delay();
         goal_handle->succeed(result);
@@ -469,14 +553,25 @@ private:
   double max_acceleration_scaling_;
   double cartesian_eef_step_m_;
   double cartesian_min_fraction_;
+  bool enforce_orientation_path_constraint_;
+  double orientation_constraint_x_tolerance_rad_;
+  double orientation_constraint_y_tolerance_rad_;
+  double orientation_constraint_z_tolerance_rad_;
+  double orientation_constraint_weight_;
   bool preview_only_;
   double preview_step_delay_sec_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
+  std::vector<std::string> startup_joint_names_;
+  std::vector<double> startup_joint_positions_;
   std::vector<std::string> return_joint_names_;
   std::vector<double> return_joint_positions_;
   std::vector<std::string> place_joint_names_;
   std::vector<double> place_joint_positions_;
+  std::vector<std::string> post_place_joint_names_;
+  std::vector<double> post_place_joint_positions_;
+  std::vector<std::string> pre_return_joint_names_;
+  std::vector<double> pre_return_joint_positions_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
