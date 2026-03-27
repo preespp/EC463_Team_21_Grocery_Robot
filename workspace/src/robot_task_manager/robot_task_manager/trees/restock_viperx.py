@@ -1,54 +1,47 @@
 import py_trees
 import robot_task_manager.bt_nodes as bt_nodes
 
-
 def create_restock_viperx_tree(bb):
-
-    process_one_item = py_trees.composites.Sequence("ProcessRestockItem", memory=True, children=[
+    # Initial phase: pick first item and go to restock start pose
+    root_sequence = py_trees.composites.Sequence("EmployeeRestockRoot", memory=True, children=[
         bt_nodes.SetCurrentItem(bb),
-
-        # bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
-        # bt_nodes.RepositionViperXArm(goal_key="basket_pose"),
-
-        # bt_nodes.VerifyViperXPosition(),
-        # py_trees.decorators.Retry(
-        #     name="AlignUntilReady",
-        #     num_failures=3,
-        #     child=py_trees.composites.Sequence("AlignStep", memory=True, children=[
-        #         bt_nodes.RepositionViperXArm(goal_key="pose"),
-        #         bt_nodes.VerifyViperXPosition(),
-        #     ]),
-        # ),
-        # bt_nodes.RepositionViperXArm(goal_key="shelf_pose"),
-        # bt_nodes.VerifyViperXPosition(),
-        # py_trees.decorators.Retry(
-        #     name="AlignUntilReady",
-        #     num_failures=3,
-        #     child=py_trees.composites.Sequence("AlignStep", memory=True, children=[
-        #         bt_nodes.RepositionViperXArm(goal_key="pose"),
-        #         bt_nodes.VerifyViperXPosition(),
-        #     ]),
-        # ),
-        # bt_nodes.MoveViperXGripper(command="open"),
-        # bt_nodes.RepositionViperXArm(goal_key="home_pose"),
-
-        bt_nodes.ChangeInventory(bb, mode="restock"),
+        bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
+        bt_nodes.MoveGripper(command="open"),
     ])
 
-    num_items = len(getattr(bb, "items", []))
+    # Per-item restock flow (one product type per submission; could be repeated qty times)
+    item_sequence = py_trees.composites.Sequence("RestockItemSequence", memory=True, children=[
+        py_trees.composites.Selector("RestockActionSelector", memory=True, children=[
+            py_trees.composites.Sequence("PerformRestock", memory=True, children=[
+                py_trees.composites.Sequence("PickAndPlace", memory=True, children=[
+                    bt_nodes.RepositionArmToGoalPose(goal_key="basket_pose"),
+                    bt_nodes.VerifyViperXPosition(),
+                    bt_nodes.MoveGripper(command="close"),
+                    bt_nodes.RepositionArmToGoalPose(goal_key="shelf_pose"),
+                    bt_nodes.MoveGripper(command="open"),
+                    bt_nodes.RepositionArmToGoalPose(goal_key="home_pose"),
+                ]),
+                bt_nodes.ChangeInventory(bb, mode="restock"),
+            ]),
+        ]),
+    ])
 
-    repeat_each_item = py_trees.decorators.Repeat(
-        name="RepeatForEachItem",
-        child=process_one_item,
+    num_items = max(1, len(getattr(bb, "items", [])))
+    repeat_items = py_trees.decorators.Repeat(
+        name="RepeatUntilAllItemsDone",
+        child=item_sequence,
         num_success=num_items,
     )
 
-    root = py_trees.composites.Sequence("RestockRoot", memory=True, children=[
-        bt_nodes.DebugPrint("Restock/Employee tree selected"),
-        bt_nodes.DebugPrint(lambda: f"Items in order: {len(getattr(bb, 'items', []))}"),
-        repeat_each_item,
-        # bt_nodes.SetHome(bb),
-        # bt_nodes.NavigateToGoalPose(goal_key="nav_goal"),
+    cleanup_sequence = py_trees.composites.Sequence("RestockCleanup", memory=True, children=[
+        bt_nodes.SetHome(bb),
+        bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
+    ])
+
+    root = py_trees.composites.Sequence("EmployeeRestockFlow", memory=True, children=[
+        root_sequence,
+        repeat_items,
+        cleanup_sequence,
     ])
 
     return root
