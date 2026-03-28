@@ -6,7 +6,7 @@ import py_trees
 from robot_interfaces.srv import NewOrder
 from robot_interfaces.msg import Order, OrderItem
 
-from robot_task_manager.blackboard import setup_blackboard
+from robot_task_manager.blackboard import setup_custom_blackboard
 from robot_task_manager.trees.customer import create_customer_tree
 from robot_task_manager.trees.restock import create_restock_tree
 
@@ -17,7 +17,7 @@ class BTExecutor(Node):
     def __init__(self):
         super().__init__("bt_executor")
 
-        self.bb = setup_blackboard()
+        self.bb = setup_custom_blackboard()
 
         self.current_order: Order | None = None
         self.robot_busy = False
@@ -110,6 +110,7 @@ class BTExecutor(Node):
         self.bb.shelf_pose = None
         self.bb.current_rack = 1
         self.bb.pose = None
+        self.bb.arm_last_commanded_pose = None
         self.bb.slot_id = None
         self.bb.anchor_id = None
         self.bb.rack_id = None

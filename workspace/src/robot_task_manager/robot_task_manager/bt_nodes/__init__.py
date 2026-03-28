@@ -6,6 +6,7 @@ from .semantic_nodes import (
 )
 from .navigation_nodes import NavigateToGoalPose, MoveDistanceForCurrentItem
 from .arm_nodes import RepositionArmToGoalPose, VerifyPosition, MoveGripper
+from .rack_nodes import RepositionRackToGoalLevel
 from .viperx_nodes import (
     RepositionViperXArm,
     VerifyViperXPosition,
@@ -13,5 +14,4 @@ from .viperx_nodes import (
     SelectBasketSlot,
     MoveToDetectedPose,
 )
-# from .rack_nodes import RepositionRackToGoalLevel
 from .inventory_nodes import ChangeInventory

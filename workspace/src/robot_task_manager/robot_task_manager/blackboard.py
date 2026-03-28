@@ -1,6 +1,20 @@
 import py_trees
 from robot_interfaces.msg import Order
 
+
+def _make_pose(x: float, y: float, z: float, frame_id: str = "base_link") -> dict:
+    return {
+        "frame_id": frame_id,
+        "x": float(x),
+        "y": float(y),
+        "z": float(z),
+        "qx": 0.0,
+        "qy": 0.0,
+        "qz": 0.0,
+        "qw": 1.0,
+    }
+
+
 def setup_blackboard():
     bb = py_trees.blackboard.Blackboard()
 
@@ -49,6 +63,46 @@ def setup_blackboard():
     bb.home_rack = 1
 
     # For navigation
+    bb.nav_goal = (0.0, 0.0, 0.0)
+    bb.home_goal = (0.0, 0.0, 0.0)
+    bb.slot_id = None
+    bb.anchor_id = None
+    bb.rack_id = None
+    bb.semantic_id = None
+    bb.semantic_target_label = None
+    bb.nav_goal_source = None
+
+    return bb
+
+
+def setup_custom_blackboard():
+    bb = py_trees.blackboard.Blackboard()
+
+    bb.mode = None
+
+    bb.order: Order | None = None
+    bb.order_id_text = None
+
+    bb.items = []
+    bb.item_index = 0
+    bb.current_item = None
+    bb.num_current_item = 0
+
+    # Servo-arm blackboard uses Cartesian targets in base_link.
+    # robot_manipulation converts these into joint targets for the motors.
+    bb.home_pose = _make_pose(0.18, 0.00, 0.28)
+    bb.basket_pose = _make_pose(0.16, -0.18, 0.16)
+    bb.pose = _make_pose(0.30, 0.00, 0.18)
+    bb.goal_pose = None
+    bb.shelf_pose = None
+    bb.arm_last_commanded_pose = None
+
+    bb.detected_object_pose = None
+
+    bb.current_rack = 1
+    bb.rack_goal = 1
+    bb.home_rack = 1
+
     bb.nav_goal = (0.0, 0.0, 0.0)
     bb.home_goal = (0.0, 0.0, 0.0)
     bb.slot_id = None
