@@ -8,9 +8,12 @@ viperx_arm_server:
     max_velocity_scaling: 0.2
     max_acceleration_scaling: 0.2
     enforce_orientation_path_constraint: true
+    enforce_orientation_path_constraint_on_pose_moves: false
+    use_position_target_with_orientation_constraint: true
+    allow_orientation_constraint_fallback: false
     orientation_constraint_x_tolerance_rad: 0.12
     orientation_constraint_y_tolerance_rad: 0.12
-    orientation_constraint_z_tolerance_rad: 0.20
+    orientation_constraint_z_tolerance_rad: 1.57
     orientation_constraint_weight: 1.0
     preview_only: false
     preview_step_delay_sec: 1.0
@@ -18,6 +21,12 @@ viperx_arm_server:
     # Fallback values used if named targets are not available in the SRDF.
     open_gripper_pos: 0.035
     closed_gripper_pos: 0.040
+    scan_center_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    scan_center_joint_positions: [0.0, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0]
+    scan_left_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    scan_left_joint_positions: [0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0]
+    scan_right_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    scan_right_joint_positions: [-0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0]
     startup_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
     startup_joint_positions: [0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0]
     place_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]

@@ -9,13 +9,13 @@ def create_restock_viperx_tree(bb):
         children=[
             bt_nodes.SetCurrentItem(bb),
             bt_nodes.ResolveCurrentItemSemanticTargetViperX(bb),
-            bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
-            bt_nodes.MoveViperXGripper(command="open"),
+            bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
+            bt_nodes.MoveViperXGripper(command="open", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="basket_pose", bb=bb),
             bt_nodes.VerifyViperXPosition(bb=bb),
-            bt_nodes.MoveViperXGripper(command="close"),
+            bt_nodes.MoveViperXGripper(command="close", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="shelf_pose", bb=bb),
-            bt_nodes.MoveViperXGripper(command="open"),
+            bt_nodes.MoveViperXGripper(command="open", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="home_pose", bb=bb),
             bt_nodes.ChangeInventory(bb, mode="restock"),
         ],
@@ -33,7 +33,7 @@ def create_restock_viperx_tree(bb):
         memory=True,
         children=[
             bt_nodes.SetHome(bb),
-            bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
+            bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
         ],
     )
 

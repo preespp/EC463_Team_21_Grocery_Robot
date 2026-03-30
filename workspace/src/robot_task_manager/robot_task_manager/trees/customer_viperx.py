@@ -17,13 +17,63 @@ def create_customer_viperx_tree(bb):
     8. Update inventory
     """
 
-    # Sequence for detecting object position and moving to it
-    detect_and_approach = py_trees.composites.Sequence(
-        "DetectAndApproach",
+    search_timeout_sec = float(getattr(bb, "viperx_search_timeout_sec", 3.0))
+
+    detect_center = py_trees.composites.Sequence(
+        "DetectFromCenter",
         memory=True,
         children=[
-            bt_nodes.RepositionViperXArm(goal_key="pose", bb=bb),  # Move to observation pose
-            bt_nodes.VerifyViperXPosition(bb=bb),  # Detect object, store in bb.detected_object_pose
+            bt_nodes.RepositionViperXArm(goal_key="scan_center_pose", bb=bb),
+            bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
+        ],
+    )
+
+    detect_left = py_trees.composites.Sequence(
+        "DetectFromLeft",
+        memory=True,
+        children=[
+            bt_nodes.RepositionViperXArm(goal_key="scan_left_pose", bb=bb),
+            bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
+        ],
+    )
+
+    detect_right = py_trees.composites.Sequence(
+        "DetectFromRight",
+        memory=True,
+        children=[
+            bt_nodes.RepositionViperXArm(goal_key="scan_right_pose", bb=bb),
+            bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
+        ],
+    )
+
+    search_for_target = py_trees.composites.Selector(
+        "SearchForTarget",
+        memory=True,
+        children=[
+            detect_center,
+            detect_left,
+            detect_right,
+        ],
+    )
+
+    detect_and_prepare = py_trees.composites.Sequence(
+        "DetectAndPreparePick",
+        memory=True,
+        children=[
+            search_for_target,
+            bt_nodes.PrepareDetectedPickPoses(bb=bb),
+        ],
+    )
+
+    # Old-style pick sequence: open -> pregrasp -> grasp(and close) -> lift
+    approach_and_grab = py_trees.composites.Sequence(
+        "ApproachAndGrab",
+        memory=True,
+        children=[
+            bt_nodes.MoveViperXGripper(command="open", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="pregrasp_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="grasp_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="lift_pose", bb=bb),
         ],
     )
 
@@ -34,7 +84,9 @@ def create_customer_viperx_tree(bb):
         children=[
             bt_nodes.SelectBasketSlot(bb=bb),  # Select basket slot based on item type
             bt_nodes.RepositionViperXArm(goal_key="basket_pose", bb=bb),  # Move to basket position
-            bt_nodes.MoveViperXGripper(command="open"),  # Release item
+            bt_nodes.MoveViperXGripper(command="open", bb=bb),  # Release item
+            bt_nodes.RepositionViperXArm(goal_key="post_place_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="pre_return_pose", bb=bb),
         ],
     )
 
@@ -48,14 +100,13 @@ def create_customer_viperx_tree(bb):
             bt_nodes.ResolveCurrentItemSemanticTargetViperX(bb),
 
             # Navigate to shelf location (x, y coordinates)
-            bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
+            bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
 
-            # Detect object and verify positioning
-            detect_and_approach,
+            # Scan center -> left -> right until the target is seen, then build pick waypoints
+            detect_and_prepare,
 
-            # Move to detected object pose and grab
-            bt_nodes.MoveToDetectedPose(bb=bb),
-            bt_nodes.MoveViperXGripper(command="close"),
+            # Execute pregrasp -> grasp(and close) -> lift
+            approach_and_grab,
 
             # Place in basket with smart slot selection
             place_in_basket,
@@ -88,7 +139,7 @@ def create_customer_viperx_tree(bb):
             
             # Go home after all items picked
             bt_nodes.SetHome(bb),
-            bt_nodes.NavigateToGoalPose(goal_key="nav_goal", bb=bb),
+            bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
             bt_nodes.DebugPrint("Customer picking complete"),
         ],
     )

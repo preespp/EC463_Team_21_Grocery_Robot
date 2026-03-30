@@ -143,7 +143,6 @@ class ResolveCurrentItemSemanticTarget(py_trees.behaviour.Behaviour):
         self.bb.semantic_target_label = None
         self.bb.nav_goal_source = "legacy"
         self.bb.shelf_pose = None
-        self.bb.pose = None
         self.feedback_message = f"{reason}; falling back to legacy coordinates"
         return py_trees.common.Status.SUCCESS
 

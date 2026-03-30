@@ -1,5 +1,10 @@
+from copy import deepcopy
+
 import py_trees
 from robot_interfaces.msg import Order
+
+
+DEFAULT_VIPERX_BASE_FRAME = "vx300s/base_link"
 
 
 def _make_pose(x: float, y: float, z: float, frame_id: str = "base_link") -> dict:
@@ -13,6 +18,28 @@ def _make_pose(x: float, y: float, z: float, frame_id: str = "base_link") -> dic
         "qz": 0.0,
         "qw": 1.0,
     }
+
+
+def _make_command_target(command: str) -> dict:
+    return {"command": str(command)}
+
+
+def reset_viperx_manipulation_state(bb):
+    bb.pose = deepcopy(
+        getattr(bb, "observation_pose", _make_command_target("startup_arm_pose"))
+    )
+    bb.basket_pose = deepcopy(
+        getattr(bb, "default_basket_pose", _make_command_target("place_arm_pose"))
+    )
+    bb.goal_pose = None
+    bb.shelf_pose = None
+    bb.shelf_height = None
+    bb.detected_object_pose = None
+    bb.pregrasp_pose = None
+    bb.grasp_pose = None
+    bb.lift_pose = None
+    bb.locked_pick_orientation_xyzw = None
+    bb.basket_bottle_count = 0
 
 
 def setup_blackboard():
@@ -31,31 +58,60 @@ def setup_blackboard():
     # For manipulation
     # Preset arm states are stored as BT command dictionaries.
     # The corresponding raw joint values live in robot_manipulation config/server parameters.
-    bb.home_pose = {"command": "return_arm_pose"}
-    bb.basket_pose = {"command": "place_arm_pose"}
-    bb.pose = {"command": "startup_arm_pose"}
-    bb.goal_pose = None # Preferred BT arm target pose key for ViperX flow
+    bb.arm_base_frame = DEFAULT_VIPERX_BASE_FRAME
+    bb.viperx_ee_orientation_frame = "vx300s/ee_gripper_link"
+    bb.viperx_ee_link = "vx300s/ee_gripper_link"
+    # Keep the pick posture level in the base frame instead of inheriting scan-pose wrist tilt.
+    bb.viperx_use_current_ee_orientation = False
+    bb.viperx_fixed_pick_orientation_xyzw = (0.0, 0.0, 0.0, 1.0)
+    bb.viperx_target_classes_text = "bottle,cup"
+    bb.viperx_close_gripper_position = 0.040
+    bb.viperx_pregrasp_offset_z_m = 0.15
+    bb.viperx_grasp_offset_z_m = 0.00
+    bb.viperx_lift_offset_z_m = 0.20
+    bb.viperx_search_timeout_sec = 3.0
+    bb.viperx_workspace_min_x = -0.50
+    bb.viperx_workspace_max_x = 0.80
+    bb.viperx_workspace_min_y = -0.80
+    bb.viperx_workspace_max_y = 0.80
+    bb.viperx_workspace_min_z = -0.20
+    bb.viperx_workspace_max_z = 0.80
+    bb.viperx_target_stability_count = 4
+    bb.viperx_target_match_distance_m = 0.03
+    bb.viperx_cooldown_sec = 3.0
+    bb.scan_center_pose = _make_command_target("scan_center_arm_pose")
+    bb.scan_left_pose = _make_command_target("scan_left_arm_pose")
+    bb.scan_right_pose = _make_command_target("scan_right_arm_pose")
+    bb.observation_pose = deepcopy(bb.scan_center_pose)
+    bb.home_pose = _make_command_target("return_arm_pose")
+    bb.default_basket_pose = _make_command_target("place_arm_pose")
+    bb.post_place_pose = _make_command_target("post_place_arm_pose")
+    bb.pre_return_pose = _make_command_target("pre_return_arm_pose")
+    bb.goal_pose = None  # Preferred BT arm target pose key for ViperX flow
 
     # For basket management (3 bottle slots + 1 random slot)
     bb.basket_poses = [
-        {"command": "place_arm_pose"},  # Bottle slot 1
-        {"command": "place_arm_pose"},  # Bottle slot 2
-        {"command": "place_arm_pose"},  # Bottle slot 3
-        {"command": "place_arm_pose"},  # Random items slot
+        _make_command_target("place_arm_pose"),  # Bottle slot 1
+        _make_command_target("place_arm_pose"),  # Bottle slot 2
+        _make_command_target("place_arm_pose"),  # Bottle slot 3
+        _make_command_target("place_arm_pose"),  # Random items slot
     ]
     bb.basket_bottle_count = 0  # Track how many bottles have been picked
     
     # For shelf level state selection (3 hardcoded shelf commands)
     bb.shelf_height = None  # Semantic shelf level (1, 2, or 3)
     bb.shelf_poses = {
-        1: {"command": "shelf_level_1_pose"},
-        2: {"command": "shelf_level_2_pose"},
-        3: {"command": "shelf_level_3_pose"},
+        1: _make_command_target("shelf_level_1_pose"),
+        2: _make_command_target("shelf_level_2_pose"),
+        3: _make_command_target("shelf_level_3_pose"),
     }
     bb.shelf_pose = None  # Selected preset shelf pose for the current level
 
     # For object detection results
     bb.detected_object_pose = None  # Pose returned from vision service
+    bb.latest_detections_json = None
+    bb.latest_detection_time = None
+    bb.shared_tf_buffer = None
 
     # For rack levels
     bb.current_rack = 1
@@ -63,6 +119,7 @@ def setup_blackboard():
     bb.home_rack = 1
 
     # For navigation
+    bb.skip_navigation = False
     bb.nav_goal = (0.0, 0.0, 0.0)
     bb.home_goal = (0.0, 0.0, 0.0)
     bb.slot_id = None
@@ -71,6 +128,9 @@ def setup_blackboard():
     bb.semantic_id = None
     bb.semantic_target_label = None
     bb.nav_goal_source = None
+    bb.viperx_detection_min_confidence = 0.50
+
+    reset_viperx_manipulation_state(bb)
 
     return bb
 
@@ -103,6 +163,7 @@ def setup_custom_blackboard():
     bb.rack_goal = 1
     bb.home_rack = 1
 
+    bb.skip_navigation = False
     bb.nav_goal = (0.0, 0.0, 0.0)
     bb.home_goal = (0.0, 0.0, 0.0)
     bb.slot_id = None
@@ -111,5 +172,6 @@ def setup_custom_blackboard():
     bb.semantic_id = None
     bb.semantic_target_label = None
     bb.nav_goal_source = None
+    bb.viperx_detection_min_confidence = 0.60
 
     return bb

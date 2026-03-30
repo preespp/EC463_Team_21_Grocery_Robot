@@ -46,6 +46,15 @@ public:
     enforce_orientation_path_constraint_ = this->declare_parameter<bool>(
       "enforce_orientation_path_constraint",
       true);
+    enforce_orientation_path_constraint_on_pose_moves_ = this->declare_parameter<bool>(
+      "enforce_orientation_path_constraint_on_pose_moves",
+      false);
+    use_position_target_with_orientation_constraint_ = this->declare_parameter<bool>(
+      "use_position_target_with_orientation_constraint",
+      true);
+    allow_orientation_constraint_fallback_ = this->declare_parameter<bool>(
+      "allow_orientation_constraint_fallback",
+      false);
     orientation_constraint_x_tolerance_rad_ = this->declare_parameter<double>(
       "orientation_constraint_x_tolerance_rad",
       0.12);
@@ -54,7 +63,7 @@ public:
       0.12);
     orientation_constraint_z_tolerance_rad_ = this->declare_parameter<double>(
       "orientation_constraint_z_tolerance_rad",
-      0.20);
+      1.57);
     orientation_constraint_weight_ = this->declare_parameter<double>(
       "orientation_constraint_weight",
       1.0);
@@ -68,6 +77,27 @@ public:
     close_gripper_named_target_ = this->declare_parameter<std::string>(
       "close_gripper_named_target",
       "Grasping");
+    scan_center_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "scan_center_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    scan_center_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "scan_center_joint_positions",
+      std::vector<double>{0.0, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+    scan_left_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "scan_left_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    scan_left_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "scan_left_joint_positions",
+      std::vector<double>{0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+    scan_right_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "scan_right_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    scan_right_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "scan_right_joint_positions",
+      std::vector<double>{-0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
     startup_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "startup_joint_names",
       std::vector<std::string>{
@@ -147,6 +177,130 @@ public:
   }
 
 private:
+  static bool is_gripper_command(const std::string & command)
+  {
+    return command == "open_gripper" || command == "close_gripper";
+  }
+
+  static bool is_named_arm_command(const std::string & command)
+  {
+    return
+      command == "scan_center_arm_pose" || command == "scan_left_arm_pose" ||
+      command == "scan_right_arm_pose" ||
+      command == "startup_arm_pose" || command == "return_arm_pose" ||
+      command == "place_arm_pose" || command == "post_place_arm_pose" ||
+      command == "pre_return_arm_pose";
+  }
+
+  static bool is_pose_goal_command(const std::string & command)
+  {
+    return command.empty() || command == "arm";
+  }
+
+  const std::vector<std::string> & joint_names_for_command(const std::string & command) const
+  {
+    if (command == "scan_center_arm_pose") {
+      return scan_center_joint_names_;
+    }
+    if (command == "scan_left_arm_pose") {
+      return scan_left_joint_names_;
+    }
+    if (command == "scan_right_arm_pose") {
+      return scan_right_joint_names_;
+    }
+    if (command == "startup_arm_pose") {
+      return startup_joint_names_;
+    }
+    if (command == "place_arm_pose") {
+      return place_joint_names_;
+    }
+    if (command == "post_place_arm_pose") {
+      return post_place_joint_names_;
+    }
+    if (command == "pre_return_arm_pose") {
+      return pre_return_joint_names_;
+    }
+    return return_joint_names_;
+  }
+
+  const std::vector<double> & joint_positions_for_command(const std::string & command) const
+  {
+    if (command == "scan_center_arm_pose") {
+      return scan_center_joint_positions_;
+    }
+    if (command == "scan_left_arm_pose") {
+      return scan_left_joint_positions_;
+    }
+    if (command == "scan_right_arm_pose") {
+      return scan_right_joint_positions_;
+    }
+    if (command == "startup_arm_pose") {
+      return startup_joint_positions_;
+    }
+    if (command == "place_arm_pose") {
+      return place_joint_positions_;
+    }
+    if (command == "post_place_arm_pose") {
+      return post_place_joint_positions_;
+    }
+    if (command == "pre_return_arm_pose") {
+      return pre_return_joint_positions_;
+    }
+    return return_joint_positions_;
+  }
+
+  std::string failure_message_for_named_command(const std::string & command) const
+  {
+    if (command == "scan_center_arm_pose") {
+      return "Failed to execute configured center scan arm pose";
+    }
+    if (command == "scan_left_arm_pose") {
+      return "Failed to execute configured left scan arm pose";
+    }
+    if (command == "scan_right_arm_pose") {
+      return "Failed to execute configured right scan arm pose";
+    }
+    if (command == "startup_arm_pose") {
+      return "Failed to execute configured startup arm pose";
+    }
+    if (command == "place_arm_pose") {
+      return "Failed to execute configured place arm pose";
+    }
+    if (command == "post_place_arm_pose") {
+      return "Failed to execute configured post-place arm pose";
+    }
+    if (command == "pre_return_arm_pose") {
+      return "Failed to execute configured pre-return arm pose";
+    }
+    return "Failed to execute configured return arm pose";
+  }
+
+  std::string success_message_for_named_command(const std::string & command) const
+  {
+    if (command == "scan_center_arm_pose") {
+      return "Center scan arm pose complete";
+    }
+    if (command == "scan_left_arm_pose") {
+      return "Left scan arm pose complete";
+    }
+    if (command == "scan_right_arm_pose") {
+      return "Right scan arm pose complete";
+    }
+    if (command == "startup_arm_pose") {
+      return "Startup arm pose complete";
+    }
+    if (command == "place_arm_pose") {
+      return "Place arm pose complete";
+    }
+    if (command == "post_place_arm_pose") {
+      return "Post-place arm pose complete";
+    }
+    if (command == "pre_return_arm_pose") {
+      return "Pre-return arm pose complete";
+    }
+    return "Return arm pose complete";
+  }
+
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID &,
     std::shared_ptr<const PickArm::Goal> goal)
@@ -157,13 +311,19 @@ private:
     }
 
     const auto command = goal->planning_group;
-    if (
-      command != "open_gripper" && command != "close_gripper" &&
-      command != "startup_arm_pose" && command != "return_arm_pose" &&
-      command != "place_arm_pose" && command != "post_place_arm_pose" &&
-      command != "pre_return_arm_pose" &&
-      goal->target_pose.header.frame_id.empty())
-    {
+    if (is_gripper_command(command) || is_named_arm_command(command)) {
+      return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    }
+
+    if (!is_pose_goal_command(command)) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "ViperX goal rejected: unsupported planning_group '%s'",
+        command.c_str());
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    if (goal->target_pose.header.frame_id.empty()) {
       RCLCPP_WARN(this->get_logger(), "ViperX goal rejected: target_pose.frame_id is empty");
       return rclcpp_action::GoalResponse::REJECT;
     }
@@ -223,32 +383,83 @@ private:
       arm_move_group_->setStartStateToCurrentState();
       const std::string target_link =
         !ee_link.empty() ? ee_link : arm_move_group_->getEndEffectorLink();
-      bool path_constraints_set = false;
-      if (enforce_orientation_path_constraint_ && !target_link.empty()) {
-        moveit_msgs::msg::OrientationConstraint orientation_constraint;
-        orientation_constraint.header.frame_id = target_pose.header.frame_id;
-        orientation_constraint.link_name = target_link;
-        orientation_constraint.orientation = target_pose.pose.orientation;
-        orientation_constraint.absolute_x_axis_tolerance = orientation_constraint_x_tolerance_rad_;
-        orientation_constraint.absolute_y_axis_tolerance = orientation_constraint_y_tolerance_rad_;
-        orientation_constraint.absolute_z_axis_tolerance = orientation_constraint_z_tolerance_rad_;
-        orientation_constraint.weight = orientation_constraint_weight_;
+      const auto plan_pose_target = [&](bool use_orientation_constraint) -> bool {
+        bool path_constraints_set = false;
+        bool position_target_set = false;
+        if (use_orientation_constraint && !target_link.empty()) {
+          moveit_msgs::msg::OrientationConstraint orientation_constraint;
+          orientation_constraint.header.frame_id = target_pose.header.frame_id;
+          orientation_constraint.link_name = target_link;
+          orientation_constraint.orientation = target_pose.pose.orientation;
+          orientation_constraint.absolute_x_axis_tolerance = orientation_constraint_x_tolerance_rad_;
+          orientation_constraint.absolute_y_axis_tolerance = orientation_constraint_y_tolerance_rad_;
+          orientation_constraint.absolute_z_axis_tolerance = orientation_constraint_z_tolerance_rad_;
+          orientation_constraint.weight = orientation_constraint_weight_;
 
-        moveit_msgs::msg::Constraints path_constraints;
-        path_constraints.orientation_constraints.push_back(orientation_constraint);
-        arm_move_group_->setPathConstraints(path_constraints);
-        path_constraints_set = true;
-      }
+          moveit_msgs::msg::Constraints path_constraints;
+          path_constraints.orientation_constraints.push_back(orientation_constraint);
+          arm_move_group_->setPathConstraints(path_constraints);
+          path_constraints_set = true;
+        }
 
-      if (!ee_link.empty()) {
-        arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
-      } else {
-        arm_move_group_->setPoseTarget(target_pose.pose);
-      }
-      const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
-      arm_move_group_->clearPoseTargets();
-      if (path_constraints_set) {
-        arm_move_group_->clearPathConstraints();
+        if (
+          use_orientation_constraint &&
+          use_position_target_with_orientation_constraint_ &&
+          !target_link.empty())
+        {
+          position_target_set = arm_move_group_->setPositionTarget(
+            target_pose.pose.position.x,
+            target_pose.pose.position.y,
+            target_pose.pose.position.z,
+            target_link);
+          if (!position_target_set) {
+            RCLCPP_WARN(
+              this->get_logger(),
+              "Failed to set constrained position target for link '%s'.",
+              target_link.c_str());
+          }
+        } else if (!ee_link.empty()) {
+          arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
+        } else {
+          arm_move_group_->setPoseTarget(target_pose.pose);
+        }
+
+        if (
+          use_orientation_constraint &&
+          use_position_target_with_orientation_constraint_ &&
+          !position_target_set &&
+          !target_link.empty())
+        {
+          if (path_constraints_set) {
+            arm_move_group_->clearPathConstraints();
+          }
+          arm_move_group_->clearPoseTargets();
+          return false;
+        }
+
+        const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+        arm_move_group_->clearPoseTargets();
+        if (path_constraints_set) {
+          arm_move_group_->clearPathConstraints();
+        }
+        return ok;
+      };
+
+      const bool use_orientation_constraint =
+        enforce_orientation_path_constraint_ &&
+        enforce_orientation_path_constraint_on_pose_moves_ &&
+        !target_link.empty();
+      bool ok = plan_pose_target(use_orientation_constraint);
+      if (
+        !ok && use_orientation_constraint &&
+        allow_orientation_constraint_fallback_ && !target_link.empty())
+      {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Pose planning with orientation constraint failed for link '%s'; retrying without path constraints.",
+          target_link.c_str());
+        arm_move_group_->setStartStateToCurrentState();
+        ok = plan_pose_target(false);
       }
       if (!ok) {
         return false;
@@ -423,7 +634,7 @@ private:
       const auto goal = goal_handle->get_goal();
       const auto command = goal->planning_group;
 
-      if (command == "open_gripper" || command == "close_gripper") {
+      if (is_gripper_command(command)) {
         feedback->stage = command;
         feedback->position_error_m = 0.0f;
         goal_handle->publish_feedback(feedback);
@@ -446,38 +657,17 @@ private:
         return;
       }
 
-      if (
-        command == "startup_arm_pose" || command == "return_arm_pose" ||
-        command == "place_arm_pose" || command == "post_place_arm_pose" ||
-        command == "pre_return_arm_pose")
-      {
+      if (is_named_arm_command(command)) {
         feedback->stage = command;
         feedback->position_error_m = 0.0f;
         goal_handle->publish_feedback(feedback);
 
-        const auto & joint_names =
-          (command == "startup_arm_pose") ? startup_joint_names_ :
-          ((command == "place_arm_pose") ? place_joint_names_ :
-          ((command == "post_place_arm_pose") ? post_place_joint_names_ :
-          ((command == "pre_return_arm_pose") ? pre_return_joint_names_ : return_joint_names_)));
-        const auto & joint_positions =
-          (command == "startup_arm_pose") ? startup_joint_positions_ :
-          ((command == "place_arm_pose") ? place_joint_positions_ :
-          ((command == "post_place_arm_pose") ? post_place_joint_positions_ :
-          ((command == "pre_return_arm_pose") ? pre_return_joint_positions_ : return_joint_positions_)));
+        const auto & joint_names = joint_names_for_command(command);
+        const auto & joint_positions = joint_positions_for_command(command);
 
         if (!execute_arm_joint_target(joint_names, joint_positions)) {
           result->success = false;
-          result->message =
-            (command == "startup_arm_pose") ?
-            "Failed to execute configured startup arm pose" :
-            (command == "place_arm_pose") ?
-            "Failed to execute configured place arm pose" :
-            (command == "post_place_arm_pose") ?
-            "Failed to execute configured post-place arm pose" :
-            (command == "pre_return_arm_pose") ?
-            "Failed to execute configured pre-return arm pose" :
-            "Failed to execute configured return arm pose";
+          result->message = failure_message_for_named_command(command);
           result->final_position_error_m = -1.0f;
           goal_handle->abort(result);
           goal_active_.store(false);
@@ -485,15 +675,19 @@ private:
         }
 
         result->success = true;
-        result->message =
-          (command == "startup_arm_pose") ? "Startup arm pose complete" :
-          (command == "place_arm_pose") ? "Place arm pose complete" :
-          (command == "post_place_arm_pose") ? "Post-place arm pose complete" :
-          (command == "pre_return_arm_pose") ? "Pre-return arm pose complete" :
-          "Return arm pose complete";
+        result->message = success_message_for_named_command(command);
         result->final_position_error_m = 0.0f;
         maybe_preview_delay();
         goal_handle->succeed(result);
+        goal_active_.store(false);
+        return;
+      }
+
+      if (!is_pose_goal_command(command)) {
+        result->success = false;
+        result->message = "Unsupported planning_group";
+        result->final_position_error_m = -1.0f;
+        goal_handle->abort(result);
         goal_active_.store(false);
         return;
       }
@@ -554,6 +748,9 @@ private:
   double cartesian_eef_step_m_;
   double cartesian_min_fraction_;
   bool enforce_orientation_path_constraint_;
+  bool enforce_orientation_path_constraint_on_pose_moves_;
+  bool use_position_target_with_orientation_constraint_;
+  bool allow_orientation_constraint_fallback_;
   double orientation_constraint_x_tolerance_rad_;
   double orientation_constraint_y_tolerance_rad_;
   double orientation_constraint_z_tolerance_rad_;
@@ -562,6 +759,12 @@ private:
   double preview_step_delay_sec_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
+  std::vector<std::string> scan_center_joint_names_;
+  std::vector<double> scan_center_joint_positions_;
+  std::vector<std::string> scan_left_joint_names_;
+  std::vector<double> scan_left_joint_positions_;
+  std::vector<std::string> scan_right_joint_names_;
+  std::vector<double> scan_right_joint_positions_;
   std::vector<std::string> startup_joint_names_;
   std::vector<double> startup_joint_positions_;
   std::vector<std::string> return_joint_names_;

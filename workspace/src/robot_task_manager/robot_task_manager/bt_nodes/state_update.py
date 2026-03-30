@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import py_trees
 
 
@@ -54,7 +56,17 @@ class SetCurrentItem(py_trees.behaviour.Behaviour):
         self.bb.semantic_target_label = None
         self.bb.nav_goal_source = "legacy"
         self.bb.shelf_pose = None
-        self.bb.pose = None
+        self.bb.detected_object_pose = None
+        self.bb.pregrasp_pose = None
+        self.bb.grasp_pose = None
+        self.bb.lift_pose = None
+        self.bb.locked_pick_orientation_xyzw = None
+
+        # Mirror the old monolithic picker:
+        # - first item starts from startup_arm_pose
+        # - later items start from the returned home pose
+        if idx > 0 and getattr(self.bb, "home_pose", None) is not None:
+            self.bb.pose = deepcopy(getattr(self.bb, "home_pose"))
 
         x = _to_float(getattr(item, "aisle", 0.0), 0.0)
         y = _to_float(getattr(item, "rack", 0.0), 0.0)

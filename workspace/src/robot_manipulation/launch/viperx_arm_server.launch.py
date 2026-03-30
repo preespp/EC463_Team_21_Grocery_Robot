@@ -57,6 +57,7 @@ def launch_setup(context, *args, **kwargs):
         ]),
         value_type=str,
     )
+    kinematics_config = os.path.join(moveit_pkg, "config", "kinematics.yaml")
 
     return [
         Node(
@@ -69,6 +70,7 @@ def launch_setup(context, *args, **kwargs):
             ],
             parameters=[
                 viperx_server_param,
+                kinematics_config,
                 {
                     "robot_description": robot_description,
                     "robot_description_semantic": robot_description_semantic,
