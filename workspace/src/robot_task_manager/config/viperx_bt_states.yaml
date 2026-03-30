@@ -1,0 +1,56 @@
+# BT-side ViperX state configuration template
+#
+# This file documents the command-style arm states used by robot_task_manager.
+# The blackboard stores these command names, and RepositionViperXArm forwards
+# them to the PickArm action as planning_group strings.
+#
+# IMPORTANT:
+# - Fill the actual joint values in robot_manipulation/config/viperx_arm_server.yaml
+# - If you add a brand-new command name, the C++ arm server must also recognize it
+#   before the BT can use it successfully.
+
+viperx_bt_states:
+  observation_pose:
+    command: "startup_arm_pose"
+    description: "Observation pose used before vision detection."
+
+  home_pose:
+    command: "return_arm_pose"
+    description: "Safe home/return pose after pick or place."
+
+  shelf_levels:
+    level_1:
+      command: "shelf_level_1_pose"
+      description: "Bottom shelf hardcoded pose."
+    level_2:
+      command: "shelf_level_2_pose"
+      description: "Middle shelf hardcoded pose."
+    level_3:
+      command: "shelf_level_3_pose"
+      description: "Top shelf hardcoded pose."
+
+  basket_slots:
+    - slot: 0
+      command: "place_arm_pose"
+      description: "Bottle slot 1"
+    - slot: 1
+      command: "place_arm_pose"
+      description: "Bottle slot 2"
+    - slot: 2
+      command: "place_arm_pose"
+      description: "Bottle slot 3"
+    - slot: 3
+      command: "place_arm_pose"
+      description: "Random items slot"
+
+  optional_post_place_states:
+    post_place:
+      command: "post_place_arm_pose"
+    pre_return:
+      command: "pre_return_arm_pose"
+
+# Corresponding raw joint arrays are stored in robot_manipulation/config/viperx_arm_server.yaml
+# Example format there:
+#
+# startup_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+# startup_joint_positions: [0.0, -1.85, 1.57, 0.0, 0.40, 0.0]

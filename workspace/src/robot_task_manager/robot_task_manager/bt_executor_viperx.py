@@ -2,11 +2,13 @@ import rclpy
 from rclpy.node import Node
 import requests
 import py_trees
+from std_msgs.msg import String
+from tf2_ros import Buffer, TransformListener
 
 from robot_interfaces.srv import NewOrder
 from robot_interfaces.msg import Order, OrderItem
 
-from robot_task_manager.blackboard import setup_blackboard
+from robot_task_manager.blackboard import reset_viperx_manipulation_state, setup_blackboard
 from robot_task_manager.trees.customer_viperx import create_customer_viperx_tree
 from robot_task_manager.trees.restock_viperx import create_restock_viperx_tree
 
@@ -18,18 +20,36 @@ class BTExecutor(Node):
         super().__init__("bt_executor")
 
         self.bb = setup_blackboard()
+        self.declare_parameter("skip_navigation", False)
+        self.declare_parameter("detection_min_confidence", 0.50)
+        self.bb.skip_navigation = bool(self.get_parameter("skip_navigation").value)
+        self.bb.viperx_detection_min_confidence = float(
+            self.get_parameter("detection_min_confidence").value
+        )
 
         self.current_order: Order | None = None
         self.robot_busy = False
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.bb.shared_tf_buffer = self.tf_buffer
 
         self.create_service(NewOrder, "/order/new", self.new_order_cb)
+        self.create_subscription(String, "/detections_json", self._on_detections, 10)
 
         self.poll_timer = self.create_timer(1.0, self.nodejs)
 
         self.tree: py_trees.trees.BehaviourTree | None = None
         self.bt_tick_timer = self.create_timer(0.1, self.tick_bt)
 
-        self.get_logger().info("BTExecutor ready (order intake + blackboard + BT)")
+        self.get_logger().info(
+            "BTExecutor ready (order intake + blackboard + BT) "
+            f"| skip_navigation={self.bb.skip_navigation} "
+            f"| detection_min_confidence={self.bb.viperx_detection_min_confidence:.2f}"
+        )
+
+    def _on_detections(self, msg: String):
+        self.bb.latest_detections_json = msg.data
+        self.bb.latest_detection_time = self.get_clock().now()
 
     def new_order_cb(self, request, response):
         if self.current_order is not None:
@@ -85,6 +105,7 @@ class BTExecutor(Node):
         self.bb.items = list(order.items)
         self.bb.item_index = 0
         self.bb.current_item = None
+        reset_viperx_manipulation_state(self.bb)
 
         self.get_logger().info(
             f"Order loaded | id={order.order_id} | role={self.bb.mode} | items={len(self.bb.items)}"
@@ -97,6 +118,11 @@ class BTExecutor(Node):
         self.robot_busy = False
 
         # Clear order data
+        if self.tree is not None:
+            try:
+                self.tree.shutdown()
+            except Exception as e:
+                self.get_logger().warn(f"BT shutdown warning: {e}")
         self.tree = None
         self.bb.order = None
         self.bb.order_id_text = None
@@ -105,12 +131,18 @@ class BTExecutor(Node):
         self.bb.current_item = None
         self.bb.num_current_item = 0
         self.bb.mode = None
-        self.bb.nav_goal = (0.0, 0.0)
+        self.bb.nav_goal = (0.0, 0.0, 0.0)
+        self.bb.home_goal = (0.0, 0.0, 0.0)
         self.bb.rack_goal = 1
-        self.bb.shelf_pose = None
         self.bb.current_rack = 1
-        self.bb.pose = None
-        self.bb.goal_pose = None
+        self.bb.home_rack = 1
+        self.bb.slot_id = None
+        self.bb.anchor_id = None
+        self.bb.rack_id = None
+        self.bb.semantic_id = None
+        self.bb.semantic_target_label = None
+        self.bb.nav_goal_source = None
+        reset_viperx_manipulation_state(self.bb)
 
         self.get_logger().info("Order cleared -> IDLE")
 

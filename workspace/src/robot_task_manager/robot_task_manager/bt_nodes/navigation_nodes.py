@@ -178,6 +178,49 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         self.goal_handle = None
 
 
+class MaybeNavigateToGoalPose(NavigateToGoalPose):
+    """
+    Navigate to bb.goal_key unless the blackboard requests navigation to be skipped.
+
+    This is useful for bench tests where the arm logic should run without waiting on Nav2.
+    """
+
+    def __init__(
+        self,
+        goal_key: str,
+        bb=None,
+        yaw: float = 0.0,
+        frame_id: str = "map",
+        skip_flag_key: str = "skip_navigation",
+    ):
+        super().__init__(goal_key=goal_key, bb=bb, yaw=yaw, frame_id=frame_id)
+        self.name = f"MaybeNavigateToGoalPose[{goal_key}]"
+        self.skip_flag_key = skip_flag_key
+        self.skip_navigation = False
+
+    def initialise(self):
+        self.skip_navigation = bool(getattr(self.bb, self.skip_flag_key, False))
+        if self.skip_navigation:
+            self.send_future = None
+            self.result_future = None
+            self.goal_handle = None
+            self.feedback_message = (
+                f"Skipping navigation because bb.{self.skip_flag_key} is true"
+            )
+            self._dbg(self.feedback_message)
+            return
+        super().initialise()
+
+    def update(self):
+        if self.skip_navigation:
+            return py_trees.common.Status.SUCCESS
+        return super().update()
+
+    def terminate(self, new_status):
+        self.skip_navigation = False
+        super().terminate(new_status)
+
+
 ############## Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)
 class MoveDistanceForCurrentItem(py_trees.behaviour.Behaviour):
     """

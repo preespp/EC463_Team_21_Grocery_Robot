@@ -31,6 +31,106 @@ def median_depth(depth_frame, x, y, k=5):
     return float(np.median(vals)) if vals else 0.0
 
 
+def nearest_valid_pixel(
+    depth_frame,
+    x_start,
+    y_start,
+    x_end,
+    y_end,
+    target_x,
+    target_y,
+    *,
+    step=2,
+    min_depth_m=0.08,
+    max_depth_m=3.0,
+    reference_depth_m=None,
+    reference_tolerance_m=0.10,
+):
+    best_pixel = None
+    best_score = None
+    for yy in range(y_start, y_end + 1, step):
+        for xx in range(x_start, x_end + 1, step):
+            d = depth_frame.get_distance(xx, yy)
+            if not (min_depth_m < d < max_depth_m):
+                continue
+            if (
+                reference_depth_m is not None
+                and abs(float(d) - float(reference_depth_m)) > float(reference_tolerance_m)
+            ):
+                continue
+            depth_local = median_depth(depth_frame, xx, yy, k=5)
+            if depth_local <= 0.0:
+                continue
+            score = (xx - target_x) ** 2 + (yy - target_y) ** 2
+            if best_score is None or score < best_score:
+                best_score = score
+                best_pixel = (xx, yy, depth_local)
+    return best_pixel
+
+
+def robust_depth_near_pixel(
+    depth_frame,
+    target_x,
+    target_y,
+    *,
+    bbox=None,
+    local_half_window_px=12,
+    reference_depth_m=None,
+    reference_tolerance_m=0.10,
+):
+    h, w = depth_frame.get_height(), depth_frame.get_width()
+    tx = int(max(0, min(w - 1, target_x)))
+    ty = int(max(0, min(h - 1, target_y)))
+
+    center_depth = median_depth(depth_frame, tx, ty, k=7)
+    if center_depth > 0.0:
+        return center_depth, tx, ty
+
+    wx1 = max(0, tx - int(local_half_window_px))
+    wy1 = max(0, ty - int(local_half_window_px))
+    wx2 = min(w - 1, tx + int(local_half_window_px))
+    wy2 = min(h - 1, ty + int(local_half_window_px))
+    local_pick = nearest_valid_pixel(
+        depth_frame,
+        wx1,
+        wy1,
+        wx2,
+        wy2,
+        tx,
+        ty,
+        step=1,
+        reference_depth_m=reference_depth_m,
+        reference_tolerance_m=reference_tolerance_m,
+    )
+    if local_pick is not None:
+        px, py, depth_m = local_pick
+        return depth_m, px, py
+
+    if bbox is not None:
+        x1, y1, x2, y2 = bbox
+        bx1 = max(0, min(w - 1, int(x1)))
+        by1 = max(0, min(h - 1, int(y1)))
+        bx2 = max(0, min(w - 1, int(x2)))
+        by2 = max(0, min(h - 1, int(y2)))
+        bbox_pick = nearest_valid_pixel(
+            depth_frame,
+            bx1,
+            by1,
+            bx2,
+            by2,
+            tx,
+            ty,
+            step=2,
+            reference_depth_m=reference_depth_m,
+            reference_tolerance_m=reference_tolerance_m,
+        )
+        if bbox_pick is not None:
+            px, py, depth_m = bbox_pick
+            return depth_m, px, py
+
+    return 0.0, tx, ty
+
+
 def robust_bbox_depth(depth_frame, x1, y1, x2, y2):
     """
     Get a robust depth estimate near the center of a bbox.
@@ -56,23 +156,6 @@ def robust_bbox_depth(depth_frame, x1, y1, x2, y2):
     if bx2 <= bx1 or by2 <= by1:
         return 0.0, cx, cy
 
-    def nearest_valid_pixel(x_start, y_start, x_end, y_end, target_x, target_y, step=2):
-        best_pixel = None
-        best_score = None
-        for yy in range(y_start, y_end + 1, step):
-            for xx in range(x_start, x_end + 1, step):
-                d = depth_frame.get_distance(xx, yy)
-                if not (0.08 < d < 3.0):
-                    continue
-                depth_local = median_depth(depth_frame, xx, yy, k=5)
-                if depth_local <= 0.0:
-                    continue
-                score = (xx - target_x) ** 2 + (yy - target_y) ** 2
-                if best_score is None or score < best_score:
-                    best_score = score
-                    best_pixel = (xx, yy, depth_local)
-        return best_pixel
-
     width = bx2 - bx1 + 1
     height = by2 - by1 + 1
 
@@ -83,17 +166,213 @@ def robust_bbox_depth(depth_frame, x1, y1, x2, y2):
     ix2 = min(bx2, cx + inner_half_w)
     iy2 = min(by2, cy + inner_half_h)
 
-    inner_pick = nearest_valid_pixel(ix1, iy1, ix2, iy2, cx, cy)
+    inner_pick = nearest_valid_pixel(depth_frame, ix1, iy1, ix2, iy2, cx, cy)
     if inner_pick is not None:
         px, py, depth_m = inner_pick
         return depth_m, px, py
 
-    bbox_pick = nearest_valid_pixel(bx1, by1, bx2, by2, cx, cy)
+    bbox_pick = nearest_valid_pixel(depth_frame, bx1, by1, bx2, by2, cx, cy)
     if bbox_pick is not None:
         px, py, depth_m = bbox_pick
         return depth_m, px, py
 
     return 0.0, cx, cy
+
+
+def band_horizontal_span(
+    depth_frame,
+    x1,
+    y1,
+    x2,
+    y2,
+    *,
+    reference_depth_m,
+    reference_tolerance_m=0.08,
+):
+    best_span = 0
+    for yy in range(int(y1), int(y2) + 1, 2):
+        xs = []
+        for xx in range(int(x1), int(x2) + 1, 2):
+            d = depth_frame.get_distance(xx, yy)
+            if not (0.08 < d < 3.0):
+                continue
+            if abs(float(d) - float(reference_depth_m)) > float(reference_tolerance_m):
+                continue
+            xs.append(xx)
+        if len(xs) >= 2:
+            best_span = max(best_span, int(max(xs) - min(xs)))
+    return best_span
+
+
+def infer_partial_bottle_visibility(
+    depth_frame,
+    x1,
+    y1,
+    x2,
+    y2,
+    *,
+    surface_depth_m,
+    fy,
+    image_height,
+    nominal_height_m,
+    partial_ratio_threshold,
+    edge_contact_px,
+):
+    bbox_height_px = max(1, int(y2) - int(y1) + 1)
+    top_edge_contact = int(y1) <= int(edge_contact_px)
+    bottom_edge_contact = int(y2) >= int(image_height) - 1 - int(edge_contact_px)
+
+    if top_edge_contact and not bottom_edge_contact:
+        return {
+            "partial": True,
+            "case": "lower_half",
+            "visible_ratio_estimate": 0.0,
+            "expected_height_px": 0.0,
+            "top_span_px": 0,
+            "bottom_span_px": 0,
+        }
+
+    if bottom_edge_contact and not top_edge_contact:
+        return {
+            "partial": True,
+            "case": "upper_half",
+            "visible_ratio_estimate": 0.0,
+            "expected_height_px": 0.0,
+            "top_span_px": 0,
+            "bottom_span_px": 0,
+        }
+
+    if surface_depth_m <= 0.0 or fy <= 0.0 or nominal_height_m <= 0.0:
+        return {
+            "partial": False,
+            "case": "full_or_unknown",
+            "visible_ratio_estimate": 1.0,
+            "expected_height_px": 0.0,
+            "top_span_px": 0,
+            "bottom_span_px": 0,
+        }
+
+    expected_height_px = float(fy) * float(nominal_height_m) / float(surface_depth_m)
+    if expected_height_px <= 1.0:
+        return {
+            "partial": False,
+            "case": "full_or_unknown",
+            "visible_ratio_estimate": 1.0,
+            "expected_height_px": expected_height_px,
+            "top_span_px": 0,
+            "bottom_span_px": 0,
+        }
+
+    visible_ratio = float(bbox_height_px) / float(expected_height_px)
+    result = {
+        "partial": bool(visible_ratio < float(partial_ratio_threshold)),
+        "case": "full_or_unknown",
+        "visible_ratio_estimate": visible_ratio,
+        "expected_height_px": expected_height_px,
+        "top_span_px": 0,
+        "bottom_span_px": 0,
+    }
+    if not result["partial"]:
+        return result
+
+    band_h = max(6, bbox_height_px // 5)
+    top_span = band_horizontal_span(
+        depth_frame,
+        x1,
+        y1,
+        x2,
+        min(int(y2), int(y1) + band_h),
+        reference_depth_m=surface_depth_m,
+    )
+    bottom_span = band_horizontal_span(
+        depth_frame,
+        x1,
+        max(int(y1), int(y2) - band_h),
+        x2,
+        y2,
+        reference_depth_m=surface_depth_m,
+    )
+    result["top_span_px"] = int(top_span)
+    result["bottom_span_px"] = int(bottom_span)
+
+    if top_span > 0 and bottom_span > 0:
+        if float(top_span) <= float(bottom_span) * 0.82:
+            result["case"] = "upper_half"
+        elif float(bottom_span) <= float(top_span) * 0.82:
+            result["case"] = "lower_half"
+
+    return result
+
+
+def choose_bottle_grasp_depth(
+    depth_frame,
+    x1,
+    y1,
+    x2,
+    y2,
+    *,
+    depth_intrin,
+    nominal_height_m,
+    partial_ratio_threshold,
+    partial_grasp_offset_m,
+    edge_contact_px,
+):
+    surface_depth_m, center_x, center_y = robust_bbox_depth(depth_frame, x1, y1, x2, y2)
+    visibility = infer_partial_bottle_visibility(
+        depth_frame,
+        x1,
+        y1,
+        x2,
+        y2,
+        surface_depth_m=surface_depth_m,
+        fy=float(depth_intrin.fy),
+        image_height=depth_frame.get_height(),
+        nominal_height_m=nominal_height_m,
+        partial_ratio_threshold=partial_ratio_threshold,
+        edge_contact_px=edge_contact_px,
+    )
+    info = {
+        "grasp_strategy": "bbox_center",
+        "partial_visibility": bool(visibility["partial"]),
+        "visibility_case": str(visibility["case"]),
+        "visible_ratio_estimate": float(visibility["visible_ratio_estimate"]),
+        "expected_height_px": float(visibility["expected_height_px"]),
+        "top_span_px": int(visibility["top_span_px"]),
+        "bottom_span_px": int(visibility["bottom_span_px"]),
+    }
+
+    if (
+        surface_depth_m <= 0.0
+        or not visibility["partial"]
+        or visibility["case"] not in ("upper_half", "lower_half")
+    ):
+        return surface_depth_m, center_x, center_y, info
+
+    offset_px = int(
+        round(float(depth_intrin.fy) * float(partial_grasp_offset_m) / float(surface_depth_m))
+    )
+    offset_px = max(2, offset_px)
+    target_x = int((int(x1) + int(x2)) * 0.5)
+    if visibility["case"] == "upper_half":
+        target_y = min(int(y2) - 2, int(y1) + offset_px)
+        info["grasp_strategy"] = "partial_upper_from_top"
+    else:
+        target_y = max(int(y1) + 2, int(y2) - offset_px)
+        info["grasp_strategy"] = "partial_lower_from_bottom"
+
+    target_depth_m, grasp_x, grasp_y = robust_depth_near_pixel(
+        depth_frame,
+        target_x,
+        target_y,
+        bbox=(x1, y1, x2, y2),
+        reference_depth_m=surface_depth_m,
+        reference_tolerance_m=0.12,
+    )
+    if target_depth_m <= 0.0:
+        info["grasp_strategy"] = "bbox_center_fallback"
+        return surface_depth_m, center_x, center_y, info
+
+    return target_depth_m, grasp_x, grasp_y, info
 
 
 def euler_to_quat(roll, pitch, yaw):
@@ -185,6 +464,11 @@ class CameraVision(Node):
         self.declare_parameter("mount_rpy_deg", "1.1719,0.6432,1.4275")
         self.declare_parameter("optical_frame_rpy_deg", "-90.0,0.0,-90.0")
         self.declare_parameter("grasp_depth_offset_m", 0.02)
+        self.declare_parameter("partial_bottle_grasp_enabled", True)
+        self.declare_parameter("bottle_nominal_height_m", 0.24)
+        self.declare_parameter("bottle_partial_visibility_ratio", 0.70)
+        self.declare_parameter("bottle_partial_grasp_offset_m", 0.10)
+        self.declare_parameter("bottle_edge_contact_px", 6)
         self.declare_parameter("max_objects_tf", 5)
         self.declare_parameter("status_log_period_sec", 2.0)
         self.declare_parameter("live_window_name", "camera_vision_live")
@@ -206,6 +490,21 @@ class CameraVision(Node):
         self.camera_optical_frame = str(self.get_parameter("camera_optical_frame").value)
         self.object_frame_prefix = str(self.get_parameter("object_frame_prefix").value)
         self.grasp_depth_offset_m = float(self.get_parameter("grasp_depth_offset_m").value)
+        self.partial_bottle_grasp_enabled = bool(
+            self.get_parameter("partial_bottle_grasp_enabled").value
+        )
+        self.bottle_nominal_height_m = float(
+            self.get_parameter("bottle_nominal_height_m").value
+        )
+        self.bottle_partial_visibility_ratio = float(
+            self.get_parameter("bottle_partial_visibility_ratio").value
+        )
+        self.bottle_partial_grasp_offset_m = float(
+            self.get_parameter("bottle_partial_grasp_offset_m").value
+        )
+        self.bottle_edge_contact_px = int(
+            self.get_parameter("bottle_edge_contact_px").value
+        )
         self.max_objects_tf = int(self.get_parameter("max_objects_tf").value)
         self.status_log_period_sec = float(self.get_parameter("status_log_period_sec").value)
         self.live_window_name = str(self.get_parameter("live_window_name").value)
@@ -385,6 +684,13 @@ class CameraVision(Node):
                 f"optical_xyz=({float(point[0]):.3f}, {float(point[1]):.3f}, {float(point[2]):.3f})"
             )
             self.get_logger().info(
+                "camera_vision grasp: "
+                f"strategy={first.get('grasp_strategy', 'bbox_center')} "
+                f"case={first.get('visibility_case', 'full_or_unknown')} "
+                f"ratio={float(first.get('visible_ratio_estimate', 1.0)):.2f} "
+                f"grasp_px={tuple(first.get('grasp_px', [0, 0]))}"
+            )
+            self.get_logger().info(
                 "camera_vision detected_classes: "
                 + ", ".join(class_names)
             )
@@ -440,7 +746,7 @@ class CameraVision(Node):
             f"fps={self.latest_fps:.1f}",
             f"detections={len(detections)}",
             f"frame={self.camera_optical_frame}",
-            "grasp target = center-first valid depth",
+            "grasp target = partial-aware bottle heuristic",
             f"depth offset = {self.grasp_depth_offset_m:.3f}m",
         ]
         self._draw_text_block(annotated, panel_lines, (12, 12))
@@ -461,8 +767,9 @@ class CameraVision(Node):
                 f"#{index} {det['class_name']} conf={conf:.2f}",
                 f"depth={depth_m:.3f}m px=({cx},{cy})",
                 f"opt_xyz=({float(X):.3f}, {float(Y):.3f}, {float(Z):.3f})",
+                f"{det.get('grasp_strategy', 'bbox_center')} {det.get('visibility_case', 'full_or_unknown')}",
             ]
-            text_y = max(12, y1 - 74)
+            text_y = max(12, y1 - 92)
             self._draw_text_block(
                 annotated,
                 label_lines,
@@ -531,9 +838,36 @@ class CameraVision(Node):
                 cls_id = int(box.cls[0].cpu().numpy())
                 conf = float(box.conf[0].cpu().numpy())
                 name = names.get(cls_id, str(cls_id))
+                bbox_center_x = int((x1 + x2) * 0.5)
+                bbox_center_y = int((y1 + y2) * 0.5)
 
-                dist_m, cx, cy = robust_bbox_depth(depth, x1, y1, x2, y2)
-                surface_dist_m = dist_m
+                class_name_lower = str(name).strip().lower()
+                is_bottle = "bottle" in class_name_lower
+                if self.partial_bottle_grasp_enabled and is_bottle:
+                    surface_dist_m, cx, cy, grasp_info = choose_bottle_grasp_depth(
+                        depth,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        depth_intrin=depth_intrin,
+                        nominal_height_m=self.bottle_nominal_height_m,
+                        partial_ratio_threshold=self.bottle_partial_visibility_ratio,
+                        partial_grasp_offset_m=self.bottle_partial_grasp_offset_m,
+                        edge_contact_px=self.bottle_edge_contact_px,
+                    )
+                else:
+                    surface_dist_m, cx, cy = robust_bbox_depth(depth, x1, y1, x2, y2)
+                    grasp_info = {
+                        "grasp_strategy": "bbox_center",
+                        "partial_visibility": False,
+                        "visibility_case": "full_or_unknown",
+                        "visible_ratio_estimate": 1.0,
+                        "expected_height_px": 0.0,
+                        "top_span_px": 0,
+                        "bottom_span_px": 0,
+                    }
+                dist_m = surface_dist_m
                 if dist_m > 0.0:
                     dist_m = max(0.0, dist_m + self.grasp_depth_offset_m)
                     # RealSense deprojection returns a 3D point in the camera optical frame:
@@ -551,11 +885,18 @@ class CameraVision(Node):
                     "class_name": name,
                     "confidence": conf,
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "center_px": [cx, cy],
+                    "center_px": [bbox_center_x, bbox_center_y],
                     "distance_m": float(dist_m),
                     "surface_distance_m": float(surface_dist_m),
                     "point_camera_optical_m": point_camera_optical_m,
                     "grasp_px": [cx, cy],
+                    "grasp_strategy": str(grasp_info["grasp_strategy"]),
+                    "partial_visibility": bool(grasp_info["partial_visibility"]),
+                    "visibility_case": str(grasp_info["visibility_case"]),
+                    "visible_ratio_estimate": float(grasp_info["visible_ratio_estimate"]),
+                    "expected_height_px": float(grasp_info["expected_height_px"]),
+                    "top_span_px": int(grasp_info["top_span_px"]),
+                    "bottom_span_px": int(grasp_info["bottom_span_px"]),
                 }
                 detections_out.append(det)
 

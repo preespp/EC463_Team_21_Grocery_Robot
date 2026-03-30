@@ -103,6 +103,7 @@ def launch_setup(context, *args, **kwargs):
         ]),
         value_type=str,
     )
+    kinematics_config = os.path.join(moveit_pkg, "config", "kinematics.yaml")
 
     return [
         IncludeLaunchDescription(
@@ -127,6 +128,7 @@ def launch_setup(context, *args, **kwargs):
             ],
             parameters=[
                 os.path.join(pkg_dir, "config", "viperx_arm_server.yaml"),
+                kinematics_config,
                 {
                     "robot_description": robot_description,
                     "robot_description_semantic": robot_description_semantic,
