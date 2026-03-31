@@ -1,3 +1,5 @@
+import math
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
@@ -156,6 +158,18 @@ def generate_launch_description():
                 "telemetry_enabled": ParameterValue(
                     LaunchConfiguration("telemetry_enabled"), value_type=bool
                 ),
+                "max_linear_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_linear_speed"), value_type=float
+                ),
+                "max_lateral_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_lateral_speed"), value_type=float
+                ),
+                "max_yaw_speed": ParameterValue(
+                    LaunchConfiguration("bridge_max_yaw_speed"), value_type=float
+                ),
+                "axis_deadband": ParameterValue(
+                    LaunchConfiguration("bridge_axis_deadband"), value_type=float
+                ),
                 "left_switch": ParameterValue(LaunchConfiguration("left_switch"), value_type=int),
                 "right_switch": ParameterValue(LaunchConfiguration("right_switch"), value_type=int),
                 "odom_topic": LaunchConfiguration("odom_topic"),
@@ -206,6 +220,10 @@ def generate_launch_description():
                 default_value='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]',
             ),
             DeclareLaunchArgument("telemetry_enabled", default_value="true"),
+            DeclareLaunchArgument("bridge_max_linear_speed", default_value="3.0"),
+            DeclareLaunchArgument("bridge_max_lateral_speed", default_value="3.0"),
+            DeclareLaunchArgument("bridge_max_yaw_speed", default_value=str(4.0 * math.pi)),
+            DeclareLaunchArgument("bridge_axis_deadband", default_value="0.05"),
             DeclareLaunchArgument("left_switch", default_value="1"),
             DeclareLaunchArgument("right_switch", default_value="1"),
             DeclareLaunchArgument("odom_topic", default_value="/odom_raw"),
