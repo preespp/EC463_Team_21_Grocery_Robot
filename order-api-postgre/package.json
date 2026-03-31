@@ -1,5 +1,5 @@
 {
-  "name": "grocerybot-order-api-postgre",
+  "name": "gofr-order-api-postgre",
   "private": true,
   "type": "module",
   "scripts": {

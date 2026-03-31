@@ -16,7 +16,10 @@
 
     <main class="content">
       <header class="topbar">
-        <input class="search" :placeholder="t('search_placeholder')" />
+        <div class="top-left">
+          <img class="topbar-logo" src="/full_logo.png" alt="GOFR logo" />
+          <input class="search" :placeholder="t('search_placeholder')" />
+        </div>
         <div class="top-right">
           <div class="lang-switch">
             <button class="lang-btn" :class="{ active: currentLang === 'en' }" @click="setLang('en')" title="English">
