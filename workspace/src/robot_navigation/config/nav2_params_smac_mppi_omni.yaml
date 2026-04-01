@@ -368,9 +368,9 @@ behavior_server:
       robot_radius: 0.40
       max_radius: 1.00
       service_name: "local_costmap/get_costmap"
-      cost_threshold: 253.0
-      sample_step: 0.05
-      min_free_distance: 0.20
+      cost_threshold: 0.1
+      radius_step: 0.1
+      free_threshold: 3
       visualization: False
     drive_on_heading:
       plugin: "nav2_behaviors/DriveOnHeading"

@@ -1,13 +1,11 @@
 #include "robot_nav2_plugins/smart_back_up.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <future>
 #include <limits>
 #include <memory>
 #include <stdexcept>
-#include <utility>
 #include <vector>
 
 #include "geometry_msgs/msg/point.hpp"
@@ -19,11 +17,22 @@
 namespace
 {
 
-constexpr double kDiagonal = 0.7071067811865476;
+constexpr double kPi = 3.14159265358979323846;
 
 double clampValue(double value, double min_value, double max_value)
 {
   return std::max(min_value, std::min(value, max_value));
+}
+
+double normalizeAngle(double angle)
+{
+  while (angle > kPi) {
+    angle -= 2.0 * kPi;
+  }
+  while (angle < -kPi) {
+    angle += 2.0 * kPi;
+  }
+  return angle;
 }
 
 geometry_msgs::msg::Point makePoint(double x, double y)
@@ -59,25 +68,32 @@ void SmartBackUp::onConfigure()
     node, param_prefix + "service_name",
     rclcpp::ParameterValue(std::string("local_costmap/get_costmap")));
   nav2_util::declare_parameter_if_not_declared(
-    node, param_prefix + "cost_threshold", rclcpp::ParameterValue(253.0));
+    node, param_prefix + "cost_threshold", rclcpp::ParameterValue(0.1));
+  nav2_util::declare_parameter_if_not_declared(
+    node, param_prefix + "radius_step", rclcpp::ParameterValue(0.1));
+  nav2_util::declare_parameter_if_not_declared(
+    node, param_prefix + "free_threshold", rclcpp::ParameterValue(3));
+  nav2_util::declare_parameter_if_not_declared(
+    node, param_prefix + "visualization", rclcpp::ParameterValue(false));
+  // Kept for compatibility with older parameter files that used the
+  // candidate-direction implementation.
   nav2_util::declare_parameter_if_not_declared(
     node, param_prefix + "sample_step", rclcpp::ParameterValue(0.05));
   nav2_util::declare_parameter_if_not_declared(
     node, param_prefix + "min_free_distance", rclcpp::ParameterValue(0.20));
-  nav2_util::declare_parameter_if_not_declared(
-    node, param_prefix + "visualization", rclcpp::ParameterValue(false));
 
   node->get_parameter(param_prefix + "robot_radius", robot_radius_);
   node->get_parameter(param_prefix + "max_radius", max_radius_);
   node->get_parameter(param_prefix + "service_name", service_name_);
   node->get_parameter(param_prefix + "cost_threshold", cost_threshold_);
-  node->get_parameter(param_prefix + "sample_step", sample_step_);
-  node->get_parameter(param_prefix + "min_free_distance", min_free_distance_);
+  node->get_parameter(param_prefix + "radius_step", radius_step_);
+  node->get_parameter(param_prefix + "free_threshold", free_threshold_);
   node->get_parameter(param_prefix + "visualization", visualization_);
 
-  max_radius_ = std::max(max_radius_, min_free_distance_);
-  sample_step_ = std::max(sample_step_, 0.01);
+  max_radius_ = std::max(max_radius_, robot_radius_);
+  radius_step_ = std::max(radius_step_, 0.01);
   cost_threshold_ = clampValue(cost_threshold_, 0.0, 255.0);
+  free_threshold_ = std::max(free_threshold_, 0);
 
   costmap_client_ = node->create_client<nav2_msgs::srv::GetCostmap>(service_name_);
   marker_pub_ = node->create_publisher<visualization_msgs::msg::MarkerArray>(
@@ -102,142 +118,65 @@ bool SmartBackUp::waitForCostmapService() const
   return true;
 }
 
-bool SmartBackUp::worldToMap(
+bool SmartBackUp::findFreeSpaceCentroid(
   const Costmap & costmap,
-  double world_x,
-  double world_y,
-  unsigned int & map_x,
-  unsigned int & map_y) const
+  double pose_x,
+  double pose_y,
+  geometry_msgs::msg::Point & centroid,
+  std::vector<geometry_msgs::msg::Point> & free_points,
+  double & selected_radius) const
 {
-  const double origin_x = costmap.metadata.origin.position.x;
-  const double origin_y = costmap.metadata.origin.position.y;
-  const double resolution = costmap.metadata.resolution;
-
-  if (world_x < origin_x || world_y < origin_y) {
+  if (costmap.metadata.size_x == 0 || costmap.metadata.size_y == 0 || costmap.data.empty()) {
     return false;
   }
 
-  map_x = static_cast<unsigned int>((world_x - origin_x) / resolution);
-  map_y = static_cast<unsigned int>((world_y - origin_y) / resolution);
+  const double resolution = costmap.metadata.resolution;
+  const double origin_x = costmap.metadata.origin.position.x;
+  const double origin_y = costmap.metadata.origin.position.y;
 
-  return map_x < costmap.metadata.size_x && map_y < costmap.metadata.size_y;
-}
+  for (double radius = robot_radius_; radius <= max_radius_ + 1.0e-6; radius += radius_step_) {
+    std::vector<geometry_msgs::msg::Point> current_points;
 
-unsigned char SmartBackUp::getCellCost(
-  const Costmap & costmap,
-  double world_x,
-  double world_y) const
-{
-  unsigned int map_x = 0;
-  unsigned int map_y = 0;
-  if (!worldToMap(costmap, world_x, world_y, map_x, map_y)) {
-    return 255;
-  }
+    for (std::size_t ix = 0; ix < costmap.metadata.size_x; ++ix) {
+      for (std::size_t iy = 0; iy < costmap.metadata.size_y; ++iy) {
+        const auto index = ix + iy * costmap.metadata.size_x;
+        const double x = static_cast<double>(ix) * resolution + origin_x;
+        const double y = static_cast<double>(iy) * resolution + origin_y;
 
-  const auto index = static_cast<std::size_t>(map_x) +
-    static_cast<std::size_t>(map_y) * costmap.metadata.size_x;
-  return costmap.data.at(index);
-}
+        if (std::hypot(x - pose_x, y - pose_y) > radius) {
+          continue;
+        }
 
-SmartBackUp::CandidateDirection SmartBackUp::evaluateCandidate(
-  const Costmap & costmap,
-  const CandidateDirection & candidate,
-  double pose_x,
-  double pose_y,
-  double yaw,
-  double requested_distance) const
-{
-  CandidateDirection evaluated = candidate;
-  const double evaluation_distance = std::max(max_radius_, requested_distance);
-  const double cos_yaw = std::cos(yaw);
-  const double sin_yaw = std::sin(yaw);
-  const double offset_scale = robot_radius_ * 0.80;
-  const std::array<double, 3> lateral_offsets{{-offset_scale, 0.0, offset_scale}};
-  const double perp_x = -candidate.dir_y;
-  const double perp_y = candidate.dir_x;
-
-  double accumulated_cost = 0.0;
-  int samples = 0;
-
-  for (double distance = sample_step_; distance <= evaluation_distance + 1.0e-6; distance += sample_step_) {
-    bool blocked = false;
-
-    for (double offset : lateral_offsets) {
-      const double body_x = candidate.dir_x * distance + perp_x * offset;
-      const double body_y = candidate.dir_y * distance + perp_y * offset;
-      const double world_x = pose_x + body_x * cos_yaw - body_y * sin_yaw;
-      const double world_y = pose_y + body_x * sin_yaw + body_y * cos_yaw;
-      const unsigned char cost = getCellCost(costmap, world_x, world_y);
-      if (static_cast<double>(cost) >= cost_threshold_) {
-        blocked = true;
-        break;
+        if (static_cast<double>(costmap.data.at(index)) <= cost_threshold_) {
+          current_points.push_back(makePoint(x, y));
+        }
       }
-      accumulated_cost += static_cast<double>(cost);
-      ++samples;
     }
 
-    if (blocked) {
-      break;
-    }
-
-    evaluated.free_distance = distance;
-  }
-
-  if (samples > 0) {
-    evaluated.average_cost = accumulated_cost / static_cast<double>(samples);
-  }
-
-  evaluated.valid = evaluated.free_distance >= min_free_distance_;
-
-  const double rear_bias = 0.15 * std::max(0.0, -candidate.dir_x);
-  const double reach_bonus = evaluated.free_distance + 1.0e-6 >= requested_distance ? 0.25 : 0.0;
-  const double cost_penalty = 0.50 * (evaluated.average_cost / 255.0);
-  evaluated.score = evaluated.free_distance + rear_bias + reach_bonus - cost_penalty;
-
-  return evaluated;
-}
-
-bool SmartBackUp::selectDirection(
-  const Costmap & costmap,
-  double pose_x,
-  double pose_y,
-  double yaw,
-  double requested_distance,
-  CandidateDirection & selected,
-  std::vector<CandidateDirection> & evaluated) const
-{
-  const std::array<CandidateDirection, 5> candidates{{
-    {"back", -1.0, 0.0},
-    {"back_left", -kDiagonal, kDiagonal},
-    {"back_right", -kDiagonal, -kDiagonal},
-    {"left", 0.0, 1.0},
-    {"right", 0.0, -1.0},
-  }};
-
-  bool found = false;
-  for (const auto & candidate : candidates) {
-    auto result = evaluateCandidate(costmap, candidate, pose_x, pose_y, yaw, requested_distance);
-    evaluated.push_back(result);
-
-    if (!result.valid) {
+    if (static_cast<int>(current_points.size()) <= free_threshold_) {
       continue;
     }
 
-    if (!found || result.score > selected.score) {
-      selected = result;
-      found = true;
+    centroid = makePoint(0.0, 0.0);
+    for (const auto & point : current_points) {
+      centroid.x += point.x;
+      centroid.y += point.y;
     }
+    centroid.x /= static_cast<double>(current_points.size());
+    centroid.y /= static_cast<double>(current_points.size());
+    free_points = current_points;
+    selected_radius = radius;
+    return true;
   }
 
-  return found;
+  return false;
 }
 
 void SmartBackUp::publishVisualization(
-  const std::vector<CandidateDirection> & candidates,
-  const CandidateDirection & selected,
+  const std::vector<geometry_msgs::msg::Point> & free_points,
+  const geometry_msgs::msg::Point & target_point,
   double pose_x,
-  double pose_y,
-  double yaw) const
+  double pose_y) const
 {
   if (!visualization_) {
     return;
@@ -256,52 +195,36 @@ void SmartBackUp::publishVisualization(
   delete_marker.action = visualization_msgs::msg::Marker::DELETEALL;
   markers.markers.push_back(delete_marker);
 
-  const double cos_yaw = std::cos(yaw);
-  const double sin_yaw = std::sin(yaw);
-  int marker_id = 0;
+  visualization_msgs::msg::Marker free_space_marker;
+  free_space_marker.header.frame_id = this->global_frame_;
+  free_space_marker.header.stamp = node->now();
+  free_space_marker.ns = "smart_back_up_free_space";
+  free_space_marker.id = 0;
+  free_space_marker.type = visualization_msgs::msg::Marker::POINTS;
+  free_space_marker.action = visualization_msgs::msg::Marker::ADD;
+  free_space_marker.pose.orientation.w = 1.0;
+  free_space_marker.scale.x = 0.03;
+  free_space_marker.scale.y = 0.03;
+  free_space_marker.color.r = 1.0F;
+  free_space_marker.color.a = 1.0F;
+  free_space_marker.points = free_points;
+  markers.markers.push_back(free_space_marker);
 
-  for (const auto & candidate : candidates) {
-    visualization_msgs::msg::Marker marker;
-    marker.header.frame_id = this->global_frame_;
-    marker.header.stamp = node->now();
-    marker.ns = "smart_back_up_candidates";
-    marker.id = marker_id++;
-    marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
-    marker.action = visualization_msgs::msg::Marker::ADD;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 0.03;
-    marker.color.a = 1.0;
-    marker.color.r = candidate.valid ? 0.2F : 1.0F;
-    marker.color.g = candidate.valid ? 0.9F : 0.1F;
-    marker.color.b = 0.2F;
-    marker.points.push_back(makePoint(pose_x, pose_y));
-
-    const double body_x = candidate.dir_x * candidate.free_distance;
-    const double body_y = candidate.dir_y * candidate.free_distance;
-    const double end_x = pose_x + body_x * cos_yaw - body_y * sin_yaw;
-    const double end_y = pose_y + body_x * sin_yaw + body_y * cos_yaw;
-    marker.points.push_back(makePoint(end_x, end_y));
-    markers.markers.push_back(marker);
-  }
-
-  visualization_msgs::msg::Marker chosen;
-  chosen.header.frame_id = this->global_frame_;
-  chosen.header.stamp = node->now();
-  chosen.ns = "smart_back_up_selected";
-  chosen.id = marker_id;
-  chosen.type = visualization_msgs::msg::Marker::SPHERE;
-  chosen.action = visualization_msgs::msg::Marker::ADD;
-  chosen.pose.orientation.w = 1.0;
-  chosen.scale.x = 0.10;
-  chosen.scale.y = 0.10;
-  chosen.scale.z = 0.10;
-  chosen.color.a = 1.0;
-  chosen.color.g = 1.0F;
-  const double chosen_body_x = selected.dir_x * selected.free_distance;
-  const double chosen_body_y = selected.dir_y * selected.free_distance;
-  chosen.pose.position.x = pose_x + chosen_body_x * cos_yaw - chosen_body_y * sin_yaw;
-  chosen.pose.position.y = pose_y + chosen_body_x * sin_yaw + chosen_body_y * cos_yaw;
-  markers.markers.push_back(chosen);
+  visualization_msgs::msg::Marker target_marker;
+  target_marker.header.frame_id = this->global_frame_;
+  target_marker.header.stamp = node->now();
+  target_marker.ns = "smart_back_up_target";
+  target_marker.id = 1;
+  target_marker.type = visualization_msgs::msg::Marker::POINTS;
+  target_marker.action = visualization_msgs::msg::Marker::ADD;
+  target_marker.pose.orientation.w = 1.0;
+  target_marker.scale.x = 0.08;
+  target_marker.scale.y = 0.08;
+  target_marker.color.g = 1.0F;
+  target_marker.color.a = 1.0F;
+  target_marker.points.push_back(target_point);
+  target_marker.points.push_back(makePoint(pose_x, pose_y));
+  markers.markers.push_back(target_marker);
 
   marker_pub_->publish(markers);
 }
@@ -349,29 +272,31 @@ SmartBackUp::Status SmartBackUp::onRun(const std::shared_ptr<const BackUpAction:
   const double yaw = tf2::getYaw(this->initial_pose_.pose.orientation);
   const double requested_distance = std::abs(command->target.x);
 
-  CandidateDirection selected;
-  std::vector<CandidateDirection> evaluated;
-  if (!selectDirection(costmap, pose_x, pose_y, yaw, requested_distance, selected, evaluated)) {
+  geometry_msgs::msg::Point centroid;
+  std::vector<geometry_msgs::msg::Point> free_points;
+  double selected_radius = 0.0;
+  if (!findFreeSpaceCentroid(costmap, pose_x, pose_y, centroid, free_points, selected_radius)) {
     RCLCPP_WARN(this->logger_, "SmartBackUp could not find enough free space.");
     return Status::FAILED;
   }
 
-  direction_x_ = selected.dir_x;
-  direction_y_ = selected.dir_y;
-  this->command_x_ = std::min(
-    requested_distance,
-    std::max(min_free_distance_, selected.free_distance - sample_step_));
+  const double angle_to_free_space = std::atan2(centroid.y - pose_y, centroid.x - pose_x);
+  const double angle_diff = normalizeAngle(angle_to_free_space - yaw);
+
+  direction_x_ = std::cos(angle_diff);
+  direction_y_ = std::sin(angle_diff);
+  this->command_x_ = requested_distance;
   this->command_speed_ = std::abs(command->speed);
   this->command_time_allowance_ = command->time_allowance;
   this->end_time_ = this->clock_->now() + this->command_time_allowance_;
   this->last_vel_ = std::numeric_limits<double>::max();
 
-  publishVisualization(evaluated, selected, pose_x, pose_y, yaw);
+  publishVisualization(free_points, centroid, pose_x, pose_y);
 
   RCLCPP_INFO(
     this->logger_,
-    "SmartBackUp selected %s | free_distance=%.2f m | command_distance=%.2f m | avg_cost=%.1f",
-    selected.name.c_str(), selected.free_distance, this->command_x_, selected.average_cost);
+    "SmartBackUp selected centroid retreat | radius=%.2f m | angle=%.1f deg | command_distance=%.2f m",
+    selected_radius, angle_diff * 180.0 / kPi, this->command_x_);
 
   return Status::SUCCEEDED;
 }

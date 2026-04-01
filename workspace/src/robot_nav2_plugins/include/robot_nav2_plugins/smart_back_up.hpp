@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/pose2_d.hpp"
 #include "nav2_behaviors/plugins/drive_on_heading.hpp"
 #include "nav2_msgs/action/back_up.hpp"
@@ -30,59 +31,32 @@ protected:
   void onConfigure() override;
 
 private:
-  struct CandidateDirection
-  {
-    std::string name;
-    double dir_x;
-    double dir_y;
-    double free_distance{0.0};
-    double average_cost{255.0};
-    double score{-1.0e9};
-    bool valid{false};
-  };
-
   bool waitForCostmapService() const;
-  bool worldToMap(
-    const Costmap & costmap,
-    double world_x,
-    double world_y,
-    unsigned int & map_x,
-    unsigned int & map_y) const;
-  unsigned char getCellCost(const Costmap & costmap, double world_x, double world_y) const;
-  CandidateDirection evaluateCandidate(
-    const Costmap & costmap,
-    const CandidateDirection & candidate,
-    double pose_x,
-    double pose_y,
-    double yaw,
-    double requested_distance) const;
-  bool selectDirection(
+  bool findFreeSpaceCentroid(
     const Costmap & costmap,
     double pose_x,
     double pose_y,
-    double yaw,
-    double requested_distance,
-    CandidateDirection & selected,
-    std::vector<CandidateDirection> & evaluated) const;
+    geometry_msgs::msg::Point & centroid,
+    std::vector<geometry_msgs::msg::Point> & free_points,
+    double & selected_radius) const;
   bool isHolonomicCollisionFree(
     double distance_traveled,
     geometry_msgs::msg::Twist * cmd_vel,
     geometry_msgs::msg::Pose2D & pose2d) const;
   void publishVisualization(
-    const std::vector<CandidateDirection> & candidates,
-    const CandidateDirection & selected,
+    const std::vector<geometry_msgs::msg::Point> & free_points,
+    const geometry_msgs::msg::Point & target_point,
     double pose_x,
-    double pose_y,
-    double yaw) const;
+    double pose_y) const;
 
   rclcpp::Client<nav2_msgs::srv::GetCostmap>::SharedPtr costmap_client_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
   std::string service_name_;
   double robot_radius_{0.40};
   double max_radius_{1.00};
-  double cost_threshold_{253.0};
-  double sample_step_{0.05};
-  double min_free_distance_{0.20};
+  double cost_threshold_{0.1};
+  double radius_step_{0.1};
+  int free_threshold_{3};
   bool visualization_{false};
   double direction_x_{-1.0};
   double direction_y_{0.0};
