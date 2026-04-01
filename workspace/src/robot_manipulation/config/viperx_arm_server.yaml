@@ -7,7 +7,7 @@ viperx_arm_server:
     planning_time_sec: 3.0
     max_velocity_scaling: 0.2
     max_acceleration_scaling: 0.2
-    enforce_orientation_path_constraint: true
+    enforce_orientation_path_constraint: false
     enforce_orientation_path_constraint_on_pose_moves: false
     use_position_target_with_orientation_constraint: true
     allow_orientation_constraint_fallback: false
@@ -17,6 +17,8 @@ viperx_arm_server:
     orientation_constraint_weight: 1.0
     preview_only: false
     preview_step_delay_sec: 1.0
+    verify_final_orientation_match: false
+    orientation_check_settle_sec: 0.15
 
     # Fallback values used if named targets are not available in the SRDF.
     open_gripper_pos: 0.035
@@ -37,6 +39,10 @@ viperx_arm_server:
     pre_return_joint_positions: [0.0, -1.37881011, 1.20427718, 0.0, 0.27925268, 0.0]
     return_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
     return_joint_positions: [0.0, -1.85004901, 1.53588974, 0.0, 0.80285146, 0.0]
+    lift_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    lift_joint_positions: [0.0, -0.17453293, 1.39626340, 0.0, -1.20427718, 0.0]
+    post_lift_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
+    post_lift_joint_positions: [0.0, -0.82030475, 1.06465084, 0.0, -0.24434610, 0.0]
 
     # Interbotix SRDF defaults for gripper group states.
     open_gripper_named_target: "Released"

@@ -123,6 +123,20 @@ def resolve_use_ekf(run_mode: str, requested: bool | None) -> bool:
     return run_mode != "bench"
 
 
+def resolve_cmd_topics(command: str, requested: str | None) -> str:
+    if requested:
+        return requested
+    if command == "localization-stack":
+        return DEFAULT_LOCALIZATION_CMD_TOPICS
+    return DEFAULT_CMD_TOPICS
+
+
+def resolve_with_base_link_crop(command: str, requested: bool | None) -> bool:
+    if requested is not None:
+        return requested
+    return command == "mapping-stack"
+
+
 def render_command(command: Sequence[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
@@ -415,6 +429,10 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
     run_mode = args.run_mode
     use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
     carto_config = args.cartographer_config_basename or MAPPING_CONFIG_BASENAME[run_mode]
+    cmd_topics = resolve_cmd_topics("mapping-stack", args.cmd_topics)
+    with_base_link_crop = resolve_with_base_link_crop(
+        "mapping-stack", args.with_base_link_crop
+    )
     command = [
         "ros2",
         "launch",
@@ -424,7 +442,7 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"udp_receiver_ip:={args.udp_receiver_ip}",
         f"serial_port:={args.serial_port}",
         f"baud_rate:={args.baud_rate}",
-        f"cmd_topics:={args.cmd_topics}",
+        f"cmd_topics:={cmd_topics}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
         f"bridge_max_linear_speed:={args.bridge_max_linear_speed}",
         f"bridge_max_lateral_speed:={args.bridge_max_lateral_speed}",
@@ -450,7 +468,7 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
-        f"with_base_link_crop:={bool_to_launch(args.with_base_link_crop)}",
+        f"with_base_link_crop:={bool_to_launch(with_base_link_crop)}",
         f"crop_box_frame:={args.crop_box_frame}",
         f"crop_min_x:={args.crop_min_x}",
         f"crop_max_x:={args.crop_max_x}",
@@ -469,6 +487,10 @@ def build_mapping_launch_cmd(args: argparse.Namespace) -> List[str]:
 def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
     run_mode = args.run_mode
     use_ekf = resolve_use_ekf(run_mode, args.use_ekf)
+    cmd_topics = resolve_cmd_topics("localization-stack", args.cmd_topics)
+    with_base_link_crop = resolve_with_base_link_crop(
+        "localization-stack", args.with_base_link_crop
+    )
     with_semantic_map = args.with_semantic_map
     if not args.semantic_map_file and args.map_name != "testmapMain":
         with_semantic_map = False
@@ -485,7 +507,7 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"udp_receiver_ip:={args.udp_receiver_ip}",
         f"serial_port:={args.serial_port}",
         f"baud_rate:={args.baud_rate}",
-        f"cmd_topics:={args.cmd_topics}",
+        f"cmd_topics:={cmd_topics}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
@@ -507,7 +529,7 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"lidar_roll:={args.lidar_roll}",
         f"lidar_pitch:={args.lidar_pitch}",
         f"lidar_yaw:={args.lidar_yaw}",
-        f"with_base_link_crop:={bool_to_launch(args.with_base_link_crop)}",
+        f"with_base_link_crop:={bool_to_launch(with_base_link_crop)}",
         f"crop_box_frame:={args.crop_box_frame}",
         f"crop_min_x:={args.crop_min_x}",
         f"crop_max_x:={args.crop_max_x}",
@@ -671,9 +693,9 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common = argparse.ArgumentParser(add_help=False)
     stack_common.add_argument("--hostname", default="192.168.8.150")
     stack_common.add_argument("--udp-receiver-ip", default="192.168.8.249")
-    stack_common.add_argument("--serial-port", default="/dev/ttyUSB0")
+    stack_common.add_argument("--serial-port", default="/dev/ttyUSB1")
     stack_common.add_argument("--baud-rate", type=int, default=115200)
-    stack_common.add_argument("--cmd-topics", default=DEFAULT_CMD_TOPICS)
+    stack_common.add_argument("--cmd-topics", default=None)
     stack_common.add_argument(
         "--telemetry-enabled",
         type=parse_bool,
@@ -707,7 +729,7 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--lidar-roll", type=float, default=0.0)
     stack_common.add_argument("--lidar-pitch", type=float, default=0.0)
     stack_common.add_argument("--lidar-yaw", type=float, default=0.0)
-    stack_common.add_argument("--with-base-link-crop", type=parse_bool, default=True)
+    stack_common.add_argument("--with-base-link-crop", type=parse_bool, default=None)
     stack_common.add_argument("--crop-box-frame", default="base_link")
     stack_common.add_argument("--crop-min-x", type=float, default=-0.2540)
     stack_common.add_argument("--crop-max-x", type=float, default=0.1397)
@@ -715,6 +737,12 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument("--crop-max-y", type=float, default=0.2794)
     stack_common.add_argument("--crop-min-z", type=float, default=-1.0)
     stack_common.add_argument("--crop-max-z", type=float, default=1.0)
+    stack_common.add_argument("--bridge-max-linear-speed", type=float, default=3.0)
+    stack_common.add_argument("--bridge-max-lateral-speed", type=float, default=3.0)
+    stack_common.add_argument(
+        "--bridge-max-yaw-speed", type=float, default=4.0 * math.pi
+    )
+    stack_common.add_argument("--bridge-axis-deadband", type=float, default=0.05)
     stack_common.add_argument("--dry-run", action="store_true")
 
     mapping_parser = subparsers.add_parser(
@@ -722,7 +750,6 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[stack_common],
         help="One-line mapping phase launch (LiDAR + Cartographer + serial bridge).",
     )
-    mapping_parser.set_defaults(with_base_link_crop=True)
     mapping_parser.add_argument("--with-collision", type=parse_bool, default=False)
     mapping_parser.add_argument("--with-rviz", type=parse_bool, default=False)
 
@@ -730,10 +757,6 @@ def build_parser() -> argparse.ArgumentParser:
         "localization-stack",
         parents=[stack_common],
         help="One-line localization + Nav2 launch.",
-    )
-    localization_parser.set_defaults(
-        with_base_link_crop=False,
-        cmd_topics=DEFAULT_LOCALIZATION_CMD_TOPICS,
     )
     localization_parser.add_argument("--maps-dir", default=DEFAULT_MAPS_DIR)
     localization_parser.add_argument("--map-name", default=DEFAULT_MAP_NAME)
@@ -743,12 +766,6 @@ def build_parser() -> argparse.ArgumentParser:
     localization_parser.add_argument("--with-semantic-map", type=parse_bool, default=True)
     localization_parser.add_argument("--semantic-map-file", default="")
     localization_parser.add_argument("--with-nav2-rviz", type=parse_bool, default=False)
-    localization_parser.add_argument("--bridge-max-linear-speed", type=float, default=3.0)
-    localization_parser.add_argument("--bridge-max-lateral-speed", type=float, default=3.0)
-    localization_parser.add_argument(
-        "--bridge-max-yaw-speed", type=float, default=4.0 * math.pi
-    )
-    localization_parser.add_argument("--bridge-axis-deadband", type=float, default=0.05)
 
     teleop_common = argparse.ArgumentParser(add_help=False)
     teleop_common.add_argument("--topic", default="/cmd_vel")

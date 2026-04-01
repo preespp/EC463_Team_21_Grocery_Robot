@@ -1,5 +1,5 @@
 {
-  "name": "grocerybot-fleet-manager",
+  "name": "gofr-fleet-manager",
   "private": true,
   "type": "module",
   "scripts": {

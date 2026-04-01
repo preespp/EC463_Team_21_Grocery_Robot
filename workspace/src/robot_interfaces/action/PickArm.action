@@ -6,6 +6,7 @@ float32 pregrasp_offset_m
 float32 retreat_offset_m
 float32 gripper_close_position
 bool use_cartesian_approach
+bool require_orientation_match
 
 ---
 # Result

@@ -4,9 +4,9 @@ export const currentLang = ref(localStorage.getItem('fleet_lang') || 'en')
 
 const messages = {
   en: {
-    brand: 'GroceryBot Fleet',
+    brand: 'Fleet Manager',
     nav_inventory: 'Inventory Report',
-    nav_ask_ai: 'Ask AI',
+    nav_ask_ai: 'Ask GOFR AI',
     nav_store_map: 'Store Map',
     nav_slam: 'Real-time SLAM Map',
     nav_robot_status: 'Robot Status',
@@ -21,7 +21,7 @@ const messages = {
     help_3: 'Use Robot Status to monitor battery and operating mode.',
     help_4: 'Store Map and Real-time SLAM Map are placeholders for now.',
     close: 'Close',
-    idle_title: 'Fleet Manager',
+    idle_title: 'GOFR: Grocery Operations & Fulfillment Robot',
     idle_subtitle: 'Tap anywhere to continue',
     login_title: 'Employee Login',
     login_subtitle: 'Use employee ID and password.',
@@ -59,7 +59,7 @@ const messages = {
     qty_gt_zero: 'Quantity must be greater than 0.',
     restock_submitted: 'Restock submitted',
     submit_failed: 'Submit failed',
-    ask_ai: 'Ask AI',
+    ask_ai: 'Ask GOFR AI',
     ask_ai_blank: 'This page is intentionally blank for now.',
     ask_ai_plan: 'Planned: employee AI assistant panel.',
     store_map: 'Map Reassign Product Location',
@@ -98,9 +98,9 @@ const messages = {
     download_failed: 'Failed to download report'
   },
   es: {
-    brand: 'Flota GroceryBot',
+    brand: 'Gestor de Flota',
     nav_inventory: 'Reporte de Inventario',
-    nav_ask_ai: 'Preguntar IA',
+    nav_ask_ai: 'Preguntar a la IA de GOFR',
     nav_store_map: 'Mapa de Tienda',
     nav_slam: 'Mapa SLAM en Tiempo Real',
     nav_robot_status: 'Estado de Robots',
@@ -115,7 +115,7 @@ const messages = {
     help_3: 'Use Estado de Robots para batería y modo.',
     help_4: 'Mapa de Tienda y Mapa SLAM son placeholders por ahora.',
     close: 'Cerrar',
-    idle_title: 'Gestor de Flota',
+    idle_title: 'GOFR: Robot de Operaciones y Cumplimiento de Comestibles',
     idle_subtitle: 'Toque cualquier parte para continuar',
     login_title: 'Inicio de Empleado',
     login_subtitle: 'Use ID de empleado y contraseña.',
@@ -192,9 +192,9 @@ const messages = {
     download_failed: 'Error al descargar reporte'
   },
   zh: {
-    brand: 'GroceryBot 车队',
+    brand: '车队管理',
     nav_inventory: '库存报告',
-    nav_ask_ai: '询问 AI',
+    nav_ask_ai: '询问 GOFR AI',
     nav_store_map: '商店地图',
     nav_slam: '实时 SLAM 地图',
     nav_robot_status: '机器人状态',
@@ -209,7 +209,7 @@ const messages = {
     help_3: '在机器人状态页面查看电量和运行模式。',
     help_4: '商店地图与实时 SLAM 地图目前为占位页。',
     close: '关闭',
-    idle_title: '车队管理',
+    idle_title: 'GOFR：杂货运营与履约机器人',
     idle_subtitle: '点击任意位置继续',
     login_title: '员工登录',
     login_subtitle: '请输入员工 ID 和密码。',

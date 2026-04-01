@@ -24,6 +24,7 @@ def create_customer_viperx_tree(bb):
         memory=True,
         children=[
             bt_nodes.RepositionViperXArm(goal_key="scan_center_pose", bb=bb),
+            bt_nodes.LockCurrentViperXOrientation(bb=bb),
             bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
         ],
     )
@@ -74,6 +75,7 @@ def create_customer_viperx_tree(bb):
             bt_nodes.RepositionViperXArm(goal_key="pregrasp_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="grasp_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="lift_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="post_lift_pose", bb=bb),
         ],
     )
 

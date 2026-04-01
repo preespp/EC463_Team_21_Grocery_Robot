@@ -37,7 +37,12 @@ def reset_viperx_manipulation_state(bb):
     bb.detected_object_pose = None
     bb.pregrasp_pose = None
     bb.grasp_pose = None
-    bb.lift_pose = None
+    bb.lift_pose = deepcopy(
+        getattr(bb, "default_lift_pose", _make_command_target("lift_arm_pose"))
+    )
+    bb.post_lift_pose = deepcopy(
+        getattr(bb, "default_post_lift_pose", _make_command_target("post_lift_arm_pose"))
+    )
     bb.locked_pick_orientation_xyzw = None
     bb.basket_bottle_count = 0
 
@@ -61,12 +66,15 @@ def setup_blackboard():
     bb.arm_base_frame = DEFAULT_VIPERX_BASE_FRAME
     bb.viperx_ee_orientation_frame = "vx300s/ee_gripper_link"
     bb.viperx_ee_link = "vx300s/ee_gripper_link"
-    # Keep the pick posture level in the base frame instead of inheriting scan-pose wrist tilt.
-    bb.viperx_use_current_ee_orientation = False
-    bb.viperx_fixed_pick_orientation_xyzw = (0.0, 0.0, 0.0, 1.0)
+    # Lock the real EE quaternion from the known-horizontal center scan pose.
+    # This is more reliable on hardware than assuming identity is horizontal.
+    bb.viperx_use_current_ee_orientation = True
+    bb.viperx_fixed_pick_orientation_xyzw = None
     bb.viperx_target_classes_text = "bottle,cup"
     bb.viperx_close_gripper_position = 0.040
-    bb.viperx_pregrasp_offset_z_m = 0.15
+    bb.viperx_pregrasp_target_x_m = 0.35
+    bb.viperx_pregrasp_offset_x_m = -0.15
+    bb.viperx_pregrasp_offset_z_m = 0.0
     bb.viperx_grasp_offset_z_m = 0.00
     bb.viperx_lift_offset_z_m = 0.20
     bb.viperx_search_timeout_sec = 3.0
@@ -84,9 +92,12 @@ def setup_blackboard():
     bb.scan_right_pose = _make_command_target("scan_right_arm_pose")
     bb.observation_pose = deepcopy(bb.scan_center_pose)
     bb.home_pose = _make_command_target("return_arm_pose")
+    bb.default_lift_pose = _make_command_target("lift_arm_pose")
+    bb.default_post_lift_pose = _make_command_target("post_lift_arm_pose")
     bb.default_basket_pose = _make_command_target("place_arm_pose")
     bb.post_place_pose = _make_command_target("post_place_arm_pose")
     bb.pre_return_pose = _make_command_target("pre_return_arm_pose")
+    bb.post_lift_pose = deepcopy(bb.default_post_lift_pose)
     bb.goal_pose = None  # Preferred BT arm target pose key for ViperX flow
 
     # For basket management (3 bottle slots + 1 random slot)
