@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <map>
@@ -16,6 +17,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Quaternion.h"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 
@@ -45,7 +48,7 @@ public:
     cartesian_min_fraction_ = this->declare_parameter<double>("cartesian_min_fraction", 0.9);
     enforce_orientation_path_constraint_ = this->declare_parameter<bool>(
       "enforce_orientation_path_constraint",
-      true);
+      false);
     enforce_orientation_path_constraint_on_pose_moves_ = this->declare_parameter<bool>(
       "enforce_orientation_path_constraint_on_pose_moves",
       false);
@@ -69,6 +72,12 @@ public:
       1.0);
     preview_only_ = this->declare_parameter<bool>("preview_only", false);
     preview_step_delay_sec_ = this->declare_parameter<double>("preview_step_delay_sec", 1.0);
+    verify_final_orientation_match_ = this->declare_parameter<bool>(
+      "verify_final_orientation_match",
+      false);
+    orientation_check_settle_sec_ = this->declare_parameter<double>(
+      "orientation_check_settle_sec",
+      0.15);
     open_gripper_pos_ = this->declare_parameter<double>("open_gripper_pos", 0.035);
     closed_gripper_pos_ = this->declare_parameter<double>("closed_gripper_pos", 0.0);
     open_gripper_named_target_ = this->declare_parameter<std::string>(
@@ -133,6 +142,20 @@ public:
     pre_return_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "pre_return_joint_positions",
       std::vector<double>{0.0, -1.37881011, 1.20427718, 0.0, 0.27925268, 0.0});
+    lift_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "lift_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    lift_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "lift_joint_positions",
+      std::vector<double>{0.0, -0.17453293, 1.39626340, 0.0, -1.20427718, 0.0});
+    post_lift_joint_names_ = this->declare_parameter<std::vector<std::string>>(
+      "post_lift_joint_names",
+      std::vector<std::string>{
+        "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
+    post_lift_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "post_lift_joint_positions",
+      std::vector<double>{0.0, -0.82030475, 1.06465084, 0.0, -0.24434610, 0.0});
 
     action_server_ = rclcpp_action::create_server<PickArm>(
       this,
@@ -188,6 +211,7 @@ private:
       command == "scan_center_arm_pose" || command == "scan_left_arm_pose" ||
       command == "scan_right_arm_pose" ||
       command == "startup_arm_pose" || command == "return_arm_pose" ||
+      command == "lift_arm_pose" || command == "post_lift_arm_pose" ||
       command == "place_arm_pose" || command == "post_place_arm_pose" ||
       command == "pre_return_arm_pose";
   }
@@ -210,6 +234,12 @@ private:
     }
     if (command == "startup_arm_pose") {
       return startup_joint_names_;
+    }
+    if (command == "lift_arm_pose") {
+      return lift_joint_names_;
+    }
+    if (command == "post_lift_arm_pose") {
+      return post_lift_joint_names_;
     }
     if (command == "place_arm_pose") {
       return place_joint_names_;
@@ -237,6 +267,12 @@ private:
     if (command == "startup_arm_pose") {
       return startup_joint_positions_;
     }
+    if (command == "lift_arm_pose") {
+      return lift_joint_positions_;
+    }
+    if (command == "post_lift_arm_pose") {
+      return post_lift_joint_positions_;
+    }
     if (command == "place_arm_pose") {
       return place_joint_positions_;
     }
@@ -263,6 +299,12 @@ private:
     if (command == "startup_arm_pose") {
       return "Failed to execute configured startup arm pose";
     }
+    if (command == "lift_arm_pose") {
+      return "Failed to execute configured lift arm pose";
+    }
+    if (command == "post_lift_arm_pose") {
+      return "Failed to execute configured post-lift arm pose";
+    }
     if (command == "place_arm_pose") {
       return "Failed to execute configured place arm pose";
     }
@@ -288,6 +330,12 @@ private:
     }
     if (command == "startup_arm_pose") {
       return "Startup arm pose complete";
+    }
+    if (command == "lift_arm_pose") {
+      return "Lift arm pose complete";
+    }
+    if (command == "post_lift_arm_pose") {
+      return "Post-lift arm pose complete";
     }
     if (command == "place_arm_pose") {
       return "Place arm pose complete";
@@ -353,53 +401,172 @@ private:
     return tf_buffer_.transform(pose_in, planning_frame, tf2::durationFromSec(0.3));
   }
 
+  moveit_msgs::msg::Constraints make_orientation_constraints(
+    const geometry_msgs::msg::PoseStamped & target_pose,
+    const std::string & target_link) const
+  {
+    moveit_msgs::msg::OrientationConstraint orientation_constraint;
+    orientation_constraint.header.frame_id = target_pose.header.frame_id;
+    orientation_constraint.link_name = target_link;
+    orientation_constraint.orientation = target_pose.pose.orientation;
+    orientation_constraint.absolute_x_axis_tolerance = orientation_constraint_x_tolerance_rad_;
+    orientation_constraint.absolute_y_axis_tolerance = orientation_constraint_y_tolerance_rad_;
+    orientation_constraint.absolute_z_axis_tolerance = orientation_constraint_z_tolerance_rad_;
+    orientation_constraint.weight = orientation_constraint_weight_;
+
+    moveit_msgs::msg::Constraints path_constraints;
+    path_constraints.orientation_constraints.push_back(orientation_constraint);
+    return path_constraints;
+  }
+
+  static double shortest_angle_distance(double from, double to)
+  {
+    return std::atan2(std::sin(to - from), std::cos(to - from));
+  }
+
+  bool pose_is_within_orientation_tolerance(
+    const geometry_msgs::msg::PoseStamped & target_pose,
+    const std::string & target_link)
+  {
+    if (target_link.empty()) {
+      return true;
+    }
+
+    const auto actual_pose = arm_move_group_->getCurrentPose(target_link);
+
+    tf2::Quaternion desired_q;
+    desired_q.setX(target_pose.pose.orientation.x);
+    desired_q.setY(target_pose.pose.orientation.y);
+    desired_q.setZ(target_pose.pose.orientation.z);
+    desired_q.setW(target_pose.pose.orientation.w);
+    desired_q.normalize();
+
+    tf2::Quaternion actual_q;
+    actual_q.setX(actual_pose.pose.orientation.x);
+    actual_q.setY(actual_pose.pose.orientation.y);
+    actual_q.setZ(actual_pose.pose.orientation.z);
+    actual_q.setW(actual_pose.pose.orientation.w);
+    actual_q.normalize();
+
+    double desired_roll = 0.0;
+    double desired_pitch = 0.0;
+    double desired_yaw = 0.0;
+    tf2::Matrix3x3(desired_q).getRPY(desired_roll, desired_pitch, desired_yaw);
+
+    double actual_roll = 0.0;
+    double actual_pitch = 0.0;
+    double actual_yaw = 0.0;
+    tf2::Matrix3x3(actual_q).getRPY(actual_roll, actual_pitch, actual_yaw);
+
+    const auto abs_roll_error =
+      std::abs(shortest_angle_distance(desired_roll, actual_roll));
+    const auto abs_pitch_error =
+      std::abs(shortest_angle_distance(desired_pitch, actual_pitch));
+    const auto abs_yaw_error =
+      std::abs(shortest_angle_distance(desired_yaw, actual_yaw));
+
+    if (
+      abs_roll_error <= orientation_constraint_x_tolerance_rad_ &&
+      abs_pitch_error <= orientation_constraint_y_tolerance_rad_ &&
+      abs_yaw_error <= orientation_constraint_z_tolerance_rad_)
+    {
+      return true;
+    }
+
+    RCLCPP_WARN(
+      this->get_logger(),
+      "End-effector orientation drift for link '%s': roll=%.3f pitch=%.3f yaw=%.3f rad",
+      target_link.c_str(),
+      abs_roll_error,
+      abs_pitch_error,
+      abs_yaw_error);
+    return false;
+  }
+
   bool plan_and_execute_arm(
     const geometry_msgs::msg::PoseStamped & target_pose,
     const std::string & ee_link,
-    bool use_cartesian)
+    bool use_cartesian,
+    bool require_orientation_match)
   {
+    const std::string target_link =
+      !ee_link.empty() ? ee_link : arm_move_group_->getEndEffectorLink();
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     if (use_cartesian) {
+      arm_move_group_->setStartStateToCurrentState();
+      const auto previous_pose_reference_frame = arm_move_group_->getPoseReferenceFrame();
+      const auto previous_end_effector_link = arm_move_group_->getEndEffectorLink();
+      const auto restore_move_group_context = [&]() {
+        arm_move_group_->setPoseReferenceFrame(previous_pose_reference_frame);
+        if (
+          !previous_end_effector_link.empty() &&
+          previous_end_effector_link != arm_move_group_->getEndEffectorLink())
+        {
+          arm_move_group_->setEndEffectorLink(previous_end_effector_link);
+        }
+      };
+
+      arm_move_group_->setPoseReferenceFrame(target_pose.header.frame_id);
+      if (!target_link.empty() && target_link != arm_move_group_->getEndEffectorLink()) {
+        if (!arm_move_group_->setEndEffectorLink(target_link)) {
+          RCLCPP_WARN(
+            this->get_logger(),
+            "Failed to set Cartesian end-effector link to '%s'.",
+            target_link.c_str());
+          restore_move_group_context();
+          return false;
+        }
+      }
+
       std::vector<geometry_msgs::msg::Pose> waypoints;
       waypoints.push_back(target_pose.pose);
 
       moveit_msgs::msg::RobotTrajectory robot_traj;
-      const double fraction = arm_move_group_->computeCartesianPath(
-        waypoints,
-        cartesian_eef_step_m_,
-        0.0,
-        robot_traj,
-        true);
-      if (fraction < cartesian_min_fraction_ || robot_traj.joint_trajectory.points.empty()) {
+      const bool use_orientation_constraint =
+        require_orientation_match && enforce_orientation_path_constraint_ && !target_link.empty();
+      const auto required_fraction = use_orientation_constraint ?
+        std::max(cartesian_min_fraction_, 0.999) : cartesian_min_fraction_;
+      const double fraction = use_orientation_constraint ?
+        arm_move_group_->computeCartesianPath(
+          waypoints,
+          cartesian_eef_step_m_,
+          0.0,
+          robot_traj,
+          make_orientation_constraints(target_pose, target_link),
+          true) :
+        arm_move_group_->computeCartesianPath(
+          waypoints,
+          cartesian_eef_step_m_,
+          0.0,
+          robot_traj,
+          true);
+      restore_move_group_context();
+      if (fraction < required_fraction || robot_traj.joint_trajectory.points.empty()) {
         RCLCPP_WARN(
           this->get_logger(),
           "Cartesian path fraction too low: %.3f < %.3f",
           fraction,
-          cartesian_min_fraction_);
+          required_fraction);
         return false;
       }
       plan.trajectory_ = robot_traj;
     } else {
       arm_move_group_->setStartStateToCurrentState();
-      const std::string target_link =
-        !ee_link.empty() ? ee_link : arm_move_group_->getEndEffectorLink();
       const auto plan_pose_target = [&](bool use_orientation_constraint) -> bool {
         bool path_constraints_set = false;
         bool position_target_set = false;
-        if (use_orientation_constraint && !target_link.empty()) {
-          moveit_msgs::msg::OrientationConstraint orientation_constraint;
-          orientation_constraint.header.frame_id = target_pose.header.frame_id;
-          orientation_constraint.link_name = target_link;
-          orientation_constraint.orientation = target_pose.pose.orientation;
-          orientation_constraint.absolute_x_axis_tolerance = orientation_constraint_x_tolerance_rad_;
-          orientation_constraint.absolute_y_axis_tolerance = orientation_constraint_y_tolerance_rad_;
-          orientation_constraint.absolute_z_axis_tolerance = orientation_constraint_z_tolerance_rad_;
-          orientation_constraint.weight = orientation_constraint_weight_;
 
-          moveit_msgs::msg::Constraints path_constraints;
-          path_constraints.orientation_constraints.push_back(orientation_constraint);
-          arm_move_group_->setPathConstraints(path_constraints);
+        if (use_orientation_constraint && !target_link.empty()) {
+          arm_move_group_->setPathConstraints(
+            make_orientation_constraints(target_pose, target_link));
           path_constraints_set = true;
+        }
+
+        arm_move_group_->setPoseReferenceFrame(target_pose.header.frame_id);
+        if (!ee_link.empty()) {
+          arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
+        } else {
+          arm_move_group_->setPoseTarget(target_pose.pose);
         }
 
         if (
@@ -418,23 +585,6 @@ private:
               "Failed to set constrained position target for link '%s'.",
               target_link.c_str());
           }
-        } else if (!ee_link.empty()) {
-          arm_move_group_->setPoseTarget(target_pose.pose, ee_link);
-        } else {
-          arm_move_group_->setPoseTarget(target_pose.pose);
-        }
-
-        if (
-          use_orientation_constraint &&
-          use_position_target_with_orientation_constraint_ &&
-          !position_target_set &&
-          !target_link.empty())
-        {
-          if (path_constraints_set) {
-            arm_move_group_->clearPathConstraints();
-          }
-          arm_move_group_->clearPoseTargets();
-          return false;
         }
 
         const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
@@ -442,26 +592,19 @@ private:
         if (path_constraints_set) {
           arm_move_group_->clearPathConstraints();
         }
+        if (use_orientation_constraint && !position_target_set && !target_link.empty()) {
+          return false;
+        }
         return ok;
       };
 
       const bool use_orientation_constraint =
+        require_orientation_match &&
         enforce_orientation_path_constraint_ &&
         enforce_orientation_path_constraint_on_pose_moves_ &&
         !target_link.empty();
-      bool ok = plan_pose_target(use_orientation_constraint);
-      if (
-        !ok && use_orientation_constraint &&
-        allow_orientation_constraint_fallback_ && !target_link.empty())
-      {
-        RCLCPP_WARN(
-          this->get_logger(),
-          "Pose planning with orientation constraint failed for link '%s'; retrying without path constraints.",
-          target_link.c_str());
-        arm_move_group_->setStartStateToCurrentState();
-        ok = plan_pose_target(false);
-      }
-      if (!ok) {
+
+      if (!plan_pose_target(use_orientation_constraint)) {
         return false;
       }
     }
@@ -469,7 +612,18 @@ private:
       publish_preview(plan);
       return true;
     }
-    return arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    const bool execute_ok =
+      arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    if (!execute_ok) {
+      return false;
+    }
+    if (!require_orientation_match || !verify_final_orientation_match_) {
+      return true;
+    }
+    if (orientation_check_settle_sec_ > 0.0) {
+      std::this_thread::sleep_for(std::chrono::duration<double>(orientation_check_settle_sec_));
+    }
+    return pose_is_within_orientation_tolerance(target_pose, target_link);
   }
 
   void publish_preview(const moveit::planning_interface::MoveGroupInterface::Plan & plan)
@@ -697,7 +851,13 @@ private:
       goal_handle->publish_feedback(feedback);
 
       const auto target_pose = transform_pose_to_planning_frame(goal->target_pose);
-      if (!plan_and_execute_arm(target_pose, goal->ee_link, goal->use_cartesian_approach)) {
+      if (
+        !plan_and_execute_arm(
+          target_pose,
+          goal->ee_link,
+          goal->use_cartesian_approach,
+          goal->require_orientation_match))
+      {
         result->success = false;
         result->message = "Failed to plan/execute arm pose";
         result->final_position_error_m = -1.0f;
@@ -757,6 +917,8 @@ private:
   double orientation_constraint_weight_;
   bool preview_only_;
   double preview_step_delay_sec_;
+  bool verify_final_orientation_match_;
+  double orientation_check_settle_sec_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
   std::vector<std::string> scan_center_joint_names_;
@@ -775,6 +937,10 @@ private:
   std::vector<double> post_place_joint_positions_;
   std::vector<std::string> pre_return_joint_names_;
   std::vector<double> pre_return_joint_positions_;
+  std::vector<std::string> lift_joint_names_;
+  std::vector<double> lift_joint_positions_;
+  std::vector<std::string> post_lift_joint_names_;
+  std::vector<double> post_lift_joint_positions_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;

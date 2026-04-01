@@ -96,6 +96,7 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         goal_msg.retreat_offset_m = 0.0
         goal_msg.gripper_close_position = -1.0
         goal_msg.use_cartesian_approach = False
+        goal_msg.require_orientation_match = False
         return goal_msg
 
     def _make_pose_goal(self, target_pose) -> PickArm.Goal:
@@ -106,6 +107,7 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         goal_msg.retreat_offset_m = 0.0
         goal_msg.gripper_close_position = -1.0
         goal_msg.use_cartesian_approach = False
+        goal_msg.require_orientation_match = False
 
         if isinstance(target_pose, PoseStamped):
             goal_msg.target_pose = target_pose
@@ -122,6 +124,9 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
             )
             goal_msg.use_cartesian_approach = bool(
                 target_pose.get("use_cartesian_approach", False)
+            )
+            goal_msg.require_orientation_match = bool(
+                target_pose.get("require_orientation_match", False)
             )
         return goal_msg
 
@@ -871,7 +876,8 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
     def __init__(
         self,
         bb=None,
-        pregrasp_offset_z_m: float = 0.15,
+        pregrasp_offset_x_m: float = -0.15,
+        pregrasp_offset_z_m: float = 0.0,
         grasp_offset_z_m: float = 0.0,
         lift_offset_z_m: float = 0.20,
         workspace_min_x: float = -0.50,
@@ -885,6 +891,7 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
     ):
         super().__init__("PrepareDetectedPickPoses")
         self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
+        self.pregrasp_offset_x_m = float(pregrasp_offset_x_m)
         self.pregrasp_offset_z_m = float(pregrasp_offset_z_m)
         self.grasp_offset_z_m = float(grasp_offset_z_m)
         self.lift_offset_z_m = float(lift_offset_z_m)
@@ -925,6 +932,11 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         max_z = self._config_float("viperx_workspace_max_z", self.workspace_max_z)
         return min(max(float(value), min_z), max_z)
 
+    def _clamp_x(self, value: float) -> float:
+        min_x = self._config_float("viperx_workspace_min_x", self.workspace_min_x)
+        max_x = self._config_float("viperx_workspace_max_x", self.workspace_max_x)
+        return min(max(float(value), min_x), max_x)
+
     def _within_workspace(self, x: float, y: float, z: float) -> bool:
         return (
             self._config_float("viperx_workspace_min_x", self.workspace_min_x)
@@ -942,13 +954,14 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
     def _copy_pose(
         detected_pose: dict,
         *,
+        x: float,
         z: float,
         use_cartesian_approach: bool,
         quat_xyzw: tuple[float, float, float, float],
     ) -> dict:
         pose = {
             "frame_id": str(detected_pose.get("frame_id", "vx300s/base_link")),
-            "x": float(detected_pose.get("x", 0.0)),
+            "x": float(x),
             "y": float(detected_pose.get("y", 0.0)),
             "z": float(z),
             "qx": float(quat_xyzw[0]),
@@ -1034,42 +1047,46 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         grasp_z = self._clamp_z(
             z + self._config_float("viperx_grasp_offset_z_m", self.grasp_offset_z_m)
         )
+        pregrasp_x = self._clamp_x(
+            self._config_float("viperx_pregrasp_target_x_m", 0.35)
+        )
         pregrasp_z = self._clamp_z(
             grasp_z + self._config_float("viperx_pregrasp_offset_z_m", self.pregrasp_offset_z_m)
-        )
-        lift_z = self._clamp_z(
-            grasp_z + self._config_float("viperx_lift_offset_z_m", self.lift_offset_z_m)
         )
         quat_xyzw = self._get_pick_orientation_xyzw()
 
         self.bb.pregrasp_pose = self._copy_pose(
             detected_pose,
+            x=pregrasp_x,
             z=pregrasp_z,
             use_cartesian_approach=False,
             quat_xyzw=quat_xyzw,
         )
         self.bb.pregrasp_pose["ee_link"] = self._resolve_ee_link()
+        self.bb.pregrasp_pose["require_orientation_match"] = True
         self.bb.grasp_pose = self._copy_pose(
             detected_pose,
+            x=x,
             z=grasp_z,
             use_cartesian_approach=True,
             quat_xyzw=quat_xyzw,
         )
         self.bb.grasp_pose["ee_link"] = self._resolve_ee_link()
+        self.bb.grasp_pose["require_orientation_match"] = True
         self.bb.grasp_pose["gripper_close_position"] = float(
             getattr(self.bb, "viperx_close_gripper_position", 0.0)
         )
-        self.bb.lift_pose = self._copy_pose(
-            detected_pose,
-            z=lift_z,
-            use_cartesian_approach=True,
-            quat_xyzw=quat_xyzw,
+        self.bb.lift_pose = deepcopy(
+            getattr(self.bb, "default_lift_pose", {"command": "lift_arm_pose"})
         )
-        self.bb.lift_pose["ee_link"] = self._resolve_ee_link()
+        self.bb.post_lift_pose = deepcopy(
+            getattr(self.bb, "default_post_lift_pose", {"command": "post_lift_arm_pose"})
+        )
 
         self.feedback_message = (
             "Prepared pick poses "
-            f"pregrasp_z={pregrasp_z:.3f} grasp_z={grasp_z:.3f} lift_z={lift_z:.3f}"
+            f"pregrasp_x={pregrasp_x:.3f} pregrasp_z={pregrasp_z:.3f} "
+            f"grasp_z={grasp_z:.3f} lift=lift_arm_pose post_lift=post_lift_arm_pose"
         )
         return py_trees.common.Status.SUCCESS
 

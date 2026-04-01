@@ -59,7 +59,12 @@ class SetCurrentItem(py_trees.behaviour.Behaviour):
         self.bb.detected_object_pose = None
         self.bb.pregrasp_pose = None
         self.bb.grasp_pose = None
-        self.bb.lift_pose = None
+        self.bb.lift_pose = deepcopy(
+            getattr(self.bb, "default_lift_pose", {"command": "lift_arm_pose"})
+        )
+        self.bb.post_lift_pose = deepcopy(
+            getattr(self.bb, "default_post_lift_pose", {"command": "post_lift_arm_pose"})
+        )
         self.bb.locked_pick_orientation_xyzw = None
 
         # Mirror the old monolithic picker:
