@@ -1,4 +1,5 @@
 import json
+import math
 import time
 from copy import deepcopy
 from typing import Optional
@@ -85,7 +86,8 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         )
         return pose_msg
 
-    def _make_command_goal(self, command: str) -> PickArm.Goal:
+    def _make_command_goal(self, target: dict) -> PickArm.Goal:
+        command = str(target.get("command", "")).strip()
         goal_msg = PickArm.Goal()
         goal_msg.target_pose.header.frame_id = _resolve_base_frame(self.bb)
         goal_msg.target_pose.header.stamp = self.node.get_clock().now().to_msg()
@@ -97,6 +99,7 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         goal_msg.gripper_close_position = -1.0
         goal_msg.use_cartesian_approach = False
         goal_msg.require_orientation_match = False
+        goal_msg.waist_delta_rad = float(target.get("waist_delta_rad", 0.0))
         return goal_msg
 
     def _make_pose_goal(self, target_pose) -> PickArm.Goal:
@@ -108,6 +111,7 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         goal_msg.gripper_close_position = -1.0
         goal_msg.use_cartesian_approach = False
         goal_msg.require_orientation_match = False
+        goal_msg.waist_delta_rad = 0.0
 
         if isinstance(target_pose, PoseStamped):
             goal_msg.target_pose = target_pose
@@ -151,7 +155,7 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
             return
 
         if self._is_command_target(target):
-            goal_msg = self._make_command_goal(target["command"])
+            goal_msg = self._make_command_goal(target)
         elif isinstance(target, PoseStamped) or self._is_pose_dict_target(target):
             goal_msg = self._make_pose_goal(target)
         else:
@@ -167,6 +171,39 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
         self.goal_handle = None
         self.result_future = None
         self.feedback_message = f"Sent ViperX goal from bb.{self.goal_key}"
+
+    def _send_recovery_scan_center(self) -> bool:
+        scan_center_target = getattr(self.bb, "scan_center_pose", {"command": "scan_center_arm_pose"})
+        if not self._is_command_target(scan_center_target):
+            scan_center_target = {"command": "scan_center_arm_pose"}
+
+        goal_msg = self._make_command_goal(scan_center_target)
+        goal_msg.target_pose.header.stamp = self.node.get_clock().now().to_msg()
+        recovery_future = self.client.send_goal_async(goal_msg)
+
+        while rclpy.ok():
+            rclpy.spin_once(self.node, timeout_sec=0.05)
+            if recovery_future.done():
+                break
+        if not recovery_future.done():
+            return False
+
+        recovery_goal_handle = recovery_future.result()
+        if recovery_goal_handle is None or not recovery_goal_handle.accepted:
+            return False
+
+        recovery_result_future = recovery_goal_handle.get_result_async()
+        while rclpy.ok():
+            rclpy.spin_once(self.node, timeout_sec=0.05)
+            if recovery_result_future.done():
+                break
+        if not recovery_result_future.done():
+            return False
+
+        wrapped = recovery_result_future.result()
+        if wrapped is None:
+            return False
+        return wrapped.status == GoalStatus.STATUS_SUCCEEDED
 
     def update(self):
         if self.send_future is None:
@@ -194,6 +231,15 @@ class RepositionViperXArm(py_trees.behaviour.Behaviour):
             result_msg = ""
             if getattr(wrapped, "result", None) is not None:
                 result_msg = str(getattr(wrapped.result, "message", "") or "")
+            if (
+                result_msg == "Pose exceeded orientation tolerance"
+                and self.goal_key != "scan_center_pose"
+                and self._send_recovery_scan_center()
+            ):
+                self.feedback_message = (
+                    "Pose exceeded tolerance; returned to scan middle position"
+                )
+                return py_trees.common.Status.FAILURE
             self.feedback_message = (
                 f"ViperX failed with status={wrapped.status}"
                 + (f": {result_msg}" if result_msg else "")
@@ -559,6 +605,7 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
                 "confidence": confidence,
                 "depth_m": depth_m,
                 "surface_distance_m": float(det.get("surface_distance_m", depth_m)),
+                "point_camera_optical_m": list(point_m),
                 "bbox": list(det.get("bbox", [])) if isinstance(det.get("bbox"), list) else [],
                 "center_px": list(det.get("center_px", [])) if isinstance(det.get("center_px"), list) else [],
                 "grasp_px": list(det.get("grasp_px", [])) if isinstance(det.get("grasp_px"), list) else [],
@@ -705,6 +752,7 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
             "surface_distance_m": float(best_detection.get("surface_distance_m", best_detection["depth_m"])),
             "frame_id": self._target_frame(),
             "source_frame": camera_frame,
+            "point_camera_optical_m": list(best_detection.get("point_camera_optical_m", [])),
             "class_name": str(best_detection["class_name"]),
             "confidence": float(best_detection["confidence"]),
             "bbox": list(best_detection.get("bbox", [])),
@@ -756,6 +804,70 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
         self.stable_xyz_samples = []
         self.stable_count = 0
         self.search_start_time = None
+
+
+class PrepareWaistCenteringGoal(py_trees.behaviour.Behaviour):
+    """
+    Convert the current camera-space detection offset into a waist-only joint move.
+
+    The detected target already contains a 3D point in the camera optical frame.
+    We use atan2(x, z) as the horizontal pointing error and turn that into a
+    bounded waist delta so the next detection is closer to the image center.
+    """
+
+    def __init__(self, bb=None):
+        super().__init__("PrepareWaistCenteringGoal")
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
+
+    @staticmethod
+    def _clamp(value: float, limit: float) -> float:
+        if limit <= 0.0:
+            return 0.0
+        return max(-limit, min(limit, value))
+
+    def update(self):
+        default_goal = {"command": "waist_delta_arm_pose", "waist_delta_rad": 0.0}
+        self.bb.waist_center_pose = default_goal
+
+        if not bool(getattr(self.bb, "viperx_waist_centering_enabled", True)):
+            self.feedback_message = "Waist centering disabled"
+            return py_trees.common.Status.SUCCESS
+
+        detected = getattr(self.bb, "detected_object_pose", None)
+        if not isinstance(detected, dict):
+            self.feedback_message = "No detected target available for waist centering"
+            return py_trees.common.Status.FAILURE
+
+        point_camera_optical_m = detected.get("point_camera_optical_m", [])
+        if not isinstance(point_camera_optical_m, list) or len(point_camera_optical_m) != 3:
+            self.feedback_message = "Detection has no camera-space point for waist centering"
+            return py_trees.common.Status.FAILURE
+
+        camera_x = float(point_camera_optical_m[0])
+        camera_z = float(point_camera_optical_m[2])
+        if camera_z <= 1e-6:
+            self.feedback_message = "Detection camera-space depth is invalid for waist centering"
+            return py_trees.common.Status.FAILURE
+
+        error_rad = math.atan2(camera_x, camera_z)
+        gain = float(getattr(self.bb, "viperx_waist_centering_gain", 1.0))
+        sign = float(getattr(self.bb, "viperx_waist_centering_sign", -1.0))
+        min_error_rad = float(getattr(self.bb, "viperx_waist_centering_min_error_rad", 0.04))
+        max_delta_rad = float(getattr(self.bb, "viperx_waist_centering_max_delta_rad", 0.35))
+
+        delta_rad = self._clamp(sign * gain * error_rad, max_delta_rad)
+        if abs(error_rad) < min_error_rad:
+            delta_rad = 0.0
+
+        self.bb.waist_center_pose = {
+            "command": "waist_delta_arm_pose",
+            "waist_delta_rad": float(delta_rad),
+        }
+        self.feedback_message = (
+            f"Prepared waist centering delta={delta_rad:.3f}rad "
+            f"from camera error={error_rad:.3f}rad"
+        )
+        return py_trees.common.Status.SUCCESS
 
 
 class LockCurrentViperXOrientation(py_trees.behaviour.Behaviour):
@@ -1053,6 +1165,9 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         pregrasp_z = self._clamp_z(
             grasp_z + self._config_float("viperx_pregrasp_offset_z_m", self.pregrasp_offset_z_m)
         )
+        post_grasp_lift_z = self._clamp_z(
+            grasp_z + self._config_float("viperx_post_grasp_lift_offset_z_m", 0.10)
+        )
         quat_xyzw = self._get_pick_orientation_xyzw()
 
         self.bb.pregrasp_pose = self._copy_pose(
@@ -1076,6 +1191,15 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         self.bb.grasp_pose["gripper_close_position"] = float(
             getattr(self.bb, "viperx_close_gripper_position", 0.0)
         )
+        self.bb.post_grasp_lift_pose = self._copy_pose(
+            detected_pose,
+            x=x,
+            z=post_grasp_lift_z,
+            use_cartesian_approach=True,
+            quat_xyzw=quat_xyzw,
+        )
+        self.bb.post_grasp_lift_pose["ee_link"] = self._resolve_ee_link()
+        self.bb.post_grasp_lift_pose["require_orientation_match"] = True
         self.bb.lift_pose = deepcopy(
             getattr(self.bb, "default_lift_pose", {"command": "lift_arm_pose"})
         )
@@ -1086,7 +1210,8 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         self.feedback_message = (
             "Prepared pick poses "
             f"pregrasp_x={pregrasp_x:.3f} pregrasp_z={pregrasp_z:.3f} "
-            f"grasp_z={grasp_z:.3f} lift=lift_arm_pose post_lift=post_lift_arm_pose"
+            f"grasp_z={grasp_z:.3f} post_grasp_lift_z={post_grasp_lift_z:.3f} "
+            f"lift=lift_arm_pose post_lift=post_lift_arm_pose"
         )
         return py_trees.common.Status.SUCCESS
 

@@ -11,13 +11,13 @@ viperx_arm_server:
     enforce_orientation_path_constraint_on_pose_moves: false
     use_position_target_with_orientation_constraint: true
     allow_orientation_constraint_fallback: false
-    orientation_constraint_x_tolerance_rad: 0.12
-    orientation_constraint_y_tolerance_rad: 0.12
-    orientation_constraint_z_tolerance_rad: 1.57
+    orientation_constraint_x_tolerance_rad: 0.20
+    orientation_constraint_y_tolerance_rad: 0.20
+    orientation_constraint_z_tolerance_rad: 0.20
     orientation_constraint_weight: 1.0
     preview_only: false
     preview_step_delay_sec: 1.0
-    verify_final_orientation_match: false
+    verify_final_orientation_match: true
     orientation_check_settle_sec: 0.15
 
     # Fallback values used if named targets are not available in the SRDF.

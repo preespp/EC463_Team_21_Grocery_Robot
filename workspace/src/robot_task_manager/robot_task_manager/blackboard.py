@@ -37,6 +37,7 @@ def reset_viperx_manipulation_state(bb):
     bb.detected_object_pose = None
     bb.pregrasp_pose = None
     bb.grasp_pose = None
+    bb.post_grasp_lift_pose = None
     bb.lift_pose = deepcopy(
         getattr(bb, "default_lift_pose", _make_command_target("lift_arm_pose"))
     )
@@ -44,6 +45,7 @@ def reset_viperx_manipulation_state(bb):
         getattr(bb, "default_post_lift_pose", _make_command_target("post_lift_arm_pose"))
     )
     bb.locked_pick_orientation_xyzw = None
+    bb.waist_center_pose = _make_command_target("waist_delta_arm_pose")
     bb.basket_bottle_count = 0
 
 
@@ -76,6 +78,7 @@ def setup_blackboard():
     bb.viperx_pregrasp_offset_x_m = -0.15
     bb.viperx_pregrasp_offset_z_m = 0.0
     bb.viperx_grasp_offset_z_m = 0.00
+    bb.viperx_post_grasp_lift_offset_z_m = 0.10
     bb.viperx_lift_offset_z_m = 0.20
     bb.viperx_search_timeout_sec = 3.0
     bb.viperx_workspace_min_x = -0.50
@@ -87,6 +90,12 @@ def setup_blackboard():
     bb.viperx_target_stability_count = 4
     bb.viperx_target_match_distance_m = 0.03
     bb.viperx_cooldown_sec = 3.0
+    bb.viperx_grasp_retry_attempts = 5
+    bb.viperx_waist_centering_enabled = True
+    bb.viperx_waist_centering_gain = 1.0
+    bb.viperx_waist_centering_sign = -1.0
+    bb.viperx_waist_centering_min_error_rad = 0.04
+    bb.viperx_waist_centering_max_delta_rad = 0.35
     bb.scan_center_pose = _make_command_target("scan_center_arm_pose")
     bb.scan_left_pose = _make_command_target("scan_left_arm_pose")
     bb.scan_right_pose = _make_command_target("scan_right_arm_pose")

@@ -216,6 +216,11 @@ private:
       command == "pre_return_arm_pose";
   }
 
+  static bool is_waist_delta_command(const std::string & command)
+  {
+    return command == "waist_delta_arm_pose";
+  }
+
   static bool is_pose_goal_command(const std::string & command)
   {
     return command.empty() || command == "arm";
@@ -359,7 +364,10 @@ private:
     }
 
     const auto command = goal->planning_group;
-    if (is_gripper_command(command) || is_named_arm_command(command)) {
+    if (
+      is_gripper_command(command) || is_named_arm_command(command) ||
+      is_waist_delta_command(command))
+    {
       return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
@@ -483,12 +491,21 @@ private:
     return false;
   }
 
+  double pose_goal_orientation_tolerance_rad() const
+  {
+    return std::min(
+      {std::max(0.0, orientation_constraint_x_tolerance_rad_),
+        std::max(0.0, orientation_constraint_y_tolerance_rad_),
+        std::max(0.0, orientation_constraint_z_tolerance_rad_)});
+  }
+
   bool plan_and_execute_arm(
     const geometry_msgs::msg::PoseStamped & target_pose,
     const std::string & ee_link,
     bool use_cartesian,
     bool require_orientation_match)
   {
+    last_arm_failure_reason_.clear();
     const std::string target_link =
       !ee_link.empty() ? ee_link : arm_move_group_->getEndEffectorLink();
     moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -513,6 +530,7 @@ private:
             this->get_logger(),
             "Failed to set Cartesian end-effector link to '%s'.",
             target_link.c_str());
+          last_arm_failure_reason_ = "Failed to set Cartesian end-effector link";
           restore_move_group_context();
           return false;
         }
@@ -547,6 +565,7 @@ private:
           "Cartesian path fraction too low: %.3f < %.3f",
           fraction,
           required_fraction);
+        last_arm_failure_reason_ = "Failed to plan Cartesian arm pose";
         return false;
       }
       plan.trajectory_ = robot_traj;
@@ -555,6 +574,30 @@ private:
       const auto plan_pose_target = [&](bool use_orientation_constraint) -> bool {
         bool path_constraints_set = false;
         bool position_target_set = false;
+        const bool use_goal_orientation_tolerance =
+          require_orientation_match && !use_orientation_constraint;
+        const double previous_goal_orientation_tolerance =
+          arm_move_group_->getGoalOrientationTolerance();
+        const double goal_orientation_tolerance =
+          pose_goal_orientation_tolerance_rad();
+
+        if (use_goal_orientation_tolerance) {
+          arm_move_group_->setGoalOrientationTolerance(goal_orientation_tolerance);
+          if (
+            std::abs(orientation_constraint_x_tolerance_rad_ - goal_orientation_tolerance) > 1e-9 ||
+            std::abs(orientation_constraint_y_tolerance_rad_ - goal_orientation_tolerance) > 1e-9 ||
+            std::abs(orientation_constraint_z_tolerance_rad_ - goal_orientation_tolerance) > 1e-9)
+          {
+            RCLCPP_INFO(
+              this->get_logger(),
+              "Using goal-only orientation tolerance %.3f rad for pose planning "
+              "(MoveIt goal tolerance is shared across roll/pitch/yaw; configured x=%.3f y=%.3f z=%.3f).",
+              goal_orientation_tolerance,
+              orientation_constraint_x_tolerance_rad_,
+              orientation_constraint_y_tolerance_rad_,
+              orientation_constraint_z_tolerance_rad_);
+          }
+        }
 
         if (use_orientation_constraint && !target_link.empty()) {
           arm_move_group_->setPathConstraints(
@@ -589,10 +632,14 @@ private:
 
         const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
         arm_move_group_->clearPoseTargets();
+        if (use_goal_orientation_tolerance) {
+          arm_move_group_->setGoalOrientationTolerance(previous_goal_orientation_tolerance);
+        }
         if (path_constraints_set) {
           arm_move_group_->clearPathConstraints();
         }
         if (use_orientation_constraint && !position_target_set && !target_link.empty()) {
+          last_arm_failure_reason_ = "Failed to set constrained position target";
           return false;
         }
         return ok;
@@ -605,6 +652,9 @@ private:
         !target_link.empty();
 
       if (!plan_pose_target(use_orientation_constraint)) {
+        if (last_arm_failure_reason_.empty()) {
+          last_arm_failure_reason_ = "Failed to plan arm pose";
+        }
         return false;
       }
     }
@@ -615,6 +665,7 @@ private:
     const bool execute_ok =
       arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!execute_ok) {
+      last_arm_failure_reason_ = "Failed to execute arm pose";
       return false;
     }
     if (!require_orientation_match || !verify_final_orientation_match_) {
@@ -623,7 +674,11 @@ private:
     if (orientation_check_settle_sec_ > 0.0) {
       std::this_thread::sleep_for(std::chrono::duration<double>(orientation_check_settle_sec_));
     }
-    return pose_is_within_orientation_tolerance(target_pose, target_link);
+    if (!pose_is_within_orientation_tolerance(target_pose, target_link)) {
+      last_arm_failure_reason_ = "Pose exceeded orientation tolerance";
+      return false;
+    }
+    return true;
   }
 
   void publish_preview(const moveit::planning_interface::MoveGroupInterface::Plan & plan)
@@ -770,6 +825,62 @@ private:
     return arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
   }
 
+  bool execute_waist_delta(double delta_rad)
+  {
+    if (std::abs(delta_rad) < 1e-6) {
+      RCLCPP_INFO(this->get_logger(), "Waist centering delta is near zero; skipping motion.");
+      return true;
+    }
+
+    arm_move_group_->setStartStateToCurrentState();
+
+    const auto joint_names = arm_move_group_->getActiveJoints();
+    const auto joint_values = arm_move_group_->getCurrentJointValues();
+    if (joint_names.empty() || joint_names.size() != joint_values.size()) {
+      RCLCPP_WARN(this->get_logger(), "Unable to read current arm joints for waist-only move.");
+      return false;
+    }
+
+    std::map<std::string, double> joint_targets;
+    bool found_waist = false;
+    for (size_t i = 0; i < joint_names.size(); ++i) {
+      double target_value = joint_values[i];
+      if (joint_names[i].find("waist") != std::string::npos) {
+        target_value += delta_rad;
+        found_waist = true;
+      }
+      joint_targets[joint_names[i]] = target_value;
+    }
+
+    if (!found_waist) {
+      RCLCPP_WARN(this->get_logger(), "Active arm joints do not contain a waist joint.");
+      return false;
+    }
+
+    if (!arm_move_group_->setJointValueTarget(joint_targets)) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to set waist-only arm target (delta=%.3f rad).",
+        delta_rad);
+      return false;
+    }
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    if (!ok) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to plan waist-only arm target (delta=%.3f rad).",
+        delta_rad);
+      return false;
+    }
+    if (preview_only_) {
+      publish_preview(plan);
+      return true;
+    }
+    return arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+  }
+
   void execute(const std::shared_ptr<GoalHandlePickArm> goal_handle)
   {
     auto result = std::make_shared<PickArm::Result>();
@@ -837,6 +948,29 @@ private:
         return;
       }
 
+      if (is_waist_delta_command(command)) {
+        feedback->stage = command;
+        feedback->position_error_m = 0.0f;
+        goal_handle->publish_feedback(feedback);
+
+        if (!execute_waist_delta(static_cast<double>(goal->waist_delta_rad))) {
+          result->success = false;
+          result->message = "Failed to execute waist-only arm move";
+          result->final_position_error_m = -1.0f;
+          goal_handle->abort(result);
+          goal_active_.store(false);
+          return;
+        }
+
+        result->success = true;
+        result->message = "Waist-only arm move complete";
+        result->final_position_error_m = 0.0f;
+        maybe_preview_delay();
+        goal_handle->succeed(result);
+        goal_active_.store(false);
+        return;
+      }
+
       if (!is_pose_goal_command(command)) {
         result->success = false;
         result->message = "Unsupported planning_group";
@@ -859,7 +993,8 @@ private:
           goal->require_orientation_match))
       {
         result->success = false;
-        result->message = "Failed to plan/execute arm pose";
+        result->message = last_arm_failure_reason_.empty() ?
+          "Failed to plan/execute arm pose" : last_arm_failure_reason_;
         result->final_position_error_m = -1.0f;
         goal_handle->abort(result);
         goal_active_.store(false);
@@ -919,6 +1054,7 @@ private:
   double preview_step_delay_sec_;
   bool verify_final_orientation_match_;
   double orientation_check_settle_sec_;
+  std::string last_arm_failure_reason_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
   std::vector<std::string> scan_center_joint_names_;

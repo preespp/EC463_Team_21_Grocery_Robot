@@ -10,6 +10,7 @@ from .rack_nodes import RepositionRackToGoalLevel
 from .viperx_nodes import (
     RepositionViperXArm,
     VerifyViperXPosition,
+    PrepareWaistCenteringGoal,
     LockCurrentViperXOrientation,
     PrepareDetectedPickPoses,
     MoveViperXGripper,
