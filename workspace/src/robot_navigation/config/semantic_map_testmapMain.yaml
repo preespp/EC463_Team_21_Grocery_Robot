@@ -13,37 +13,37 @@ anchors:
   - id: drinks_anchor
     label: Drinks Approach
     type: approach
-    x: 1.762289
-    y: 0.1618
+    x: 4.660038
+    y: -1.749387
     yaw: 0.0
   - id: fruits_anchor
     label: Fruits Approach
     type: approach
-    x: 4.282289
-    y: 3.5818
-    yaw: 0.0
+    x: 2.634634
+    y: 0.360763
+    yaw: 1.562469
   - id: snacks_anchor
     label: Snacks Approach
     type: approach
-    x: 4.642289
-    y: -3.7982
-    yaw: 0.0
+    x: 5.593001
+    y: 0.146722
+    yaw: 1.472903
 
 racks:
   - id: drinks_rack
     label: Drinks Rack
     anchor_id: drinks_anchor
-    x: 1.762289
-    y: 0.1618
-    yaw: 0.0
+    x: 5.169843
+    y: -1.749387
+    yaw: -1.597196
     width: 0.45
     depth: 0.25
     levels: 2
   - id: fruits_rack
     label: Fruits Rack
     anchor_id: fruits_anchor
-    x: 4.282289
-    y: 3.5818
+    x: 2.668063
+    y: 0.89564
     yaw: 0.0
     width: 0.45
     depth: 0.25
@@ -51,9 +51,9 @@ racks:
   - id: snacks_rack
     label: Snacks Rack
     anchor_id: snacks_anchor
-    x: 4.642289
-    y: -3.7982
-    yaw: 0.0
+    x: 5.69329
+    y: 0.61474
+    yaw: -0.096762
     width: 0.45
     depth: 0.25
     levels: 3
@@ -67,12 +67,12 @@ slots:
     product_ids: ["1"]
     product_names: ["Milk"]
     nav_pose:
-      x: 3.4
-      y: 0.119
+      x: 5.177849
+      y: -1.909191
       yaw: 0.0
     service_pose:
-      x: 3.4
-      y: 0.119
+      x: 5.177849
+      y: -1.909191
       z: 0.55
       yaw: 0.0
   - id: drinks_water_slot
@@ -83,12 +83,12 @@ slots:
     product_ids: ["2"]
     product_names: ["Water"]
     nav_pose:
-      x: 1.762289
-      y: 0.1618
+      x: 5.186558
+      y: -1.682527
       yaw: 0.0
     service_pose:
-      x: 1.762289
-      y: 0.1618
+      x: 5.186558
+      y: -1.682527
       z: 0.95
       yaw: 0.0
   - id: fruits_apple_slot
@@ -99,14 +99,14 @@ slots:
     product_ids: ["3"]
     product_names: ["Apple"]
     nav_pose:
-      x: 4.282289
-      y: 3.5818
-      yaw: 0.0
+      x: 2.760906
+      y: 0.894713
+      yaw: 1.590194
     service_pose:
-      x: 4.282289
-      y: 3.5818
+      x: 2.760906
+      y: 0.894713
       z: 0.95
-      yaw: 0.0
+      yaw: 1.590194
   - id: fruits_orange_slot
     label: Orange Slot
     rack_id: fruits_rack
@@ -115,12 +115,12 @@ slots:
     product_ids: ["4"]
     product_names: ["Orange"]
     nav_pose:
-      x: 4.282289
-      y: 3.5818
+      x: 2.550116
+      y: 0.885422
       yaw: 0.0
     service_pose:
-      x: 4.282289
-      y: 3.5818
+      x: 2.550116
+      y: 0.885422
       z: 0.55
       yaw: 0.0
   - id: snacks_rays_slot
@@ -131,12 +131,12 @@ slots:
     product_ids: ["5"]
     product_names: ["Rays"]
     nav_pose:
-      x: 5.063
-      y: -1.148
+      x: 5.625196
+      y: 0.593373
       yaw: 0.0
     service_pose:
-      x: 5.063
-      y: -1.148
+      x: 5.625196
+      y: 0.593373
       z: 0.55
       yaw: 0.0
   - id: snacks_ruffles_slot
@@ -147,12 +147,12 @@ slots:
     product_ids: ["6"]
     product_names: ["Ruffles"]
     nav_pose:
-      x: 4.642289
-      y: -3.7982
+      x: 5.467639
+      y: 0.61474
       yaw: 0.0
     service_pose:
-      x: 4.642289
-      y: -3.7982
+      x: 5.467639
+      y: 0.61474
       z: 0.95
       yaw: 0.0
   - id: snacks_cheetos_slot
@@ -163,11 +163,11 @@ slots:
     product_ids: ["7"]
     product_names: ["Cheetos"]
     nav_pose:
-      x: 4.642289
-      y: -3.7982
+      x: 5.79358
+      y: 0.572953
       yaw: 0.0
     service_pose:
-      x: 4.642289
-      y: -3.7982
+      x: 5.79358
+      y: 0.572953
       z: 1.35
       yaw: 0.0
