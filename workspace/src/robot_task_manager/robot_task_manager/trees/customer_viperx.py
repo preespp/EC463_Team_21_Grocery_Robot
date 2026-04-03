@@ -108,9 +108,10 @@ def create_customer_viperx_tree(bb):
         "PlaceInBasket",
         memory=True,
         children=[
-            bt_nodes.SelectBasketSlot(bb=bb),  # Select basket slot based on item type
+            bt_nodes.SelectBasketSlot(bb=bb),  # Select the next free basket slot
             bt_nodes.RepositionViperXArm(goal_key="basket_pose", bb=bb),  # Move to basket position
             bt_nodes.MoveViperXGripper(command="open", bb=bb),  # Release item
+            bt_nodes.MarkBasketSlotOccupied(bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="post_place_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="pre_return_pose", bb=bb),
         ],

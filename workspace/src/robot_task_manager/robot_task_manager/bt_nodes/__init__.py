@@ -15,6 +15,7 @@ from .viperx_nodes import (
     PrepareDetectedPickPoses,
     MoveViperXGripper,
     SelectBasketSlot,
+    MarkBasketSlotOccupied,
     MoveToDetectedPose,
 )
 from .inventory_nodes import ChangeInventory

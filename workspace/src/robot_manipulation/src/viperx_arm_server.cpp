@@ -127,7 +127,22 @@ public:
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     place_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "place_joint_positions",
-      std::vector<double>{1.81514242, -0.40142573, 1.51843645, 0.08726646, -1.13446401, -0.03490659});
+      std::vector<double>{2.63544717, -0.43633231, 1.22173048, 1.23918377, -1.25663706, -0.76794487});
+    place_2_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_2_joint_positions",
+      std::vector<double>{3.14159265, -0.50614548, 1.25663706, 1.58824962, -1.60570291, -0.83775804});
+    place_3_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_3_joint_positions",
+      std::vector<double>{1.76278254, -1.01229097, 1.43116999, 0.40142573, -0.45378561, -0.38397244});
+    place_4_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_4_joint_positions",
+      std::vector<double>{3.05432619, -1.34390352, 1.48352986, 1.57079633, -1.51843645, -1.44862328});
+    place_5_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_5_joint_positions",
+      std::vector<double>{0.57595865, -0.68067841, 1.32645023, -1.22173048, -1.13446401, 0.82030475});
+    place_6_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_6_joint_positions",
+      std::vector<double>{-0.27925268, -0.75049158, 1.34390352, -1.74532925, -1.79768913, 0.90757121});
     post_place_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "post_place_joint_names",
       std::vector<std::string>{
@@ -212,7 +227,10 @@ private:
       command == "scan_right_arm_pose" ||
       command == "startup_arm_pose" || command == "return_arm_pose" ||
       command == "lift_arm_pose" || command == "post_lift_arm_pose" ||
-      command == "place_arm_pose" || command == "post_place_arm_pose" ||
+      command == "place_arm_pose" || command == "place_arm_pose_1" ||
+      command == "place_arm_pose_2" || command == "place_arm_pose_3" ||
+      command == "place_arm_pose_4" || command == "place_arm_pose_5" ||
+      command == "place_arm_pose_6" || command == "post_place_arm_pose" ||
       command == "pre_return_arm_pose";
   }
 
@@ -246,7 +264,12 @@ private:
     if (command == "post_lift_arm_pose") {
       return post_lift_joint_names_;
     }
-    if (command == "place_arm_pose") {
+    if (
+      command == "place_arm_pose" || command == "place_arm_pose_1" ||
+      command == "place_arm_pose_2" || command == "place_arm_pose_3" ||
+      command == "place_arm_pose_4" || command == "place_arm_pose_5" ||
+      command == "place_arm_pose_6")
+    {
       return place_joint_names_;
     }
     if (command == "post_place_arm_pose") {
@@ -278,8 +301,23 @@ private:
     if (command == "post_lift_arm_pose") {
       return post_lift_joint_positions_;
     }
-    if (command == "place_arm_pose") {
+    if (command == "place_arm_pose" || command == "place_arm_pose_1") {
       return place_joint_positions_;
+    }
+    if (command == "place_arm_pose_2") {
+      return place_2_joint_positions_;
+    }
+    if (command == "place_arm_pose_3") {
+      return place_3_joint_positions_;
+    }
+    if (command == "place_arm_pose_4") {
+      return place_4_joint_positions_;
+    }
+    if (command == "place_arm_pose_5") {
+      return place_5_joint_positions_;
+    }
+    if (command == "place_arm_pose_6") {
+      return place_6_joint_positions_;
     }
     if (command == "post_place_arm_pose") {
       return post_place_joint_positions_;
@@ -310,8 +348,23 @@ private:
     if (command == "post_lift_arm_pose") {
       return "Failed to execute configured post-lift arm pose";
     }
-    if (command == "place_arm_pose") {
-      return "Failed to execute configured place arm pose";
+    if (command == "place_arm_pose" || command == "place_arm_pose_1") {
+      return "Failed to execute configured basket 1 place arm pose";
+    }
+    if (command == "place_arm_pose_2") {
+      return "Failed to execute configured basket 2 place arm pose";
+    }
+    if (command == "place_arm_pose_3") {
+      return "Failed to execute configured basket 3 place arm pose";
+    }
+    if (command == "place_arm_pose_4") {
+      return "Failed to execute configured basket 4 place arm pose";
+    }
+    if (command == "place_arm_pose_5") {
+      return "Failed to execute configured basket 5 place arm pose";
+    }
+    if (command == "place_arm_pose_6") {
+      return "Failed to execute configured basket 6 place arm pose";
     }
     if (command == "post_place_arm_pose") {
       return "Failed to execute configured post-place arm pose";
@@ -342,8 +395,23 @@ private:
     if (command == "post_lift_arm_pose") {
       return "Post-lift arm pose complete";
     }
-    if (command == "place_arm_pose") {
-      return "Place arm pose complete";
+    if (command == "place_arm_pose" || command == "place_arm_pose_1") {
+      return "Basket 1 place arm pose complete";
+    }
+    if (command == "place_arm_pose_2") {
+      return "Basket 2 place arm pose complete";
+    }
+    if (command == "place_arm_pose_3") {
+      return "Basket 3 place arm pose complete";
+    }
+    if (command == "place_arm_pose_4") {
+      return "Basket 4 place arm pose complete";
+    }
+    if (command == "place_arm_pose_5") {
+      return "Basket 5 place arm pose complete";
+    }
+    if (command == "place_arm_pose_6") {
+      return "Basket 6 place arm pose complete";
     }
     if (command == "post_place_arm_pose") {
       return "Post-place arm pose complete";
@@ -1069,6 +1137,11 @@ private:
   std::vector<double> return_joint_positions_;
   std::vector<std::string> place_joint_names_;
   std::vector<double> place_joint_positions_;
+  std::vector<double> place_2_joint_positions_;
+  std::vector<double> place_3_joint_positions_;
+  std::vector<double> place_4_joint_positions_;
+  std::vector<double> place_5_joint_positions_;
+  std::vector<double> place_6_joint_positions_;
   std::vector<std::string> post_place_joint_names_;
   std::vector<double> post_place_joint_positions_;
   std::vector<std::string> pre_return_joint_names_;

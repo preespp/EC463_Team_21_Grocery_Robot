@@ -1098,6 +1098,47 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
             return ee_link
         return self._resolve_orientation_frame()
 
+    @staticmethod
+    def _normalize_item_name(name: str) -> str:
+        normalized = " ".join(str(name).lower().strip().split())
+        aliases = {
+            "chips": "bag of chips",
+            "chip": "bag of chips",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _resolve_gripper_close_position(self) -> float:
+        default_close = float(getattr(self.bb, "viperx_close_gripper_position", 0.0))
+        close_positions = getattr(self.bb, "viperx_close_gripper_positions", {})
+        if not isinstance(close_positions, dict):
+            return default_close
+
+        current_item = getattr(self.bb, "current_item", None)
+        item_name = self._normalize_item_name(getattr(current_item, "name", ""))
+        if not item_name:
+            return default_close
+
+        value = close_positions.get(item_name)
+        if value is None:
+            return default_close
+        return float(value)
+
+    def _resolve_grasp_offset_z(self) -> float:
+        default_offset = self._config_float("viperx_grasp_offset_z_m", self.grasp_offset_z_m)
+        offsets_by_item = getattr(self.bb, "viperx_grasp_offset_z_by_item_m", {})
+        if not isinstance(offsets_by_item, dict):
+            return default_offset
+
+        current_item = getattr(self.bb, "current_item", None)
+        item_name = self._normalize_item_name(getattr(current_item, "name", ""))
+        if not item_name:
+            return default_offset
+
+        value = offsets_by_item.get(item_name)
+        if value is None:
+            return default_offset
+        return float(value)
+
     def _get_pick_orientation_xyzw(self) -> tuple[float, float, float, float]:
         configured = getattr(self.bb, "viperx_fixed_pick_orientation_xyzw", None)
         if (
@@ -1158,8 +1199,10 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
             )
             return py_trees.common.Status.FAILURE
 
-        grasp_z = self._clamp_z(
-            z + self._config_float("viperx_grasp_offset_z_m", self.grasp_offset_z_m)
+        grasp_offset_z = self._resolve_grasp_offset_z()
+        grasp_z = self._clamp_z(z + grasp_offset_z)
+        grasp_x = self._clamp_x(
+            x + self._config_float("viperx_grasp_offset_x_m", 0.02)
         )
         pregrasp_x = self._clamp_x(
             self._config_float("viperx_pregrasp_target_x_m", 0.35)
@@ -1183,16 +1226,15 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         self.bb.pregrasp_pose["require_orientation_match"] = True
         self.bb.grasp_pose = self._copy_pose(
             detected_pose,
-            x=x,
+            x=grasp_x,
             z=grasp_z,
             use_cartesian_approach=True,
             quat_xyzw=quat_xyzw,
         )
         self.bb.grasp_pose["ee_link"] = self._resolve_ee_link()
         self.bb.grasp_pose["require_orientation_match"] = True
-        self.bb.grasp_pose["gripper_close_position"] = float(
-            getattr(self.bb, "viperx_close_gripper_position", 0.0)
-        )
+        close_position = self._resolve_gripper_close_position()
+        self.bb.grasp_pose["gripper_close_position"] = close_position
         self.bb.post_grasp_lift_pose = self._copy_pose(
             detected_pose,
             x=x,
@@ -1210,7 +1252,9 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         self.feedback_message = (
             "Prepared pick poses "
             f"pregrasp_x={pregrasp_x:.3f} pregrasp_z={pregrasp_z:.3f} "
-            f"grasp_z={grasp_z:.3f} post_grasp_lift_z={post_grasp_lift_z:.3f} "
+            f"grasp_x={grasp_x:.3f} grasp_z={grasp_z:.3f} "
+            f"post_grasp_lift_z={post_grasp_lift_z:.3f} "
+            f"close={close_position:.3f} grasp_offset_z={grasp_offset_z:.3f} "
             "post_lift=post_lift_arm_pose"
         )
         return py_trees.common.Status.SUCCESS
@@ -1333,12 +1377,11 @@ class MoveViperXGripper(py_trees.behaviour.Behaviour):
 
 class SelectBasketSlot(py_trees.behaviour.Behaviour):
     """
-    Selects the appropriate basket slot based on item type and bottle count.
-    
-    For bottles: Uses slots 0, 1, 2 (one per bottle) - increments bb.basket_bottle_count
-    For non-bottles: Uses slot 3 (random items slot)
-    
-    Sets bb.basket_pose to the selected basket pose from bb.basket_poses.
+    Selects the next available basket slot in sequential order.
+
+    This writes bb.basket_pose for the immediate place motion and stores the
+    currently selected slot index so a later node can mark it occupied only
+    after the item is actually released.
     """
 
     def __init__(self, bb=None):
@@ -1346,28 +1389,18 @@ class SelectBasketSlot(py_trees.behaviour.Behaviour):
         self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
 
     def update(self):
-        current_item = getattr(self.bb, "current_item", None)
-        if current_item is None:
-            self.feedback_message = "No current item set"
+        basket_poses = getattr(self.bb, "basket_poses", [])
+        next_slot = int(getattr(self.bb, "basket_next_slot_index", 0))
+
+        if not basket_poses:
+            self.feedback_message = "No basket poses configured"
             return py_trees.common.Status.FAILURE
 
-        # Get item type/name to determine if it's a bottle
-        item_name = str(getattr(current_item, "name", "")).lower()
-        is_bottle = "bottle" in item_name or "water" in item_name
+        if next_slot >= len(basket_poses):
+            self.feedback_message = f"All {len(basket_poses)} basket slots are already occupied"
+            return py_trees.common.Status.FAILURE
 
-        basket_poses = getattr(self.bb, "basket_poses", [None, None, None, None])
-        bottle_count = getattr(self.bb, "basket_bottle_count", 0)
-
-        if is_bottle:
-            # Use bottle slots 0, 1, 2
-            if bottle_count >= 3:
-                self.feedback_message = "All bottle slots full"
-                return py_trees.common.Status.FAILURE
-            
-            selected_slot = bottle_count
-        else:
-            # Use random items slot (slot 3)
-            selected_slot = 3
+        selected_slot = next_slot
         selected_pose = basket_poses[selected_slot]
 
         if selected_pose is None:
@@ -1377,11 +1410,31 @@ class SelectBasketSlot(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.FAILURE
 
         self.bb.basket_pose = deepcopy(selected_pose)
-        if is_bottle:
-            self.bb.basket_bottle_count = bottle_count + 1
-            self.feedback_message = f"Selected bottle slot {selected_slot + 1}/3"
-        else:
-            self.feedback_message = "Selected random items slot"
+        self.bb.current_basket_slot_index = selected_slot
+        self.feedback_message = f"Selected basket {selected_slot + 1}/{len(basket_poses)}"
+
+        return py_trees.common.Status.SUCCESS
+
+
+class MarkBasketSlotOccupied(py_trees.behaviour.Behaviour):
+    """
+    Advances the basket tracker after the item has been released successfully.
+    """
+
+    def __init__(self, bb=None):
+        super().__init__("MarkBasketSlotOccupied")
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
+
+    def update(self):
+        basket_poses = getattr(self.bb, "basket_poses", [])
+        current_slot = getattr(self.bb, "current_basket_slot_index", None)
+
+        if current_slot is None:
+            self.feedback_message = "No basket slot currently selected"
+            return py_trees.common.Status.FAILURE
+
+        self.bb.basket_next_slot_index = min(int(current_slot) + 1, len(basket_poses))
+        self.feedback_message = f"Marked basket {int(current_slot) + 1} as occupied"
 
         return py_trees.common.Status.SUCCESS
 
