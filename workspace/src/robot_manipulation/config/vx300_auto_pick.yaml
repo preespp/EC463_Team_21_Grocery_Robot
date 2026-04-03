@@ -7,9 +7,9 @@ vision_auto_pick:
     ee_orientation_frame: "vx300s/ee_gripper_link"
     use_current_ee_orientation: true
 
-    # Pick only bottles for now.
-    target_class: "bottle"
-    min_confidence: 0.60
+    # YOLOE prompt labels for the products we currently support.
+    target_class: "roasted tea,green tea,water,can,apple,orange,lemon,bag of chips"
+    min_confidence: 0.40
     min_depth_m: 0.08
     max_depth_m: 0.70
 

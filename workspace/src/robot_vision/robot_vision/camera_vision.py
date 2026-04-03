@@ -3,6 +3,7 @@ import math
 import os
 import time
 from collections import deque
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -11,11 +12,14 @@ import rclpy
 import torch
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PointStamped, TransformStamped
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
-from ultralytics import YOLO
+from ultralytics import YOLO, YOLOE
+from ultralytics.utils import SETTINGS
+from ultralytics.utils.downloads import attempt_download_asset
 
 
 def median_depth(depth_frame, x, y, k=5):
@@ -439,9 +443,31 @@ class CameraVision(Node):
     def __init__(self):
         super().__init__("camera_vision")
         self.get_logger().info("Starting end-effector RealSense feedback node")
+        numeric_tuning_param = ParameterDescriptor(dynamic_typing=True)
 
-        self.declare_parameter("model_path", "yolov8n.pt")
-        self.declare_parameter("conf", 0.5)
+        self.declare_parameter("model_path", "yoloe-11s-seg.pt")
+        self.declare_parameter("use_yoloe", True)
+        self.declare_parameter(
+            "prompt_classes",
+            (
+                "green bottle,green tea bottle,orange bottle,"
+                "clear bottle,"
+                "coca cola can,apple,orange,lemon,"
+                "yellow lays potato chips bag,yellow potato chips bag,"
+                "side of yellow potato chips bag,yellow chips bag side view,"
+                "yellow snack bag"
+            ),
+        )
+        self.declare_parameter(
+            "published_class_names",
+            (
+                "green tea,green tea,roasted tea,"
+                "water,"
+                "can,apple,orange,lemon,"
+                "bag of chips,bag of chips,bag of chips,bag of chips,bag of chips"
+            ),
+        )
+        self.declare_parameter("conf", 0.4)
         self.declare_parameter("use_cuda", True)
         self.declare_parameter("publish_image", True)
         self.declare_parameter("show_live_window", False)
@@ -452,6 +478,14 @@ class CameraVision(Node):
         self.declare_parameter("color_width", 1280)
         self.declare_parameter("color_height", 720)
         self.declare_parameter("color_fps", 30)
+        self.declare_parameter("color_enable_auto_exposure", False)
+        self.declare_parameter("color_exposure", 300.0, numeric_tuning_param)
+        self.declare_parameter("color_gain", 24.0, numeric_tuning_param)
+        self.declare_parameter("color_brightness", 0.0, numeric_tuning_param)
+        self.declare_parameter("color_contrast", 50.0, numeric_tuning_param)
+        self.declare_parameter("color_saturation", 64.0, numeric_tuning_param)
+        self.declare_parameter("color_enable_auto_white_balance", True)
+        self.declare_parameter("color_white_balance", 4600.0, numeric_tuning_param)
         self.declare_parameter("parent_frame", "ee_link")
         self.declare_parameter("camera_mount_frame", "camera_mount_frame")
         self.declare_parameter("camera_optical_frame", "camera_color_optical_frame")
@@ -473,7 +507,15 @@ class CameraVision(Node):
         self.declare_parameter("status_log_period_sec", 2.0)
         self.declare_parameter("live_window_name", "camera_vision_live")
 
-        model_path = self.get_parameter("model_path").value
+        requested_model_path = str(self.get_parameter("model_path").value).strip()
+        self.use_yoloe = bool(self.get_parameter("use_yoloe").value)
+        self.prompt_classes = self._parse_class_list(
+            str(self.get_parameter("prompt_classes").value)
+        )
+        self.published_class_names = self._parse_class_list(
+            str(self.get_parameter("published_class_names").value)
+        )
+        self.prompt_name_to_label = {}
         self.conf_thres = float(self.get_parameter("conf").value)
         use_cuda = bool(self.get_parameter("use_cuda").value)
         self.publish_image = bool(self.get_parameter("publish_image").value)
@@ -485,6 +527,20 @@ class CameraVision(Node):
         self.color_width = int(self.get_parameter("color_width").value)
         self.color_height = int(self.get_parameter("color_height").value)
         self.color_fps = int(self.get_parameter("color_fps").value)
+        self.color_enable_auto_exposure = bool(
+            self.get_parameter("color_enable_auto_exposure").value
+        )
+        self.color_exposure = float(self.get_parameter("color_exposure").value)
+        self.color_gain = float(self.get_parameter("color_gain").value)
+        self.color_brightness = float(self.get_parameter("color_brightness").value)
+        self.color_contrast = float(self.get_parameter("color_contrast").value)
+        self.color_saturation = float(self.get_parameter("color_saturation").value)
+        self.color_enable_auto_white_balance = bool(
+            self.get_parameter("color_enable_auto_white_balance").value
+        )
+        self.color_white_balance = float(
+            self.get_parameter("color_white_balance").value
+        )
         self.parent_frame = str(self.get_parameter("parent_frame").value)
         self.camera_mount_frame = str(self.get_parameter("camera_mount_frame").value)
         self.camera_optical_frame = str(self.get_parameter("camera_optical_frame").value)
@@ -508,6 +564,8 @@ class CameraVision(Node):
         self.max_objects_tf = int(self.get_parameter("max_objects_tf").value)
         self.status_log_period_sec = float(self.get_parameter("status_log_period_sec").value)
         self.live_window_name = str(self.get_parameter("live_window_name").value)
+        self.weights_dir = self._configure_ultralytics_weights_dir()
+        self.model_path = self._resolve_model_path(requested_model_path)
 
         self.mount_xyz = self._parse_vec3(str(self.get_parameter("mount_xyz").value))
         roll_deg, pitch_deg, yaw_deg = self._parse_vec3(
@@ -544,9 +602,9 @@ class CameraVision(Node):
             f"Camera TF: parent={self.parent_frame} "
             f"mount={self.camera_mount_frame} optical={self.camera_optical_frame}"
         )
+        self.get_logger().info(f"Ultralytics weights dir: {self.weights_dir}")
 
-        self.get_logger().info(f"Loading YOLO model: {model_path}")
-        self.model = YOLO(model_path)
+        self._initialize_detection_model(requested_model_path)
         self.device = 0 if (use_cuda and torch.cuda.is_available()) else "cpu"
         if self.device != "cpu":
             self.model.to("cuda")
@@ -583,6 +641,7 @@ class CameraVision(Node):
             cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
             self.pipeline.start(cfg)
             self.use_imu = False
+        self._configure_color_sensor()
         self.align_to_color = rs.align(rs.stream.color)
 
         self.imu_fusion = SimpleIMUFusion(alpha=0.98)
@@ -600,6 +659,206 @@ class CameraVision(Node):
         if len(parts) != 3:
             raise ValueError(f"Expected 3 comma-separated values, got: {text}")
         return float(parts[0]), float(parts[1]), float(parts[2])
+
+    @staticmethod
+    def _parse_class_list(text: str) -> list[str]:
+        return [part.strip().lower() for part in text.split(",") if part.strip()]
+
+    @staticmethod
+    def _configure_ultralytics_weights_dir() -> Path:
+        weights_dir = Path(str(SETTINGS["weights_dir"])).expanduser()
+        if not weights_dir.is_absolute():
+            weights_dir = Path.home() / ".cache" / "grocerybot_ultralytics" / "weights"
+            SETTINGS["weights_dir"] = str(weights_dir)
+        weights_dir.mkdir(parents=True, exist_ok=True)
+        return weights_dir
+
+    def _resolve_model_path(self, requested_model_path: str) -> str:
+        if not requested_model_path:
+            return requested_model_path
+
+        requested = Path(requested_model_path).expanduser()
+        if requested.is_absolute() and requested.exists():
+            return str(requested)
+        if requested.exists():
+            return str(requested.resolve())
+
+        package_candidate = Path(__file__).resolve().parent / requested.name
+        if package_candidate.exists():
+            return str(package_candidate)
+
+        if not requested.is_absolute():
+            return str(self.weights_dir / requested.name)
+        return str(requested)
+
+    def _prepare_yoloe_prompt_assets(self) -> None:
+        if not self.prompt_classes:
+            return
+
+        clip_asset = self.weights_dir / "mobileclip_blt.ts"
+        if clip_asset.exists():
+            return
+
+        self.get_logger().info(
+            "Preparing YOLOE text-prompt asset mobileclip_blt.ts. "
+            "The first run may download about 572MB."
+        )
+        attempt_download_asset(str(clip_asset))
+
+    def _initialize_detection_model(self, requested_model_path: str) -> None:
+        requested_name = Path(requested_model_path).name.lower()
+        use_yoloe = self.use_yoloe or "yoloe" in requested_name
+
+        if use_yoloe:
+            if self.published_class_names:
+                if len(self.published_class_names) != len(self.prompt_classes):
+                    raise RuntimeError(
+                        "published_class_names must have the same number of entries as "
+                        "prompt_classes when YOLOE is enabled."
+                    )
+                self.prompt_name_to_label = {
+                    prompt: label
+                    for prompt, label in zip(self.prompt_classes, self.published_class_names)
+                }
+            else:
+                self.prompt_name_to_label = {
+                    prompt: prompt
+                    for prompt in self.prompt_classes
+                }
+
+            self._prepare_yoloe_prompt_assets()
+            self.get_logger().info(f"Loading YOLOE model: {self.model_path}")
+            self.model = YOLOE(self.model_path, verbose=False)
+            if self.prompt_classes:
+                self.get_logger().info(
+                    "Using YOLOE prompt classes: " + ", ".join(self.prompt_classes)
+                )
+                if self.prompt_name_to_label:
+                    self.get_logger().info(
+                        "Publishing YOLOE classes as: "
+                        + ", ".join(
+                            f"{prompt}->{label}"
+                            for prompt, label in self.prompt_name_to_label.items()
+                        )
+                    )
+                try:
+                    self.model.set_classes(self.prompt_classes)
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Failed to initialize YOLOE prompt classes. "
+                        "Ensure CLIP and the MobileCLIP text encoder are available."
+                    ) from exc
+            else:
+                self.get_logger().warn(
+                    "YOLOE is enabled but prompt_classes is empty; detection labels will not "
+                    "match your grocery products."
+                )
+            return
+
+        self.get_logger().info(f"Loading YOLO model: {self.model_path}")
+        self.model = YOLO(self.model_path)
+
+    def _configure_color_sensor(self) -> None:
+        try:
+            device = self.pipeline.get_active_profile().get_device()
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(f"Unable to access RealSense device profile: {exc}")
+            return
+
+        color_sensor = None
+        try:
+            for sensor in device.query_sensors():
+                sensor_name = ""
+                try:
+                    sensor_name = str(sensor.get_info(rs.camera_info.name))
+                except Exception:  # noqa: BLE001
+                    sensor_name = ""
+                if "rgb" in sensor_name.lower() or "color" in sensor_name.lower():
+                    color_sensor = sensor
+                    break
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(f"Unable to enumerate RealSense sensors: {exc}")
+            return
+
+        if color_sensor is None:
+            self.get_logger().warn("No RealSense color sensor found for manual tuning.")
+            return
+
+        self._set_sensor_option(
+            color_sensor,
+            rs.option.enable_auto_exposure,
+            1.0 if self.color_enable_auto_exposure else 0.0,
+            "enable_auto_exposure",
+        )
+        if not self.color_enable_auto_exposure:
+            self._set_sensor_option(
+                color_sensor,
+                rs.option.exposure,
+                self.color_exposure,
+                "exposure",
+            )
+            self._set_sensor_option(
+                color_sensor,
+                rs.option.gain,
+                self.color_gain,
+                "gain",
+            )
+
+        self._set_sensor_option(
+            color_sensor,
+            rs.option.brightness,
+            self.color_brightness,
+            "brightness",
+        )
+        self._set_sensor_option(
+            color_sensor,
+            rs.option.contrast,
+            self.color_contrast,
+            "contrast",
+        )
+        self._set_sensor_option(
+            color_sensor,
+            rs.option.saturation,
+            self.color_saturation,
+            "saturation",
+        )
+        self._set_sensor_option(
+            color_sensor,
+            rs.option.enable_auto_white_balance,
+            1.0 if self.color_enable_auto_white_balance else 0.0,
+            "enable_auto_white_balance",
+        )
+        if not self.color_enable_auto_white_balance:
+            self._set_sensor_option(
+                color_sensor,
+                rs.option.white_balance,
+                self.color_white_balance,
+                "white_balance",
+            )
+
+        self.get_logger().info(
+            "RealSense color tuning: "
+            f"auto_exposure={self.color_enable_auto_exposure} "
+            f"exposure={self.color_exposure:.1f} "
+            f"gain={self.color_gain:.1f} "
+            f"brightness={self.color_brightness:.1f} "
+            f"contrast={self.color_contrast:.1f} "
+            f"saturation={self.color_saturation:.1f} "
+            f"auto_white_balance={self.color_enable_auto_white_balance} "
+            f"white_balance={self.color_white_balance:.1f}"
+        )
+
+    def _set_sensor_option(self, sensor, option, value: float, option_name: str) -> None:
+        try:
+            if not sensor.supports(option):
+                return
+            option_range = sensor.get_option_range(option)
+            clamped = min(max(float(value), float(option_range.min)), float(option_range.max))
+            sensor.set_option(option, clamped)
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(
+                f"Unable to set RealSense color option {option_name}: {exc}"
+            )
 
     def _update_imu(self, frames):
         for f in frames:
@@ -837,7 +1096,11 @@ class CameraVision(Node):
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
                 cls_id = int(box.cls[0].cpu().numpy())
                 conf = float(box.conf[0].cpu().numpy())
-                name = names.get(cls_id, str(cls_id))
+                model_name = str(names.get(cls_id, str(cls_id))).strip()
+                name = self.prompt_name_to_label.get(
+                    model_name.lower(),
+                    model_name,
+                )
                 bbox_center_x = int((x1 + x2) * 0.5)
                 bbox_center_y = int((y1 + y2) * 0.5)
 
@@ -883,6 +1146,7 @@ class CameraVision(Node):
                 det = {
                     "class_id": cls_id,
                     "class_name": name,
+                    "model_class_name": model_name,
                     "confidence": conf,
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
                     "center_px": [bbox_center_x, bbox_center_y],

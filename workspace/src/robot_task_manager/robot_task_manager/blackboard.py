@@ -72,7 +72,7 @@ def setup_blackboard():
     # This is more reliable on hardware than assuming identity is horizontal.
     bb.viperx_use_current_ee_orientation = True
     bb.viperx_fixed_pick_orientation_xyzw = None
-    bb.viperx_target_classes_text = "bottle,cup"
+    bb.viperx_target_classes_text = "roasted tea,green tea,water,can,apple,orange,lemon,bag of chips"
     bb.viperx_close_gripper_position = 0.040
     bb.viperx_pregrasp_target_x_m = 0.35
     bb.viperx_pregrasp_offset_x_m = -0.15

@@ -533,6 +533,8 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
             
             if expected_words and detected_words:
                 overlap = detected_words & expected_words
+                if detected_words.issubset(expected_words) or expected_words.issubset(detected_words):
+                    return True
                 # 80% word overlap = match
                 if len(overlap) >= len(expected_words) * 0.8:
                     return True
@@ -565,11 +567,10 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
                 continue
 
             cls_name = str(det.get("class_name", "")).strip().lower()
-            if target_classes:
-                if cls_name not in target_classes:
-                    summary["class_mismatch"] = int(summary["class_mismatch"]) + 1
-                    continue
-            elif expected_names and not self._fuzzy_match_product(cls_name, expected_names):
+            if target_classes and cls_name not in target_classes:
+                summary["class_mismatch"] = int(summary["class_mismatch"]) + 1
+                continue
+            if expected_names and not self._fuzzy_match_product(cls_name, expected_names):
                 summary["class_mismatch"] = int(summary["class_mismatch"]) + 1
                 continue
 

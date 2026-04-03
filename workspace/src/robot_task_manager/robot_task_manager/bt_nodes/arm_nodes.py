@@ -255,6 +255,8 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
             detected_words = set(detected.replace("_", " ").split())
             expected_words = set(expected_clean.replace("_", " ").split())
             if expected_words and detected_words:
+                if detected_words.issubset(expected_words) or expected_words.issubset(detected_words):
+                    return True
                 if len(detected_words & expected_words) >= len(expected_words) * 0.8:
                     return True
         return False
