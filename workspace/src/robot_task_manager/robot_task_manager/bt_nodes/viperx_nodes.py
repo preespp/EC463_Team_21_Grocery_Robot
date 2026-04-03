@@ -1276,11 +1276,18 @@ class MoveViperXGripper(py_trees.behaviour.Behaviour):
       - planning_group = open_gripper / close_gripper
     """
 
-    def __init__(self, command: str, bb=None, action_name: str = "/pick_viperx"):
+    def __init__(
+        self,
+        command: str,
+        bb=None,
+        action_name: str = "/pick_viperx",
+        position: Optional[float] = None,
+    ):
         super().__init__(f"MoveViperXGripper[{command}]")
         self.command = command
         self.action_name = action_name
         self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
+        self.position = None if position is None else float(position)
         self.client: Optional[ActionClient] = None
         self.node = None
         self.send_future = None
@@ -1316,13 +1323,20 @@ class MoveViperXGripper(py_trees.behaviour.Behaviour):
         goal_msg.ee_link = ""
         goal_msg.pregrasp_offset_m = 0.0
         goal_msg.retreat_offset_m = 0.0
-        goal_msg.gripper_close_position = -1.0
+        goal_msg.gripper_close_position = (
+            -1.0 if self.position is None else float(self.position)
+        )
         goal_msg.use_cartesian_approach = False
 
         self.send_future = self.client.send_goal_async(goal_msg)
         self.goal_handle = None
         self.result_future = None
-        self.feedback_message = f"Gripper command sent: {self.command}"
+        if self.position is None:
+            self.feedback_message = f"Gripper command sent: {self.command}"
+        else:
+            self.feedback_message = (
+                f"Gripper command sent: {self.command} to {self.position:.3f}"
+            )
 
     def update(self):
         if self.send_future is None:

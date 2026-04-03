@@ -114,6 +114,27 @@ public:
     startup_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "startup_joint_positions",
       std::vector<double>{0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0});
+    restock_pick_ready_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_pick_ready_joint_positions",
+      std::vector<double>{0.0, -1.06465084, 1.02974426, 0.0, 0.54105207, 0.0});
+    restock_pick_approach_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_pick_approach_joint_positions",
+      std::vector<double>{2.39110108, -1.23918377, 1.30899694, 1.46607657, -0.83775804, -1.43116999});
+    restock_pick_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_pick_joint_positions",
+      std::vector<double>{1.98967535, 0.05235988, 1.55334303, 0.43633231, -1.62315620, 0.01745329});
+    restock_post_pick_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_post_pick_joint_positions",
+      std::vector<double>{2.42600766, -1.23918377, 1.09955743, 1.65806279, -0.87266463, -1.72787596});
+    restock_transfer_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_transfer_joint_positions",
+      std::vector<double>{0.12217305, -0.54105207, 0.85521133, 0.41887902, -0.33161256, -0.36651914});
+    restock_place_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_place_joint_positions",
+      std::vector<double>{0.15707963, 0.19198622, 0.29670597, 0.29670597, -0.61086524, -0.22689280});
+    restock_home_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_home_joint_positions",
+      std::vector<double>{0.0, -1.85004901, 1.57079633, 0.0, 0.73303829, 0.0});
     return_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "return_joint_names",
       std::vector<std::string>{
@@ -226,6 +247,13 @@ private:
       command == "scan_center_arm_pose" || command == "scan_left_arm_pose" ||
       command == "scan_right_arm_pose" ||
       command == "startup_arm_pose" || command == "return_arm_pose" ||
+      command == "restock_pick_ready_arm_pose" ||
+      command == "restock_pick_approach_arm_pose" ||
+      command == "restock_pick_arm_pose" ||
+      command == "restock_post_pick_arm_pose" ||
+      command == "restock_transfer_arm_pose" ||
+      command == "restock_place_arm_pose" ||
+      command == "restock_home_arm_pose" ||
       command == "lift_arm_pose" || command == "post_lift_arm_pose" ||
       command == "place_arm_pose" || command == "place_arm_pose_1" ||
       command == "place_arm_pose_2" || command == "place_arm_pose_3" ||
@@ -256,6 +284,17 @@ private:
       return scan_right_joint_names_;
     }
     if (command == "startup_arm_pose") {
+      return startup_joint_names_;
+    }
+    if (
+      command == "restock_pick_ready_arm_pose" ||
+      command == "restock_pick_approach_arm_pose" ||
+      command == "restock_pick_arm_pose" ||
+      command == "restock_post_pick_arm_pose" ||
+      command == "restock_transfer_arm_pose" ||
+      command == "restock_place_arm_pose" ||
+      command == "restock_home_arm_pose")
+    {
       return startup_joint_names_;
     }
     if (command == "lift_arm_pose") {
@@ -294,6 +333,27 @@ private:
     }
     if (command == "startup_arm_pose") {
       return startup_joint_positions_;
+    }
+    if (command == "restock_pick_ready_arm_pose") {
+      return restock_pick_ready_joint_positions_;
+    }
+    if (command == "restock_pick_approach_arm_pose") {
+      return restock_pick_approach_joint_positions_;
+    }
+    if (command == "restock_pick_arm_pose") {
+      return restock_pick_joint_positions_;
+    }
+    if (command == "restock_post_pick_arm_pose") {
+      return restock_post_pick_joint_positions_;
+    }
+    if (command == "restock_transfer_arm_pose") {
+      return restock_transfer_joint_positions_;
+    }
+    if (command == "restock_place_arm_pose") {
+      return restock_place_joint_positions_;
+    }
+    if (command == "restock_home_arm_pose") {
+      return restock_home_joint_positions_;
     }
     if (command == "lift_arm_pose") {
       return lift_joint_positions_;
@@ -342,6 +402,27 @@ private:
     if (command == "startup_arm_pose") {
       return "Failed to execute configured startup arm pose";
     }
+    if (command == "restock_pick_ready_arm_pose") {
+      return "Failed to execute configured restock pick-ready arm pose";
+    }
+    if (command == "restock_pick_approach_arm_pose") {
+      return "Failed to execute configured restock pick-approach arm pose";
+    }
+    if (command == "restock_pick_arm_pose") {
+      return "Failed to execute configured restock pick arm pose";
+    }
+    if (command == "restock_post_pick_arm_pose") {
+      return "Failed to execute configured restock post-pick arm pose";
+    }
+    if (command == "restock_transfer_arm_pose") {
+      return "Failed to execute configured restock transfer arm pose";
+    }
+    if (command == "restock_place_arm_pose") {
+      return "Failed to execute configured restock place arm pose";
+    }
+    if (command == "restock_home_arm_pose") {
+      return "Failed to execute configured restock home arm pose";
+    }
     if (command == "lift_arm_pose") {
       return "Failed to execute configured lift arm pose";
     }
@@ -388,6 +469,27 @@ private:
     }
     if (command == "startup_arm_pose") {
       return "Startup arm pose complete";
+    }
+    if (command == "restock_pick_ready_arm_pose") {
+      return "Restock pick-ready arm pose complete";
+    }
+    if (command == "restock_pick_approach_arm_pose") {
+      return "Restock pick-approach arm pose complete";
+    }
+    if (command == "restock_pick_arm_pose") {
+      return "Restock pick arm pose complete";
+    }
+    if (command == "restock_post_pick_arm_pose") {
+      return "Restock post-pick arm pose complete";
+    }
+    if (command == "restock_transfer_arm_pose") {
+      return "Restock transfer arm pose complete";
+    }
+    if (command == "restock_place_arm_pose") {
+      return "Restock place arm pose complete";
+    }
+    if (command == "restock_home_arm_pose") {
+      return "Restock home arm pose complete";
     }
     if (command == "lift_arm_pose") {
       return "Lift arm pose complete";
@@ -845,7 +947,10 @@ private:
       if (execute_gripper_named(open_gripper_named_target_)) {
         return true;
       }
-      return execute_gripper_position(open_gripper_pos_);
+      const double open_target =
+        (gripper_close_position >= 0.0f) ? static_cast<double>(gripper_close_position) :
+        open_gripper_pos_;
+      return execute_gripper_position(open_target);
     }
 
     if (command == "close_gripper") {
@@ -1133,6 +1238,13 @@ private:
   std::vector<double> scan_right_joint_positions_;
   std::vector<std::string> startup_joint_names_;
   std::vector<double> startup_joint_positions_;
+  std::vector<double> restock_pick_ready_joint_positions_;
+  std::vector<double> restock_pick_approach_joint_positions_;
+  std::vector<double> restock_pick_joint_positions_;
+  std::vector<double> restock_post_pick_joint_positions_;
+  std::vector<double> restock_transfer_joint_positions_;
+  std::vector<double> restock_place_joint_positions_;
+  std::vector<double> restock_home_joint_positions_;
   std::vector<std::string> return_joint_names_;
   std::vector<double> return_joint_positions_;
   std::vector<std::string> place_joint_names_;
