@@ -92,21 +92,21 @@ public:
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     scan_center_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "scan_center_joint_positions",
-      std::vector<double>{0.0, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+      std::vector<double>{0.0, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0});
     scan_left_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "scan_left_joint_names",
       std::vector<std::string>{
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     scan_left_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "scan_left_joint_positions",
-      std::vector<double>{0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+      std::vector<double>{0.78539816, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0});
     scan_right_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "scan_right_joint_names",
       std::vector<std::string>{
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     scan_right_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "scan_right_joint_positions",
-      std::vector<double>{-0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+      std::vector<double>{-0.78539816, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0});
     startup_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "startup_joint_names",
       std::vector<std::string>{

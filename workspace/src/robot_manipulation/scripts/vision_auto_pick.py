@@ -31,7 +31,7 @@ class VisionAutoPick(Node):
         self.declare_parameter("ee_orientation_frame", "vx300s/ee_gripper_link")
         self.declare_parameter("use_current_ee_orientation", True)
         self.declare_parameter("target_class", "")
-        self.declare_parameter("min_confidence", 0.60)
+        self.declare_parameter("min_confidence", 0.40)
         self.declare_parameter("min_depth_m", 0.08)
         self.declare_parameter("max_depth_m", 0.70)
         self.declare_parameter("workspace_min_x", 0.12)

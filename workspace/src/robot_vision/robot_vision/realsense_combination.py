@@ -12,7 +12,7 @@ Features:
   5) Optional UDP JSON streaming to Jetson
 
 Usage:
-  python realsense_grocery_robot.py --model yolov8n.pt --conf 0.5 \
+  python realsense_grocery_robot.py --model yolov8n.pt --conf 0.4 \
       --use_imu \
       --cam_offset 0.12,0.00,0.35 \
       --cam_rpy 0,0,0 \
@@ -311,7 +311,7 @@ class GroceryRobotVision:
 
     def __init__(self,
                  yolo_model_path="yolov8n.pt",
-                 conf_threshold=0.5,
+                 conf_threshold=0.4,
                  use_imu=False,
                  cam_offset_base=(0.0, 0.0, 0.0),
                  cam_rpy_deg=(0.0, 0.0, 0.0),
@@ -780,8 +780,8 @@ def main():
     parser = argparse.ArgumentParser(description="Grocery Robot Vision System (Base/Map/IMU/Jetson)")
     parser.add_argument("--model", type=str, default="yolov8n.pt",
                         help="YOLO model path (default: yolov8n.pt)")
-    parser.add_argument("--conf", type=float, default=0.5,
-                        help="Detection confidence threshold (default: 0.5)")
+    parser.add_argument("--conf", type=float, default=0.4,
+                        help="Detection confidence threshold (default: 0.4)")
 
     # NEW: IMU + extrinsic + UDP
     parser.add_argument("--use_imu", action="store_true",

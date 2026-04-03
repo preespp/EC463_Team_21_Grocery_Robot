@@ -83,7 +83,6 @@ def create_customer_viperx_tree(bb):
             bt_nodes.RepositionViperXArm(goal_key="pregrasp_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="grasp_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="post_grasp_lift_pose", bb=bb),
-            bt_nodes.RepositionViperXArm(goal_key="lift_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="post_lift_pose", bb=bb),
         ],
     )

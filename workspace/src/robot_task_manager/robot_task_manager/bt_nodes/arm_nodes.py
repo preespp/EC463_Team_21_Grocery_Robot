@@ -194,7 +194,7 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
         bb=None,
         detections_topic: str = "/detections_json",
         target_frame: str = "base_link",
-        min_confidence: float = 0.60,
+        min_confidence: float = 0.40,
         min_depth_m: float = 0.08,
         max_depth_m: float = 0.90,
         position_tolerance_m: float = 0.05,

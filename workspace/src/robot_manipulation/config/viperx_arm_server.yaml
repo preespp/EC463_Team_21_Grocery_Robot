@@ -24,11 +24,11 @@ viperx_arm_server:
     open_gripper_pos: 0.035
     closed_gripper_pos: 0.040
     scan_center_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
-    scan_center_joint_positions: [0.0, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0]
+    scan_center_joint_positions: [0.0, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0]
     scan_left_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
-    scan_left_joint_positions: [0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0]
+    scan_left_joint_positions: [0.78539816, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0]
     scan_right_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
-    scan_right_joint_positions: [-0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0]
+    scan_right_joint_positions: [-0.78539816, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0]
     startup_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
     startup_joint_positions: [0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0]
     place_joint_names: ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]

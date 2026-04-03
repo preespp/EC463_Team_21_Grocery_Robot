@@ -148,7 +148,7 @@ def setup_blackboard():
     bb.semantic_id = None
     bb.semantic_target_label = None
     bb.nav_goal_source = None
-    bb.viperx_detection_min_confidence = 0.50
+    bb.viperx_detection_min_confidence = 0.40
 
     reset_viperx_manipulation_state(bb)
 
@@ -192,6 +192,6 @@ def setup_custom_blackboard():
     bb.semantic_id = None
     bb.semantic_target_label = None
     bb.nav_goal_source = None
-    bb.viperx_detection_min_confidence = 0.60
+    bb.viperx_detection_min_confidence = 0.40
 
     return bb

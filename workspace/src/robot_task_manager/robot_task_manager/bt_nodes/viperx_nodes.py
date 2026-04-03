@@ -283,7 +283,7 @@ class VerifyViperXPosition(py_trees.behaviour.Behaviour):
         self,
         bb=None,
         detections_topic: str = "/detections_json",
-        min_confidence: float = 0.50,
+        min_confidence: float = 0.40,
         min_depth_m: float = 0.08,
         max_depth_m: float = 0.70,
         target_frame: Optional[str] = None,
@@ -983,7 +983,8 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
     Generates:
       - bb.pregrasp_pose
       - bb.grasp_pose
-      - bb.lift_pose
+      - bb.post_grasp_lift_pose
+      - bb.post_lift_pose
     """
 
     def __init__(
@@ -1201,9 +1202,7 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
         )
         self.bb.post_grasp_lift_pose["ee_link"] = self._resolve_ee_link()
         self.bb.post_grasp_lift_pose["require_orientation_match"] = True
-        self.bb.lift_pose = deepcopy(
-            getattr(self.bb, "default_lift_pose", {"command": "lift_arm_pose"})
-        )
+        self.bb.lift_pose = None
         self.bb.post_lift_pose = deepcopy(
             getattr(self.bb, "default_post_lift_pose", {"command": "post_lift_arm_pose"})
         )
@@ -1212,7 +1211,7 @@ class PrepareDetectedPickPoses(py_trees.behaviour.Behaviour):
             "Prepared pick poses "
             f"pregrasp_x={pregrasp_x:.3f} pregrasp_z={pregrasp_z:.3f} "
             f"grasp_z={grasp_z:.3f} post_grasp_lift_z={post_grasp_lift_z:.3f} "
-            f"lift=lift_arm_pose post_lift=post_lift_arm_pose"
+            "post_lift=post_lift_arm_pose"
         )
         return py_trees.common.Status.SUCCESS
 
