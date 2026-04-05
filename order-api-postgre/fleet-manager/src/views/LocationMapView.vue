@@ -83,7 +83,7 @@
                 {{ dirty ? 'Unsaved changes' : 'Saved' }}
               </span>
               <span class="muted tiny">
-                {{ editMode ? 'Drag selected map objects to update the semantic overlay.' : 'Enable edit mode to drag points.' }}
+                {{ editMode ? 'Drag objects to move them. Drag the ring handle or edit Yaw to rotate them.' : 'Enable edit mode to move points and use rotation handles.' }}
               </span>
             </div>
           </div>
@@ -339,13 +339,17 @@ function moveEntity(event) {
   if (!bundle.value || !event?.type) return
   saveMessage.value = ''
   editorError.value = ''
+  const nextX = Number(event.x)
+  const nextY = Number(event.y)
+  const nextYaw = normalizeOptionalNumber(event.yaw)
+  const nextZ = normalizeOptionalNumber(event.z)
 
   if (event.type === 'anchor') {
-    moveAnchor(event.id, Number(event.x), Number(event.y))
+    moveAnchor(event.id, nextX, nextY, nextYaw)
   } else if (event.type === 'rack') {
-    moveRack(event.id, Number(event.x), Number(event.y))
+    moveRack(event.id, nextX, nextY, nextYaw)
   } else if (event.type === 'slot') {
-    moveSlot(event.id, Number(event.x), Number(event.y))
+    moveSlot(event.id, nextX, nextY, nextYaw, nextZ)
   }
 
   refreshSelection()
@@ -356,52 +360,20 @@ function moveEntity(event) {
 function moveAnchor(anchorId, x, y, yaw = null) {
   const anchor = bundle.value.anchors?.find((item) => item.id === anchorId)
   if (!anchor) return
-  const dx = x - Number(anchor.x || 0)
-  const dy = y - Number(anchor.y || 0)
-  const nextYaw = yaw == null ? Number(anchor.yaw || 0) : Number(yaw)
-  const deltaYaw = nextYaw - Number(anchor.yaw || 0)
-
   anchor.x = x
   anchor.y = y
-  anchor.yaw = nextYaw
-
-  for (const rack of bundle.value.racks || []) {
-    if (rack.anchor_id !== anchorId) continue
-    rack.x = Number(rack.x || 0) + dx
-    rack.y = Number(rack.y || 0) + dy
-    rack.yaw = Number(rack.yaw || 0) + deltaYaw
-  }
-
-  for (const slot of bundle.value.slots || []) {
-    if (slot.anchor_id !== anchorId) continue
-    shiftSlot(slot, dx, dy, deltaYaw)
+  if (yaw != null) {
+    anchor.yaw = yaw
   }
 }
 
 function moveRack(rackId, x, y, yaw = null) {
   const rack = bundle.value.racks?.find((item) => item.id === rackId)
   if (!rack) return
-  const dx = x - Number(rack.x || 0)
-  const dy = y - Number(rack.y || 0)
-  const nextYaw = yaw == null ? Number(rack.yaw || 0) : Number(yaw)
-  const deltaYaw = nextYaw - Number(rack.yaw || 0)
-
   rack.x = x
   rack.y = y
-  rack.yaw = nextYaw
-
-  if (rack.anchor_id) {
-    const anchor = bundle.value.anchors?.find((item) => item.id === rack.anchor_id)
-    if (anchor) {
-      anchor.x = Number(anchor.x || 0) + dx
-      anchor.y = Number(anchor.y || 0) + dy
-      anchor.yaw = Number(anchor.yaw || 0) + deltaYaw
-    }
-  }
-
-  for (const slot of bundle.value.slots || []) {
-    if (slot.rack_id !== rackId) continue
-    shiftSlot(slot, dx, dy, deltaYaw)
+  if (yaw != null) {
+    rack.yaw = yaw
   }
 }
 
@@ -537,5 +509,10 @@ function parseEditorNumber(value, label) {
     return null
   }
   return parsed
+}
+
+function normalizeOptionalNumber(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 </script>

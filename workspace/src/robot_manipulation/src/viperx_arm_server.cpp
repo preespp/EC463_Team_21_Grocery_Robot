@@ -92,21 +92,21 @@ public:
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     scan_center_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "scan_center_joint_positions",
-      std::vector<double>{0.0, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+      std::vector<double>{0.0, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0});
     scan_left_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "scan_left_joint_names",
       std::vector<std::string>{
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     scan_left_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "scan_left_joint_positions",
-      std::vector<double>{0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+      std::vector<double>{0.78539816, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0});
     scan_right_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "scan_right_joint_names",
       std::vector<std::string>{
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     scan_right_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "scan_right_joint_positions",
-      std::vector<double>{-0.78539816, -1.36135682, 1.41371669, 0.0, 0.20943951, 0.0});
+      std::vector<double>{-0.78539816, -1.34390352, 1.57079633, 0.0, -0.22689280, 0.0});
     startup_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "startup_joint_names",
       std::vector<std::string>{
@@ -114,6 +114,27 @@ public:
     startup_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "startup_joint_positions",
       std::vector<double>{0.0, -1.85004901, 1.57079633, 0.0, 0.40142573, 0.0});
+    restock_pick_ready_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_pick_ready_joint_positions",
+      std::vector<double>{0.0, -1.06465084, 1.02974426, 0.0, 0.54105207, 0.0});
+    restock_pick_approach_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_pick_approach_joint_positions",
+      std::vector<double>{2.39110108, -1.23918377, 1.30899694, 1.46607657, -0.83775804, -1.43116999});
+    restock_pick_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_pick_joint_positions",
+      std::vector<double>{1.98967535, 0.05235988, 1.55334303, 0.43633231, -1.62315620, 0.01745329});
+    restock_post_pick_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_post_pick_joint_positions",
+      std::vector<double>{2.42600766, -1.23918377, 1.09955743, 1.65806279, -0.87266463, -1.72787596});
+    restock_transfer_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_transfer_joint_positions",
+      std::vector<double>{0.12217305, -0.54105207, 0.85521133, 0.41887902, -0.33161256, -0.36651914});
+    restock_place_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_place_joint_positions",
+      std::vector<double>{0.15707963, 0.19198622, 0.29670597, 0.29670597, -0.61086524, -0.22689280});
+    restock_home_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "restock_home_joint_positions",
+      std::vector<double>{0.0, -1.85004901, 1.57079633, 0.0, 0.73303829, 0.0});
     return_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "return_joint_names",
       std::vector<std::string>{
@@ -127,7 +148,22 @@ public:
         "waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"});
     place_joint_positions_ = this->declare_parameter<std::vector<double>>(
       "place_joint_positions",
-      std::vector<double>{1.81514242, -0.40142573, 1.51843645, 0.08726646, -1.13446401, -0.03490659});
+      std::vector<double>{2.63544717, -0.43633231, 1.22173048, 1.23918377, -1.25663706, -0.76794487});
+    place_2_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_2_joint_positions",
+      std::vector<double>{3.14159265, -0.50614548, 1.25663706, 1.58824962, -1.60570291, -0.83775804});
+    place_3_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_3_joint_positions",
+      std::vector<double>{1.76278254, -1.01229097, 1.43116999, 0.40142573, -0.45378561, -0.38397244});
+    place_4_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_4_joint_positions",
+      std::vector<double>{3.05432619, -1.34390352, 1.48352986, 1.57079633, -1.51843645, -1.44862328});
+    place_5_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_5_joint_positions",
+      std::vector<double>{0.57595865, -0.68067841, 1.32645023, -1.22173048, -1.13446401, 0.82030475});
+    place_6_joint_positions_ = this->declare_parameter<std::vector<double>>(
+      "place_6_joint_positions",
+      std::vector<double>{-0.27925268, -0.75049158, 1.34390352, -1.74532925, -1.79768913, 0.90757121});
     post_place_joint_names_ = this->declare_parameter<std::vector<std::string>>(
       "post_place_joint_names",
       std::vector<std::string>{
@@ -211,9 +247,24 @@ private:
       command == "scan_center_arm_pose" || command == "scan_left_arm_pose" ||
       command == "scan_right_arm_pose" ||
       command == "startup_arm_pose" || command == "return_arm_pose" ||
+      command == "restock_pick_ready_arm_pose" ||
+      command == "restock_pick_approach_arm_pose" ||
+      command == "restock_pick_arm_pose" ||
+      command == "restock_post_pick_arm_pose" ||
+      command == "restock_transfer_arm_pose" ||
+      command == "restock_place_arm_pose" ||
+      command == "restock_home_arm_pose" ||
       command == "lift_arm_pose" || command == "post_lift_arm_pose" ||
-      command == "place_arm_pose" || command == "post_place_arm_pose" ||
+      command == "place_arm_pose" || command == "place_arm_pose_1" ||
+      command == "place_arm_pose_2" || command == "place_arm_pose_3" ||
+      command == "place_arm_pose_4" || command == "place_arm_pose_5" ||
+      command == "place_arm_pose_6" || command == "post_place_arm_pose" ||
       command == "pre_return_arm_pose";
+  }
+
+  static bool is_waist_delta_command(const std::string & command)
+  {
+    return command == "waist_delta_arm_pose";
   }
 
   static bool is_pose_goal_command(const std::string & command)
@@ -235,13 +286,29 @@ private:
     if (command == "startup_arm_pose") {
       return startup_joint_names_;
     }
+    if (
+      command == "restock_pick_ready_arm_pose" ||
+      command == "restock_pick_approach_arm_pose" ||
+      command == "restock_pick_arm_pose" ||
+      command == "restock_post_pick_arm_pose" ||
+      command == "restock_transfer_arm_pose" ||
+      command == "restock_place_arm_pose" ||
+      command == "restock_home_arm_pose")
+    {
+      return startup_joint_names_;
+    }
     if (command == "lift_arm_pose") {
       return lift_joint_names_;
     }
     if (command == "post_lift_arm_pose") {
       return post_lift_joint_names_;
     }
-    if (command == "place_arm_pose") {
+    if (
+      command == "place_arm_pose" || command == "place_arm_pose_1" ||
+      command == "place_arm_pose_2" || command == "place_arm_pose_3" ||
+      command == "place_arm_pose_4" || command == "place_arm_pose_5" ||
+      command == "place_arm_pose_6")
+    {
       return place_joint_names_;
     }
     if (command == "post_place_arm_pose") {
@@ -267,14 +334,50 @@ private:
     if (command == "startup_arm_pose") {
       return startup_joint_positions_;
     }
+    if (command == "restock_pick_ready_arm_pose") {
+      return restock_pick_ready_joint_positions_;
+    }
+    if (command == "restock_pick_approach_arm_pose") {
+      return restock_pick_approach_joint_positions_;
+    }
+    if (command == "restock_pick_arm_pose") {
+      return restock_pick_joint_positions_;
+    }
+    if (command == "restock_post_pick_arm_pose") {
+      return restock_post_pick_joint_positions_;
+    }
+    if (command == "restock_transfer_arm_pose") {
+      return restock_transfer_joint_positions_;
+    }
+    if (command == "restock_place_arm_pose") {
+      return restock_place_joint_positions_;
+    }
+    if (command == "restock_home_arm_pose") {
+      return restock_home_joint_positions_;
+    }
     if (command == "lift_arm_pose") {
       return lift_joint_positions_;
     }
     if (command == "post_lift_arm_pose") {
       return post_lift_joint_positions_;
     }
-    if (command == "place_arm_pose") {
+    if (command == "place_arm_pose" || command == "place_arm_pose_1") {
       return place_joint_positions_;
+    }
+    if (command == "place_arm_pose_2") {
+      return place_2_joint_positions_;
+    }
+    if (command == "place_arm_pose_3") {
+      return place_3_joint_positions_;
+    }
+    if (command == "place_arm_pose_4") {
+      return place_4_joint_positions_;
+    }
+    if (command == "place_arm_pose_5") {
+      return place_5_joint_positions_;
+    }
+    if (command == "place_arm_pose_6") {
+      return place_6_joint_positions_;
     }
     if (command == "post_place_arm_pose") {
       return post_place_joint_positions_;
@@ -299,14 +402,50 @@ private:
     if (command == "startup_arm_pose") {
       return "Failed to execute configured startup arm pose";
     }
+    if (command == "restock_pick_ready_arm_pose") {
+      return "Failed to execute configured restock pick-ready arm pose";
+    }
+    if (command == "restock_pick_approach_arm_pose") {
+      return "Failed to execute configured restock pick-approach arm pose";
+    }
+    if (command == "restock_pick_arm_pose") {
+      return "Failed to execute configured restock pick arm pose";
+    }
+    if (command == "restock_post_pick_arm_pose") {
+      return "Failed to execute configured restock post-pick arm pose";
+    }
+    if (command == "restock_transfer_arm_pose") {
+      return "Failed to execute configured restock transfer arm pose";
+    }
+    if (command == "restock_place_arm_pose") {
+      return "Failed to execute configured restock place arm pose";
+    }
+    if (command == "restock_home_arm_pose") {
+      return "Failed to execute configured restock home arm pose";
+    }
     if (command == "lift_arm_pose") {
       return "Failed to execute configured lift arm pose";
     }
     if (command == "post_lift_arm_pose") {
       return "Failed to execute configured post-lift arm pose";
     }
-    if (command == "place_arm_pose") {
-      return "Failed to execute configured place arm pose";
+    if (command == "place_arm_pose" || command == "place_arm_pose_1") {
+      return "Failed to execute configured basket 1 place arm pose";
+    }
+    if (command == "place_arm_pose_2") {
+      return "Failed to execute configured basket 2 place arm pose";
+    }
+    if (command == "place_arm_pose_3") {
+      return "Failed to execute configured basket 3 place arm pose";
+    }
+    if (command == "place_arm_pose_4") {
+      return "Failed to execute configured basket 4 place arm pose";
+    }
+    if (command == "place_arm_pose_5") {
+      return "Failed to execute configured basket 5 place arm pose";
+    }
+    if (command == "place_arm_pose_6") {
+      return "Failed to execute configured basket 6 place arm pose";
     }
     if (command == "post_place_arm_pose") {
       return "Failed to execute configured post-place arm pose";
@@ -331,14 +470,50 @@ private:
     if (command == "startup_arm_pose") {
       return "Startup arm pose complete";
     }
+    if (command == "restock_pick_ready_arm_pose") {
+      return "Restock pick-ready arm pose complete";
+    }
+    if (command == "restock_pick_approach_arm_pose") {
+      return "Restock pick-approach arm pose complete";
+    }
+    if (command == "restock_pick_arm_pose") {
+      return "Restock pick arm pose complete";
+    }
+    if (command == "restock_post_pick_arm_pose") {
+      return "Restock post-pick arm pose complete";
+    }
+    if (command == "restock_transfer_arm_pose") {
+      return "Restock transfer arm pose complete";
+    }
+    if (command == "restock_place_arm_pose") {
+      return "Restock place arm pose complete";
+    }
+    if (command == "restock_home_arm_pose") {
+      return "Restock home arm pose complete";
+    }
     if (command == "lift_arm_pose") {
       return "Lift arm pose complete";
     }
     if (command == "post_lift_arm_pose") {
       return "Post-lift arm pose complete";
     }
-    if (command == "place_arm_pose") {
-      return "Place arm pose complete";
+    if (command == "place_arm_pose" || command == "place_arm_pose_1") {
+      return "Basket 1 place arm pose complete";
+    }
+    if (command == "place_arm_pose_2") {
+      return "Basket 2 place arm pose complete";
+    }
+    if (command == "place_arm_pose_3") {
+      return "Basket 3 place arm pose complete";
+    }
+    if (command == "place_arm_pose_4") {
+      return "Basket 4 place arm pose complete";
+    }
+    if (command == "place_arm_pose_5") {
+      return "Basket 5 place arm pose complete";
+    }
+    if (command == "place_arm_pose_6") {
+      return "Basket 6 place arm pose complete";
     }
     if (command == "post_place_arm_pose") {
       return "Post-place arm pose complete";
@@ -359,7 +534,10 @@ private:
     }
 
     const auto command = goal->planning_group;
-    if (is_gripper_command(command) || is_named_arm_command(command)) {
+    if (
+      is_gripper_command(command) || is_named_arm_command(command) ||
+      is_waist_delta_command(command))
+    {
       return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
@@ -483,12 +661,21 @@ private:
     return false;
   }
 
+  double pose_goal_orientation_tolerance_rad() const
+  {
+    return std::min(
+      {std::max(0.0, orientation_constraint_x_tolerance_rad_),
+        std::max(0.0, orientation_constraint_y_tolerance_rad_),
+        std::max(0.0, orientation_constraint_z_tolerance_rad_)});
+  }
+
   bool plan_and_execute_arm(
     const geometry_msgs::msg::PoseStamped & target_pose,
     const std::string & ee_link,
     bool use_cartesian,
     bool require_orientation_match)
   {
+    last_arm_failure_reason_.clear();
     const std::string target_link =
       !ee_link.empty() ? ee_link : arm_move_group_->getEndEffectorLink();
     moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -513,6 +700,7 @@ private:
             this->get_logger(),
             "Failed to set Cartesian end-effector link to '%s'.",
             target_link.c_str());
+          last_arm_failure_reason_ = "Failed to set Cartesian end-effector link";
           restore_move_group_context();
           return false;
         }
@@ -547,6 +735,7 @@ private:
           "Cartesian path fraction too low: %.3f < %.3f",
           fraction,
           required_fraction);
+        last_arm_failure_reason_ = "Failed to plan Cartesian arm pose";
         return false;
       }
       plan.trajectory_ = robot_traj;
@@ -555,6 +744,30 @@ private:
       const auto plan_pose_target = [&](bool use_orientation_constraint) -> bool {
         bool path_constraints_set = false;
         bool position_target_set = false;
+        const bool use_goal_orientation_tolerance =
+          require_orientation_match && !use_orientation_constraint;
+        const double previous_goal_orientation_tolerance =
+          arm_move_group_->getGoalOrientationTolerance();
+        const double goal_orientation_tolerance =
+          pose_goal_orientation_tolerance_rad();
+
+        if (use_goal_orientation_tolerance) {
+          arm_move_group_->setGoalOrientationTolerance(goal_orientation_tolerance);
+          if (
+            std::abs(orientation_constraint_x_tolerance_rad_ - goal_orientation_tolerance) > 1e-9 ||
+            std::abs(orientation_constraint_y_tolerance_rad_ - goal_orientation_tolerance) > 1e-9 ||
+            std::abs(orientation_constraint_z_tolerance_rad_ - goal_orientation_tolerance) > 1e-9)
+          {
+            RCLCPP_INFO(
+              this->get_logger(),
+              "Using goal-only orientation tolerance %.3f rad for pose planning "
+              "(MoveIt goal tolerance is shared across roll/pitch/yaw; configured x=%.3f y=%.3f z=%.3f).",
+              goal_orientation_tolerance,
+              orientation_constraint_x_tolerance_rad_,
+              orientation_constraint_y_tolerance_rad_,
+              orientation_constraint_z_tolerance_rad_);
+          }
+        }
 
         if (use_orientation_constraint && !target_link.empty()) {
           arm_move_group_->setPathConstraints(
@@ -589,10 +802,14 @@ private:
 
         const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
         arm_move_group_->clearPoseTargets();
+        if (use_goal_orientation_tolerance) {
+          arm_move_group_->setGoalOrientationTolerance(previous_goal_orientation_tolerance);
+        }
         if (path_constraints_set) {
           arm_move_group_->clearPathConstraints();
         }
         if (use_orientation_constraint && !position_target_set && !target_link.empty()) {
+          last_arm_failure_reason_ = "Failed to set constrained position target";
           return false;
         }
         return ok;
@@ -605,6 +822,9 @@ private:
         !target_link.empty();
 
       if (!plan_pose_target(use_orientation_constraint)) {
+        if (last_arm_failure_reason_.empty()) {
+          last_arm_failure_reason_ = "Failed to plan arm pose";
+        }
         return false;
       }
     }
@@ -615,6 +835,7 @@ private:
     const bool execute_ok =
       arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!execute_ok) {
+      last_arm_failure_reason_ = "Failed to execute arm pose";
       return false;
     }
     if (!require_orientation_match || !verify_final_orientation_match_) {
@@ -623,7 +844,11 @@ private:
     if (orientation_check_settle_sec_ > 0.0) {
       std::this_thread::sleep_for(std::chrono::duration<double>(orientation_check_settle_sec_));
     }
-    return pose_is_within_orientation_tolerance(target_pose, target_link);
+    if (!pose_is_within_orientation_tolerance(target_pose, target_link)) {
+      last_arm_failure_reason_ = "Pose exceeded orientation tolerance";
+      return false;
+    }
+    return true;
   }
 
   void publish_preview(const moveit::planning_interface::MoveGroupInterface::Plan & plan)
@@ -722,7 +947,10 @@ private:
       if (execute_gripper_named(open_gripper_named_target_)) {
         return true;
       }
-      return execute_gripper_position(open_gripper_pos_);
+      const double open_target =
+        (gripper_close_position >= 0.0f) ? static_cast<double>(gripper_close_position) :
+        open_gripper_pos_;
+      return execute_gripper_position(open_target);
     }
 
     if (command == "close_gripper") {
@@ -761,6 +989,62 @@ private:
     const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
     if (!ok) {
       RCLCPP_WARN(this->get_logger(), "Failed to plan configured arm pose.");
+      return false;
+    }
+    if (preview_only_) {
+      publish_preview(plan);
+      return true;
+    }
+    return arm_move_group_->execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+  }
+
+  bool execute_waist_delta(double delta_rad)
+  {
+    if (std::abs(delta_rad) < 1e-6) {
+      RCLCPP_INFO(this->get_logger(), "Waist centering delta is near zero; skipping motion.");
+      return true;
+    }
+
+    arm_move_group_->setStartStateToCurrentState();
+
+    const auto joint_names = arm_move_group_->getActiveJoints();
+    const auto joint_values = arm_move_group_->getCurrentJointValues();
+    if (joint_names.empty() || joint_names.size() != joint_values.size()) {
+      RCLCPP_WARN(this->get_logger(), "Unable to read current arm joints for waist-only move.");
+      return false;
+    }
+
+    std::map<std::string, double> joint_targets;
+    bool found_waist = false;
+    for (size_t i = 0; i < joint_names.size(); ++i) {
+      double target_value = joint_values[i];
+      if (joint_names[i].find("waist") != std::string::npos) {
+        target_value += delta_rad;
+        found_waist = true;
+      }
+      joint_targets[joint_names[i]] = target_value;
+    }
+
+    if (!found_waist) {
+      RCLCPP_WARN(this->get_logger(), "Active arm joints do not contain a waist joint.");
+      return false;
+    }
+
+    if (!arm_move_group_->setJointValueTarget(joint_targets)) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to set waist-only arm target (delta=%.3f rad).",
+        delta_rad);
+      return false;
+    }
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    const bool ok = arm_move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    if (!ok) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Failed to plan waist-only arm target (delta=%.3f rad).",
+        delta_rad);
       return false;
     }
     if (preview_only_) {
@@ -837,6 +1121,29 @@ private:
         return;
       }
 
+      if (is_waist_delta_command(command)) {
+        feedback->stage = command;
+        feedback->position_error_m = 0.0f;
+        goal_handle->publish_feedback(feedback);
+
+        if (!execute_waist_delta(static_cast<double>(goal->waist_delta_rad))) {
+          result->success = false;
+          result->message = "Failed to execute waist-only arm move";
+          result->final_position_error_m = -1.0f;
+          goal_handle->abort(result);
+          goal_active_.store(false);
+          return;
+        }
+
+        result->success = true;
+        result->message = "Waist-only arm move complete";
+        result->final_position_error_m = 0.0f;
+        maybe_preview_delay();
+        goal_handle->succeed(result);
+        goal_active_.store(false);
+        return;
+      }
+
       if (!is_pose_goal_command(command)) {
         result->success = false;
         result->message = "Unsupported planning_group";
@@ -859,7 +1166,8 @@ private:
           goal->require_orientation_match))
       {
         result->success = false;
-        result->message = "Failed to plan/execute arm pose";
+        result->message = last_arm_failure_reason_.empty() ?
+          "Failed to plan/execute arm pose" : last_arm_failure_reason_;
         result->final_position_error_m = -1.0f;
         goal_handle->abort(result);
         goal_active_.store(false);
@@ -919,6 +1227,7 @@ private:
   double preview_step_delay_sec_;
   bool verify_final_orientation_match_;
   double orientation_check_settle_sec_;
+  std::string last_arm_failure_reason_;
   double open_gripper_pos_;
   double closed_gripper_pos_;
   std::vector<std::string> scan_center_joint_names_;
@@ -929,10 +1238,22 @@ private:
   std::vector<double> scan_right_joint_positions_;
   std::vector<std::string> startup_joint_names_;
   std::vector<double> startup_joint_positions_;
+  std::vector<double> restock_pick_ready_joint_positions_;
+  std::vector<double> restock_pick_approach_joint_positions_;
+  std::vector<double> restock_pick_joint_positions_;
+  std::vector<double> restock_post_pick_joint_positions_;
+  std::vector<double> restock_transfer_joint_positions_;
+  std::vector<double> restock_place_joint_positions_;
+  std::vector<double> restock_home_joint_positions_;
   std::vector<std::string> return_joint_names_;
   std::vector<double> return_joint_positions_;
   std::vector<std::string> place_joint_names_;
   std::vector<double> place_joint_positions_;
+  std::vector<double> place_2_joint_positions_;
+  std::vector<double> place_3_joint_positions_;
+  std::vector<double> place_4_joint_positions_;
+  std::vector<double> place_5_joint_positions_;
+  std::vector<double> place_6_joint_positions_;
   std::vector<std::string> post_place_joint_names_;
   std::vector<double> post_place_joint_positions_;
   std::vector<std::string> pre_return_joint_names_;

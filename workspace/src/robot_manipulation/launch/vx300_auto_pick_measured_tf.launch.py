@@ -24,7 +24,24 @@ def generate_launch_description():
             "auto_pick_config": LaunchConfiguration("auto_pick_config"),
             "launch_camera_vision": LaunchConfiguration("launch_camera_vision"),
             "vision_model_path": LaunchConfiguration("vision_model_path"),
+            "vision_use_yoloe": LaunchConfiguration("vision_use_yoloe"),
+            "vision_prompt_classes": LaunchConfiguration("vision_prompt_classes"),
+            "vision_published_class_names": LaunchConfiguration(
+                "vision_published_class_names"
+            ),
             "vision_confidence": LaunchConfiguration("vision_confidence"),
+            "vision_color_enable_auto_exposure": LaunchConfiguration(
+                "vision_color_enable_auto_exposure"
+            ),
+            "vision_color_exposure": LaunchConfiguration("vision_color_exposure"),
+            "vision_color_gain": LaunchConfiguration("vision_color_gain"),
+            "vision_color_brightness": LaunchConfiguration("vision_color_brightness"),
+            "vision_color_contrast": LaunchConfiguration("vision_color_contrast"),
+            "vision_color_saturation": LaunchConfiguration("vision_color_saturation"),
+            "vision_color_enable_auto_white_balance": LaunchConfiguration(
+                "vision_color_enable_auto_white_balance"
+            ),
+            "vision_color_white_balance": LaunchConfiguration("vision_color_white_balance"),
             "vision_parent_frame": "vx300s/ee_gripper_link",
             "vision_camera_mount_frame": "camera_mount_frame",
             "vision_camera_optical_frame": "camera_color_optical_frame",
@@ -50,8 +67,40 @@ def generate_launch_description():
             DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),
             DeclareLaunchArgument("auto_pick_config", default_value=""),
             DeclareLaunchArgument("launch_camera_vision", default_value="true"),
-            DeclareLaunchArgument("vision_model_path", default_value="yolov8n.pt"),
-            DeclareLaunchArgument("vision_confidence", default_value="0.50"),
+            DeclareLaunchArgument("vision_model_path", default_value="yoloe-11s-seg.pt"),
+            DeclareLaunchArgument("vision_use_yoloe", default_value="true"),
+            DeclareLaunchArgument(
+                "vision_prompt_classes",
+                default_value=(
+                    "green bottle,green tea bottle,orange bottle,"
+                    "clear bottle,"
+                    "coca cola can,apple,orange,lemon,"
+                    "yellow lays potato chips bag,yellow potato chips bag,"
+                    "side of yellow potato chips bag,yellow chips bag side view,"
+                    "yellow snack bag"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "vision_published_class_names",
+                default_value=(
+                    "green tea,green tea,roasted tea,"
+                    "water,"
+                    "can,apple,orange,lemon,"
+                    "bag of chips,bag of chips,bag of chips,bag of chips,bag of chips"
+                ),
+            ),
+            DeclareLaunchArgument("vision_confidence", default_value="0.40"),
+            DeclareLaunchArgument("vision_color_enable_auto_exposure", default_value="false"),
+            DeclareLaunchArgument("vision_color_exposure", default_value="300"),
+            DeclareLaunchArgument("vision_color_gain", default_value="24"),
+            DeclareLaunchArgument("vision_color_brightness", default_value="0"),
+            DeclareLaunchArgument("vision_color_contrast", default_value="50"),
+            DeclareLaunchArgument("vision_color_saturation", default_value="64"),
+            DeclareLaunchArgument(
+                "vision_color_enable_auto_white_balance",
+                default_value="true",
+            ),
+            DeclareLaunchArgument("vision_color_white_balance", default_value="4600"),
             DeclareLaunchArgument("vision_grasp_depth_offset_m", default_value="0.02"),
             DeclareLaunchArgument("vision_publish_image", default_value="true"),
             DeclareLaunchArgument("vision_show_live_window", default_value="true"),

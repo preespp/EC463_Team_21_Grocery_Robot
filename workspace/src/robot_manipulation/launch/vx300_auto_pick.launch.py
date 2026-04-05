@@ -37,7 +37,24 @@ def generate_launch_description():
         parameters=[
             {
                 "model_path": LaunchConfiguration("vision_model_path"),
+                "use_yoloe": LaunchConfiguration("vision_use_yoloe"),
+                "prompt_classes": LaunchConfiguration("vision_prompt_classes"),
+                "published_class_names": LaunchConfiguration(
+                    "vision_published_class_names"
+                ),
                 "conf": LaunchConfiguration("vision_confidence"),
+                "color_enable_auto_exposure": LaunchConfiguration(
+                    "vision_color_enable_auto_exposure"
+                ),
+                "color_exposure": LaunchConfiguration("vision_color_exposure"),
+                "color_gain": LaunchConfiguration("vision_color_gain"),
+                "color_brightness": LaunchConfiguration("vision_color_brightness"),
+                "color_contrast": LaunchConfiguration("vision_color_contrast"),
+                "color_saturation": LaunchConfiguration("vision_color_saturation"),
+                "color_enable_auto_white_balance": LaunchConfiguration(
+                    "vision_color_enable_auto_white_balance"
+                ),
+                "color_white_balance": LaunchConfiguration("vision_color_white_balance"),
                 "parent_frame": LaunchConfiguration("vision_parent_frame"),
                 "camera_mount_frame": LaunchConfiguration("vision_camera_mount_frame"),
                 "camera_optical_frame": LaunchConfiguration("vision_camera_optical_frame"),
@@ -66,8 +83,40 @@ def generate_launch_description():
         DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),
         DeclareLaunchArgument("auto_pick_config", default_value=""),
         DeclareLaunchArgument("launch_camera_vision", default_value="false"),
-        DeclareLaunchArgument("vision_model_path", default_value="yolov8n.pt"),
-        DeclareLaunchArgument("vision_confidence", default_value="0.50"),
+        DeclareLaunchArgument("vision_model_path", default_value="yoloe-11s-seg.pt"),
+        DeclareLaunchArgument("vision_use_yoloe", default_value="true"),
+        DeclareLaunchArgument(
+            "vision_prompt_classes",
+            default_value=(
+                "green bottle,green tea bottle,orange bottle,"
+                "clear bottle,"
+                "coca cola can,apple,orange,lemon,"
+                "yellow lays potato chips bag,yellow potato chips bag,"
+                "side of yellow potato chips bag,yellow chips bag side view,"
+                "yellow snack bag"
+            ),
+        ),
+        DeclareLaunchArgument(
+            "vision_published_class_names",
+            default_value=(
+                "green tea,green tea,roasted tea,"
+                "water,"
+                "can,apple,orange,lemon,"
+                "bag of chips,bag of chips,bag of chips,bag of chips,bag of chips"
+            ),
+        ),
+        DeclareLaunchArgument("vision_confidence", default_value="0.40"),
+        DeclareLaunchArgument("vision_color_enable_auto_exposure", default_value="false"),
+        DeclareLaunchArgument("vision_color_exposure", default_value="300"),
+        DeclareLaunchArgument("vision_color_gain", default_value="24"),
+        DeclareLaunchArgument("vision_color_brightness", default_value="0"),
+        DeclareLaunchArgument("vision_color_contrast", default_value="50"),
+        DeclareLaunchArgument("vision_color_saturation", default_value="64"),
+        DeclareLaunchArgument(
+            "vision_color_enable_auto_white_balance",
+            default_value="true",
+        ),
+        DeclareLaunchArgument("vision_color_white_balance", default_value="4600"),
         DeclareLaunchArgument("vision_parent_frame", default_value="vx300s/ee_gripper_link"),
         DeclareLaunchArgument("vision_camera_mount_frame", default_value="camera_mount_frame"),
         DeclareLaunchArgument(

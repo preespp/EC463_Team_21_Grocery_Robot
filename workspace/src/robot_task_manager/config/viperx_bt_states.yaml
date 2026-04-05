@@ -31,17 +31,23 @@ viperx_bt_states:
 
   basket_slots:
     - slot: 0
-      command: "place_arm_pose"
-      description: "Bottle slot 1"
+      command: "place_arm_pose_1"
+      description: "Basket 1"
     - slot: 1
-      command: "place_arm_pose"
-      description: "Bottle slot 2"
+      command: "place_arm_pose_2"
+      description: "Basket 2"
     - slot: 2
-      command: "place_arm_pose"
-      description: "Bottle slot 3"
+      command: "place_arm_pose_3"
+      description: "Basket 3"
     - slot: 3
-      command: "place_arm_pose"
-      description: "Random items slot"
+      command: "place_arm_pose_4"
+      description: "Basket 4"
+    - slot: 4
+      command: "place_arm_pose_5"
+      description: "Basket 5"
+    - slot: 5
+      command: "place_arm_pose_6"
+      description: "Basket 6"
 
   optional_post_place_states:
     post_place:

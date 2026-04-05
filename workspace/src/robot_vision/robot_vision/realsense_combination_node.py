@@ -18,7 +18,7 @@ class RealsenseCombinationNode(Node):
         super().__init__("realsense_combination_node")
 
         self.declare_parameter("model", "yolov8n.pt")
-        self.declare_parameter("conf", 0.5)
+        self.declare_parameter("conf", 0.4)
         self.declare_parameter("use_imu", False)
         self.declare_parameter("cam_offset", "0,0,0")
         self.declare_parameter("cam_rpy", "0,0,0")
@@ -97,4 +97,3 @@ def main(args=None):
         pass
     node.destroy_node()
     rclpy.shutdown()
-
