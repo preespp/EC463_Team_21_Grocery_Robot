@@ -1,4 +1,7 @@
-# Team 21 Grocery Robot
+# Team 21 GOFR: Grocery Operations & Fulfillment Robot
+<p align="center">
+<img src="./images/Logo_grey.png" width="50%">
+</p>
 Our group’s vision is to make everyday shopping more efficient and inclusive. We aim to address issues that would benefit both owners and customers through an intelligent, multi-functional robotic system to improve shelf management and customer experience. Our final delivery would be a multi-wheel robot with functional robotic arm(s), sensors, cameras, and artificial intelligence to assist in employee stocking and customer shopping.
 
 <p align="center">
@@ -11,10 +14,10 @@ Darren Figo Sajino, Pree Simphliphan, Bach Thien Nguyen, Bernie Xu, Xingjian Jia
 ## Table of Contents
 1. [Mission](#mission)
 2. [Project Summary](#project-summary)
-3. [Repository Guide](#repository-guide)
-4. [Problems & Market Analysis](#problems-and-market-analysis)
-5. [Goals](#goals)
-6. [System Architecture](#system-architecture)
+3. [Problems & Market Analysis](#problems-and-market-analysis)
+4. [Goals](#goals)
+5. [System Architecture](#system-architecture)
+6. [Repository Guide](#repository-guide)
 7. [Team Members](#team-members)
 8. [Advisor](#advisor)
 9. [Additional Links](#team-links)
@@ -26,24 +29,9 @@ To design and develop an intelligent, multi-functional robotic system that strea
 ## Project Summary
 In recent years, more and more robots are being employed in order to make daily life more convenient. These systems benefit the users by freeing up time and performing tasks that require precision. The Grocery Robot aims to build a robust robotic system that will perform a wide variety of assistive functions to make grocery shopping more accessible and convenient.
 
-GOFR, short for Grocery Operations & Fulfillment Robot, is an autonomous retail assistant built to support both shopping and restocking workflows. The goal is not to replace store employees, but to reduce repetitive operational burden and improve customer access in environments where reliable staffing and quick item fulfillment matter every day.
+GOFR (Previously, GroceryBot), Grocery Operations & Fulfillment Robot, is an autonomous retail assistant built to support both shopping and restocking workflows. The goal is not to replace store employees, but to reduce repetitive operational burden and improve customer access in environments where reliable staffing and quick item fulfillment matter every day.
 
 At a system level, GOFR combines store-scale mobility with item-level interaction. Customer or staff requests originate in the web app and backend, are resolved against a semantic store map, and are then executed by the ROS 2 autonomy stack. The robot localizes with LiDAR, odometry, and IMU inputs, navigates using Cartographer and Nav2, and uses camera-based perception to verify and align on target items before manipulation. This creates one continuous pipeline from store request to in-aisle execution.
-
-## Repository Guide
-
-The repository is organized around those major subsystems:
-
-- `workspace/src/robot_navigation`: ROS 2 navigation, mapping, localization, Nav2 tuning, semantic map serving, teleoperation, and STM32 serial bridging
-- `workspace/src/robot_interfaces`: shared ROS 2 custom message, service, and action definitions used across navigation, manipulation, and task execution modules
-- `workspace/src/robot_manipulation`: robotic arm control, MoveIt integration, Gazebo simulation assets, waypoint/action servers, and rack interaction logic
-- `workspace/src/robot_task_manager`: Behavior Tree-based task orchestration for customer and restock workflows, blackboard state management, order intake, semantic target resolution, and robot action sequencing
-- `workspace/src/robot_vision`: RealSense and camera perception nodes, barcode utilities, and YOLO-based vision components
-- `workspace/src/robot_perception`: Ultrasonic Sensors nodes for collision detection
-- `order-api-postgre`: Node.js + PostgreSQL backend for customer orders, inventory, authentication, and semantic map data
-- `order-api-postgre/fleet-manager`: Vue-based fleet and operations dashboard for maps, inventory reporting, robot status, and AI-assisted views
-- `ESP32` and `STM32`: embedded control, sensor integration, ultrasonic experiments, and base-control firmware
-- `Maps`, `images`, and `third_party`: saved maps, project assets, and vendored dependencies used by the dashboards and robot stack
 
 ## Problems and Market Analysis
 ### Market Research
@@ -81,18 +69,31 @@ These conditions create a clear opportunity for an assistive retail robot. GOFR 
 
 ## System Architecture
 <p align="center">
-<img src="./images/ROS2.png" width="50%">
+<img src="./images/main_arch.png" width="50%">
+</p>
+<p align="center">
+Overall Software System Architecture
 </p>
 
 <p align="center">
-ROS2 System Architecture
+<img src="./images/power_diagram.png" width="50%">
+</p>
+<p align="center">
+Power Diagram
 </p>
 
 <p align="center">
-<img src="./images/workflow.png" width="50%">
+<img src="./images/communication_diagram.png" width="50%">
 </p>
 <p align="center">
-Logic Workflow
+Communication Diagram
+</p>
+
+<p align="center">
+<img src="./images/CAD_final.png" width="50%">
+</p>
+<p align="center">
+CAD Mechanical Design
 </p>
 
 ### Software Stack
@@ -135,6 +136,21 @@ Logic Workflow
 - Remote E-Stop
 - NVIDIA Jetson Nano
 
+## Repository Guide
+
+The repository is organized around those major subsystems:
+
+- `workspace/src/robot_navigation`: ROS 2 navigation, mapping, localization, Nav2 tuning, semantic map serving, teleoperation, and STM32 serial bridging
+- `workspace/src/robot_interfaces`: shared ROS 2 custom message, service, and action definitions used across navigation, manipulation, and task execution modules
+- `workspace/src/robot_manipulation`: robotic arm control, MoveIt integration, Gazebo simulation assets, waypoint/action servers, and rack interaction logic
+- `workspace/src/robot_task_manager`: Behavior Tree-based task orchestration for customer and restock workflows, blackboard state management, order intake, semantic target resolution, and robot action sequencing
+- `workspace/src/robot_vision`: RealSense and camera perception nodes, barcode utilities, and YOLO-based vision components
+- `workspace/src/robot_perception`: Ultrasonic Sensors nodes for collision detection
+- `order-api-postgre`: Node.js + PostgreSQL backend for customer orders, inventory, authentication, and semantic map data
+- `order-api-postgre/fleet-manager`: Vue-based fleet and operations dashboard for maps, inventory reporting, robot status, and AI-assisted views
+- `ESP32` and `STM32`: embedded control, sensor integration, ultrasonic experiments, and base-control firmware
+- `Maps`, `images`, and `third_party`: saved maps, project assets, and vendored dependencies used by the dashboards and robot stack
+
 ## Team Members
 - Bach Thien Nguyen, Mechanical Engineering
 - Bernie Xu, Mechanical Engineering
@@ -160,5 +176,3 @@ Logic Workflow
 
 ## Optional features links
 - [Team Jira](https://seniordesign-team-21.atlassian.net/jira/software/projects/SCRUM/summary)
-- Team Confluence
-- Something else
