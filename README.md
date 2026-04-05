@@ -15,6 +15,7 @@ Darren Figo Sajino, Pree Simphliphan, Bach Thien Nguyen, Bernie Xu, Xingjian Jia
 4. [Problems & Market Analysis](#problems-and-market-analysis)
 5. [Goals](#goals)
 6. [System Architecture](#system-architecture)
+7. [Team Members](#team-members)
 8. [Advisor](#advisor)
 9. [Additional Links](#team-links)
 
