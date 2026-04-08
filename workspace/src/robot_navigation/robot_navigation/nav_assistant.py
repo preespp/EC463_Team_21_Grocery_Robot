@@ -515,6 +515,10 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         f"baud_rate:={args.baud_rate}",
         f"cmd_topics:={cmd_topics}",
         f"telemetry_enabled:={bool_to_launch(args.telemetry_enabled)}",
+        f"bridge_max_linear_speed:={args.bridge_max_linear_speed}",
+        f"bridge_max_lateral_speed:={args.bridge_max_lateral_speed}",
+        f"bridge_max_yaw_speed:={args.bridge_max_yaw_speed}",
+        f"bridge_axis_deadband:={args.bridge_axis_deadband}",
         f"left_switch:={args.left_switch}",
         f"right_switch:={args.right_switch}",
         f"odom_topic:={args.odom_topic}",
@@ -748,7 +752,7 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common.add_argument(
         "--bridge-max-yaw-speed", type=float, default=4.0 * math.pi
     )
-    stack_common.add_argument("--bridge-axis-deadband", type=float, default=0.05)
+    stack_common.add_argument("--bridge-axis-deadband", type=float, default=0.03)
     stack_common.add_argument("--dry-run", action="store_true")
 
     mapping_parser = subparsers.add_parser(

@@ -112,6 +112,8 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: False
+    # MPPI requires controller period <= model_dt. With model_dt=0.05 s,
+    # keep controller_frequency at 20 Hz or higher so Nav2 can configure.
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.001
@@ -131,14 +133,14 @@ controller_server:
       plugin: "nav2_controller::SimpleGoalChecker"
       # Grasp-approach navigation needs a much tighter final stop than generic
       # aisle navigation. Keep one precise tolerance profile for all runs.
-      xy_goal_tolerance: 0.08
-      yaw_goal_tolerance: 0.08
+      xy_goal_tolerance: 0.10
+      yaw_goal_tolerance: 0.12
 
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
       time_steps: 56
       model_dt: 0.05
-      batch_size: 1000
+      batch_size: 600
       vx_std: 0.15
       vy_std: 0.15
       wz_std: 0.3
@@ -191,7 +193,7 @@ controller_server:
         enabled: true
         cost_power: 1
         cost_weight: 3.0
-        threshold_to_consider: 0.5
+        threshold_to_consider: 0.30
       CostCritic:
         enabled: true
         cost_power: 1
@@ -227,10 +229,12 @@ controller_server:
       VelocityDeadbandCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 35.0
+        cost_weight: 14.0
         # The STM32 rocker dead zone is fixed at 0.03, so commands below
         # about 0.09 m/s linear and 0.377 rad/s yaw are liable to be eaten by
-        # the firmware. Bias MPPI toward commands that survive that floor.
+        # the firmware. The hard floor is about 0.09 m/s linear and
+        # 0.377 rad/s yaw (4*pi * 0.03), so keep yaw aligned with the real
+        # hardware turn threshold to avoid "commanded turn but no motion".
         deadband_velocities: [0.10, 0.10, 0.40]
       TwirlingCritic:
         enabled: true
@@ -335,7 +339,7 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_smac_planner/SmacPlanner2D"
-      tolerance: 0.125
+      tolerance: 0.10
       downsample_costmap: false
       downsampling_factor: 1
       allow_unknown: true
