@@ -441,3 +441,64 @@ Testing note:
 - this patch changes the source config in `robot_navigation`
 - if you want the default localization stack to truly load this version of the parameters, rebuild `robot_navigation` before testing
 - if you do not rebuild, launch may still read the older installed config
+
+### 11.2 Return-home recovery after customer-order failure
+
+Applied in:
+
+- `workspace/src/robot_task_manager/robot_task_manager/trees/customer_viperx.py`
+- `workspace/src/robot_task_manager/robot_task_manager/bt_executor_viperx.py`
+- `workspace/src/robot_task_manager/robot_task_manager/blackboard.py`
+
+Goals of this round:
+
+- if a customer pickup order fails before completion, the base should still attempt to return to `home_goal`
+- allow a few retries for return-home navigation while preserving the overall order result as `FAILED`
+- keep "failure recovery after incomplete order execution" separate from "return-home at the end of a successful order"
+
+Behavior change:
+
+- before: `SetHome -> MaybeNavigateToGoalPose` only ran after the full order completed successfully
+- after: if any key step fails before all items are done, the tree enters a failure-recovery branch and runs `SetHome -> Retry(MaybeNavigateToGoalPose)`, then explicitly preserves the tree result as `FAILURE`
+- the success-path return-home navigation now also uses retries
+
+New parameter:
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `return_home_retry_attempts` | `3` | number of retries for navigating the base back to `home_goal` during successful shutdown or failure recovery in the customer pickup tree |
+
+Implementation notes:
+
+- the blackboard now carries `customer_order_items_completed` to distinguish "order body completed" from "order body failed early"
+- the failure return-home branch only runs if `repeat_each_item` did not complete
+- if failure recovery reaches home successfully, the tree still returns `FAILURE`, so the backend continues to treat the order as a failed order
+- if return-home still fails after retries on the success path, the overall order is still treated as failed
+
+Trigger conditions:
+
+- success path: once customer pickup finishes `repeat_each_item` successfully, the tree runs one retry-enabled return to `home_goal`
+- failure path: `ReturnHomeOnFailure` only runs when customer pickup fails before the order body completes
+- more precisely, the robot does not "go home immediately when something looks wrong"; the current step must first bubble up a final `FAILURE`
+
+Typical cases that can trigger failure-side return-home:
+
+- `SetCurrentItem` fails, for example because the order state is inconsistent or the index is already out of range
+- Nav2 navigation to the shelf stop position fails finally
+- the vision-search stage fails finally, for example after center / left / right scans still do not produce a stable target, or the wait exceeds `search_timeout_sec`
+- `PrepareDetectedPickPoses` fails, for example because the detected point is outside the arm workspace
+- the grasp motion still fails after `RetryGrabFromPregrasp` exhausts its retry budget
+- the basket placement flow fails, such as no valid basket slot or an arm step inside the place sequence fails
+- the arm fails to return to `home_pose` after the item flow
+- `ChangeInventory` fails, for example because the backend inventory API request fails
+
+Important boundaries:
+
+- `ResolveCurrentItemSemanticTargetViperX` falls back to legacy coordinates by default, so semantic-resolution problems do not always trigger return-home; it only triggers if that node finally returns `FAILURE`
+- the detection stage is not "one look then fail"; it first waits for fresh detections, checks stability, and scans center / left / right
+- this automatic return-home logic currently exists only in the customer ViperX pickup tree, not in the employee/restock tree
+
+Testing note:
+
+- this patch only changes the customer ViperX tree; the employee/restock tree is unchanged
+- `colcon` is not available in the current environment, so this was validated only at Python syntax level, not with a ROS runtime test

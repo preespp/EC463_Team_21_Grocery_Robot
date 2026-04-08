@@ -63,6 +63,7 @@ def setup_blackboard():
     bb.item_index = 0
     bb.current_item = None
     bb.num_current_item = 0
+    bb.customer_order_items_completed = False
 
     # For manipulation
     # Preset arm states are stored as BT command dictionaries.
@@ -112,6 +113,7 @@ def setup_blackboard():
     bb.viperx_target_match_distance_m = 0.03
     bb.viperx_cooldown_sec = 3.0
     bb.viperx_grasp_retry_attempts = 5
+    bb.viperx_return_home_retry_attempts = 3
     bb.viperx_waist_centering_enabled = True
     bb.viperx_waist_centering_gain = 1.0
     bb.viperx_waist_centering_sign = -1.0
@@ -198,6 +200,7 @@ def setup_custom_blackboard():
     bb.item_index = 0
     bb.current_item = None
     bb.num_current_item = 0
+    bb.customer_order_items_completed = False
 
     # Servo-arm blackboard uses Cartesian targets in base_link.
     # robot_manipulation converts these into joint targets for the motors.

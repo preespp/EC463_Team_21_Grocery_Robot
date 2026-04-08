@@ -2,6 +2,50 @@ import py_trees
 import robot_task_manager.bt_nodes as bt_nodes
 
 
+class AlwaysFail(py_trees.behaviour.Behaviour):
+    """Utility leaf for preserving overall task failure after recovery steps run."""
+
+    def __init__(self, name: str = "AlwaysFail", message: str = "Preserving FAILURE after recovery"):
+        super().__init__(name)
+        self.message = message
+
+    def update(self):
+        self.feedback_message = self.message
+        return py_trees.common.Status.FAILURE
+
+
+class SetBlackboardBool(py_trees.behaviour.Behaviour):
+    """Set a boolean blackboard flag and return SUCCESS."""
+
+    def __init__(self, bb, key: str, value: bool, name: str | None = None):
+        super().__init__(name or f"SetBlackboardBool[{key}]")
+        self.bb = bb
+        self.key = key
+        self.value = bool(value)
+
+    def update(self):
+        setattr(self.bb, self.key, self.value)
+        self.feedback_message = f"{self.key}={self.value}"
+        return py_trees.common.Status.SUCCESS
+
+
+class CheckBlackboardBool(py_trees.behaviour.Behaviour):
+    """Return SUCCESS only when a boolean blackboard flag matches the expected value."""
+
+    def __init__(self, bb, key: str, expected: bool, name: str | None = None):
+        super().__init__(name or f"CheckBlackboardBool[{key}]")
+        self.bb = bb
+        self.key = key
+        self.expected = bool(expected)
+
+    def update(self):
+        actual = bool(getattr(self.bb, self.key, False))
+        self.feedback_message = f"{self.key}={actual}"
+        if actual == self.expected:
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.FAILURE
+
+
 def create_customer_viperx_tree(bb):
     """
     Customer picking task using ViperX arm with modular leaf nodes.
@@ -19,6 +63,10 @@ def create_customer_viperx_tree(bb):
 
     search_timeout_sec = float(getattr(bb, "viperx_search_timeout_sec", 3.0))
     grasp_retry_attempts = int(getattr(bb, "viperx_grasp_retry_attempts", 2))
+    return_home_retry_attempts = int(getattr(bb, "viperx_return_home_retry_attempts", 3))
+    order_items_completed_key = "customer_order_items_completed"
+
+    setattr(bb, order_items_completed_key, False)
 
     detect_center = py_trees.composites.Sequence(
         "DetectFromCenter",
@@ -155,19 +203,74 @@ def create_customer_viperx_tree(bb):
         num_success=num_items,
     )
 
-    # Root sequence
-    root = py_trees.composites.Sequence(
-        "CustomerRoot",
+    mark_order_items_completed = SetBlackboardBool(
+        bb=bb,
+        key=order_items_completed_key,
+        value=True,
+        name="MarkCustomerOrderItemsCompleted",
+    )
+
+    success_return_home = py_trees.composites.Sequence(
+        "ReturnHomeOnSuccess",
+        memory=True,
+        children=[
+            bt_nodes.SetHome(bb),
+            py_trees.decorators.Retry(
+                name="RetryReturnHomeOnSuccess",
+                child=bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
+                num_failures=return_home_retry_attempts,
+            ),
+            bt_nodes.DebugPrint("Customer picking complete"),
+        ],
+    )
+
+    main_flow = py_trees.composites.Sequence(
+        "CustomerMainFlow",
         memory=True,
         children=[
             bt_nodes.DebugPrint("Customer ViperX tree selected"),
             bt_nodes.DebugPrint(lambda: f"Items in order: {len(getattr(bb, 'items', []))}"),
             repeat_each_item,
-            
-            # Go home after all items picked
+            mark_order_items_completed,
+            success_return_home,
+        ],
+    )
+
+    failure_return_home = py_trees.composites.Sequence(
+        "ReturnHomeOnFailure",
+        memory=True,
+        children=[
+            CheckBlackboardBool(
+                bb=bb,
+                key=order_items_completed_key,
+                expected=False,
+                name="GuardCustomerOrderFailedBeforeCompletion",
+            ),
+            bt_nodes.DebugPrint(
+                lambda: (
+                    "Customer pickup failed; attempting return home "
+                    f"(retries={return_home_retry_attempts})"
+                )
+            ),
             bt_nodes.SetHome(bb),
-            bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
-            bt_nodes.DebugPrint("Customer picking complete"),
+            py_trees.decorators.Retry(
+                name="RetryReturnHomeAfterFailure",
+                child=bt_nodes.MaybeNavigateToGoalPose(goal_key="nav_goal", bb=bb),
+                num_failures=return_home_retry_attempts,
+            ),
+            bt_nodes.DebugPrint(
+                "Return-home recovery finished; preserving FAILED order result"
+            ),
+            AlwaysFail(),
+        ],
+    )
+
+    root = py_trees.composites.Selector(
+        "CustomerRoot",
+        memory=True,
+        children=[
+            main_flow,
+            failure_return_home,
         ],
     )
 

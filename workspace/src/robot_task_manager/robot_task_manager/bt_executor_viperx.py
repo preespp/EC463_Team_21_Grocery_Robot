@@ -22,9 +22,13 @@ class BTExecutor(Node):
         self.bb = setup_blackboard()
         self.declare_parameter("skip_navigation", False)
         self.declare_parameter("detection_min_confidence", 0.40)
+        self.declare_parameter("return_home_retry_attempts", 3)
         self.bb.skip_navigation = bool(self.get_parameter("skip_navigation").value)
         self.bb.viperx_detection_min_confidence = float(
             self.get_parameter("detection_min_confidence").value
+        )
+        self.bb.viperx_return_home_retry_attempts = int(
+            self.get_parameter("return_home_retry_attempts").value
         )
 
         self.current_order: Order | None = None
@@ -44,7 +48,8 @@ class BTExecutor(Node):
         self.get_logger().info(
             "BTExecutor ready (order intake + blackboard + BT) "
             f"| skip_navigation={self.bb.skip_navigation} "
-            f"| detection_min_confidence={self.bb.viperx_detection_min_confidence:.2f}"
+            f"| detection_min_confidence={self.bb.viperx_detection_min_confidence:.2f} "
+            f"| return_home_retry_attempts={self.bb.viperx_return_home_retry_attempts}"
         )
 
     def _on_detections(self, msg: String):
@@ -105,6 +110,7 @@ class BTExecutor(Node):
         self.bb.items = list(order.items)
         self.bb.item_index = 0
         self.bb.current_item = None
+        self.bb.customer_order_items_completed = False
         reset_viperx_manipulation_state(self.bb)
 
         self.get_logger().info(
@@ -130,6 +136,7 @@ class BTExecutor(Node):
         self.bb.item_index = 0
         self.bb.current_item = None
         self.bb.num_current_item = 0
+        self.bb.customer_order_items_completed = False
         self.bb.mode = None
         self.bb.nav_goal = (0.0, 0.0, 0.0)
         self.bb.home_goal = (0.0, 0.0, 0.0)

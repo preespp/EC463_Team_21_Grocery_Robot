@@ -443,3 +443,64 @@ ros2 service list | grep order
 - 这次 patch 改的是 `robot_navigation` 的源码配置
 - 如果你要让默认 localization stack 真正加载到这版参数，测试前需要重新构建 `robot_navigation`
 - 如果没重建，launch 读到的可能还是旧的安装配置
+
+### 11.2 Customer pickup 整单失败后的回 home 恢复
+
+应用位置：
+
+- `workspace/src/robot_task_manager/robot_task_manager/trees/customer_viperx.py`
+- `workspace/src/robot_task_manager/robot_task_manager/bt_executor_viperx.py`
+- `workspace/src/robot_task_manager/robot_task_manager/blackboard.py`
+
+本轮目标：
+
+- 当 customer pickup 在整单完成前失败时，底盘仍然尝试回到 `home_goal`
+- 回 home 允许重试几次，但整单结果仍保持 `FAILED`
+- 不把“订单主体失败后的恢复”与“成功收尾后的回 home”混为一类
+
+行为变化：
+
+- 改前：只在整单成功走完后执行 `SetHome -> MaybeNavigateToGoalPose`
+- 改后：整单过程中任一关键步骤失败后，会进入 failure recovery 分支，执行 `SetHome -> Retry(MaybeNavigateToGoalPose)`，然后显式保持树结果为 `FAILURE`
+- 同时，成功路径下的回 home 也改成了带重试的导航
+
+新增参数：
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `return_home_retry_attempts` | `3` | customer pickup 在成功收尾或失败恢复时，底盘回 `home_goal` 的导航重试次数 |
+
+实现说明：
+
+- blackboard 新增 `customer_order_items_completed`，用于区分“订单主体已经完成”还是“订单主体中途失败”
+- 只有在 `repeat_each_item` 尚未完成时，才会触发失败后的回 home 恢复分支
+- 如果恢复导航最终成功，树仍然返回 `FAILURE`，因此 backend 仍会把这单记为失败单，而不是成功单
+- 如果成功路径下的回 home 在重试后仍失败，整单仍会按失败处理
+
+触发条件：
+
+- 成功路径：当 customer pickup 的 `repeat_each_item` 全部成功完成后，会执行一次带重试的回 `home_goal`
+- 失败路径：只有 customer pickup 在整单完成前失败时，才会触发 `ReturnHomeOnFailure`
+- 更准确地说，不是“某一步刚出问题就立刻回家”，而是该步骤最终向上返回 `FAILURE` 后，树才会切去回 home 恢复分支
+
+当前会触发失败后回 home 的典型情况：
+
+- `SetCurrentItem` 失败，例如订单状态异常或索引已经越界
+- 到货架的 Nav2 导航最终失败
+- 视觉搜索阶段最终失败，例如 center / left / right 扫描后仍未找到稳定目标，或等待超过 `search_timeout_sec`
+- `PrepareDetectedPickPoses` 失败，例如检测点超出机械臂工作空间
+- 抓取动作在 `RetryGrabFromPregrasp` 用完后仍失败
+- 放篮流程失败，例如 basket slot 不可用或中间某个机械臂动作失败
+- item 完成后的机械臂 `home_pose` 返回失败
+- `ChangeInventory` 失败，例如 backend 库存接口请求失败
+
+需要注意的边界：
+
+- `ResolveCurrentItemSemanticTargetViperX` 默认会 fallback 到 legacy 坐标，所以 semantic resolve 出问题不一定会触发回 home；只有它最终真的返回 `FAILURE` 才会触发
+- 检测阶段不是“看一眼没看到就失败”，而是会先经历等待新鲜 detection、稳定性计数，以及 center / left / right 三段扫描
+- 这套自动回 home 逻辑当前只写在 customer ViperX pickup 树里，不适用于 employee/restock 树
+
+测试注意：
+
+- 这次 patch 只改了 customer ViperX 树，没有改 employee/restock 树
+- 当前环境没有可用的 `colcon`，这里只做了 Python 语法级校验，没有做 ROS 运行验证
