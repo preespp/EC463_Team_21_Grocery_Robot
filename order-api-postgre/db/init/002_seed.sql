@@ -16,12 +16,27 @@ INSERT INTO employee (employee_id, first_name, last_name, password, restock_id) 
   ('005AAA', 'Bernie', 'Su', 'team21', NULL)
 ON CONFLICT (employee_id) DO NOTHING;
 
-INSERT INTO inventory (product_name, category_id, category_name, price, stock, x, y, z) VALUES
-  ('Milk', 1, 'Drinks', 3.99, 20, 1.762289, 0.161800, 1),
-  ('Water', 1, 'Drinks', 1.49, 100, 1.762289, 0.161800, 2),
-  ('Apple', 2, 'Fruits', 0.99, 10, 4.282289, 3.581800, 2),
-  ('Orange', 2, 'Fruits', 1.19, 30, 4.282289, 3.581800, 1),
-  ('Rays', 3, 'Snacks', 4.29, 201, 4.642289, -3.798200, 1),
-  ('Ruffles', 3, 'Snacks', 4.49, 76, 4.642289, -3.798200, 2),
-  ('Cheetos', 3, 'Snacks', 3.79, 32, 4.642289, -3.798200, 3)
-ON CONFLICT DO NOTHING;
+INSERT INTO inventory (product_id, product_name, category_id, category_name, price, stock, x, y, z) VALUES
+  (1, 'Green Tea', 1, 'Drinks', 3.49, 20, 5.177849, -1.909191, 1),
+  (2, 'Water', 1, 'Drinks', 1.49, 100, 5.186558, -1.682527, 2),
+  (3, 'Apple', 2, 'Fruits', 0.99, 10, 2.760906, 0.894713, 2),
+  (4, 'Orange', 2, 'Fruits', 1.19, 30, 2.550116, 0.885422, 1),
+  (5, 'Lemon', 2, 'Fruits', 0.89, 18, 5.625196, 0.593373, 1),
+  (6, 'Can', 1, 'Drinks', 2.29, 24, 5.467639, 0.614740, 2),
+  (7, 'Bag of Chips', 3, 'Snacks', 4.29, 76, 5.793580, 0.572953, 3)
+ON CONFLICT (product_id) DO UPDATE
+SET
+  product_name = EXCLUDED.product_name,
+  category_id = EXCLUDED.category_id,
+  category_name = EXCLUDED.category_name,
+  price = EXCLUDED.price,
+  stock = EXCLUDED.stock,
+  x = EXCLUDED.x,
+  y = EXCLUDED.y,
+  z = EXCLUDED.z;
+
+SELECT setval(
+  pg_get_serial_sequence('inventory', 'product_id'),
+  COALESCE((SELECT MAX(product_id) FROM inventory), 1),
+  true
+);

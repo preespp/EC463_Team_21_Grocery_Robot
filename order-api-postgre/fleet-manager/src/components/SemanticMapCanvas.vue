@@ -84,12 +84,33 @@ let resizeObserver = null
 let lastFitKey = ''
 let suppressClick = false
 let dragState = null
+const ROTATION_HANDLE_DISTANCE = 34
+const ROTATION_HANDLE_RADIUS = 8
 
 const activeRaster = computed(() => props.rasterOverride || raster.value)
 const activeMap = computed(() => props.bundle?.map || null)
 const mapWidth = computed(() => Number(activeMap.value?.width_px || activeRaster.value?.width || 0))
 const mapHeight = computed(() => Number(activeMap.value?.height_px || activeRaster.value?.height || 0))
 const fitLabel = computed(() => (viewport.mode === 'full' ? 'Full Map' : 'Fit Objects'))
+const selectedEditableEntity = computed(() => {
+  if (!props.editable || !props.selectedKey || !props.bundle) return null
+  const [type, id] = String(props.selectedKey).split(':')
+  if (!type || !id || !props.draggableTypes.includes(type)) return null
+
+  if (type === 'anchor') {
+    const anchor = props.bundle.anchors?.find((item) => item.id === id)
+    return anchor ? { ...anchor, type, key: props.selectedKey } : null
+  }
+  if (type === 'rack') {
+    const rack = props.bundle.racks?.find((item) => item.id === id)
+    return rack ? { ...rack, type, key: props.selectedKey } : null
+  }
+  if (type === 'slot') {
+    const slot = props.bundle.slots?.find((item) => item.id === id)
+    return slot ? { ...slot, type, key: props.selectedKey } : null
+  }
+  return null
+})
 
 watch(
   () => props.bundle?.map?.image_url,
@@ -268,6 +289,7 @@ function drawMap() {
   if (props.visibleLayers?.anchors !== false) drawAnchors(ctx)
   if (props.visibleLayers?.slots !== false) drawSlots(ctx)
   if (props.visibleLayers?.robots && props.robots?.length) drawRobots(ctx)
+  if (props.editable) drawSelectedRotationHandle(ctx)
 }
 
 function applyViewportTransform(ctx) {
@@ -377,6 +399,38 @@ function drawSlots(ctx) {
       drawLabel(ctx, slot.label, screen.x + 12, screen.y - 12, '#bbf7d0')
     }
   }
+}
+
+function drawSelectedRotationHandle(ctx) {
+  const handleState = getRotationHandleState(selectedEditableEntity.value)
+  if (!handleState) return
+
+  ctx.save()
+  ctx.strokeStyle = 'rgba(191, 219, 254, 0.92)'
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.moveTo(handleState.center.x, handleState.center.y)
+  ctx.lineTo(handleState.handle.x, handleState.handle.y)
+  ctx.stroke()
+
+  ctx.fillStyle = '#0f172a'
+  ctx.beginPath()
+  ctx.arc(handleState.handle.x, handleState.handle.y, ROTATION_HANDLE_RADIUS + 3, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = '#f8fafc'
+  ctx.strokeStyle = '#38bdf8'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(handleState.handle.x, handleState.handle.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+
+  ctx.fillStyle = '#38bdf8'
+  ctx.beginPath()
+  ctx.arc(handleState.handle.x, handleState.handle.y, 2.5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
 }
 
 function drawRobots(ctx) {
@@ -567,8 +621,24 @@ function handlePointerDown(event) {
   if (!props.interactive || !canvasRef.value) return
 
   const point = getLocalPoint(event)
+  const rotateHandle = pickRotationHandle(point.x, point.y)
+  if (rotateHandle) {
+    dragState = {
+      kind: 'rotate',
+      pointerId: event.pointerId,
+      entity: rotateHandle.entity,
+      moved: false,
+      x: rotateHandle.pose.x,
+      y: rotateHandle.pose.y
+    }
+    emit('select', rotateHandle.entity)
+    canvasRef.value.setPointerCapture?.(event.pointerId)
+    return
+  }
+
   const pixel = screenToPixel(point.x, point.y)
-  const entity = pickEntity(pixel.x, pixel.y)
+  const selectedEntity = pickSelectedEntity(pixel.x, pixel.y)
+  const entity = selectedEntity || pickEntity(pixel.x, pixel.y)
   const canDragEntity = props.editable && entity && props.draggableTypes.includes(entity.type)
 
   if (canDragEntity) {
@@ -613,6 +683,21 @@ function handlePointerMove(event) {
     dragState.lastY = point.y
     clampViewport()
     drawMap()
+    return
+  }
+
+  if (dragState.kind === 'rotate') {
+    const mapPose = screenToMap(point.x, point.y)
+    const yaw = Math.atan2(mapPose.y - dragState.y, mapPose.x - dragState.x)
+    dragState.moved = true
+    suppressClick = true
+    viewport.mode = 'content'
+    emit('move-entity', {
+      ...dragState.entity,
+      x: dragState.x,
+      y: dragState.y,
+      yaw
+    })
     return
   }
 
@@ -740,6 +825,82 @@ function pickEntity(pixelX, pixelY) {
     .sort((a, b) => a.priority - b.priority || a.distance - b.distance)[0] || null
 }
 
+function pickSelectedEntity(pixelX, pixelY) {
+  const entity = selectedEditableEntity.value
+  if (!entity || !isLayerVisibleForType(entity.type)) return null
+  const hit = getEntityHitCandidate(entity, pixelX, pixelY, -1)
+  return hit && hit.distance <= hit.threshold ? entity : null
+}
+
+function pickRotationHandle(screenX, screenY) {
+  const handleState = getRotationHandleState(selectedEditableEntity.value)
+  if (!handleState) return null
+  const distance = Math.hypot(handleState.handle.x - screenX, handleState.handle.y - screenY)
+  if (distance > ROTATION_HANDLE_RADIUS + 6) return null
+  return {
+    entity: selectedEditableEntity.value,
+    pose: handleState.pose
+  }
+}
+
+function getRotationHandleState(entity) {
+  if (!entity || !activeMap.value || !stageSize.width || !stageSize.height) return null
+  const pose = getEntityPose(entity)
+  const pixel = mapToPixel(pose.x, pose.y)
+  const center = pixelToScreen(pixel.x, pixel.y)
+  const yaw = getEntityYaw(entity)
+  return {
+    pose,
+    center,
+    handle: {
+      x: center.x + Math.cos(-yaw) * ROTATION_HANDLE_DISTANCE,
+      y: center.y + Math.sin(-yaw) * ROTATION_HANDLE_DISTANCE
+    }
+  }
+}
+
+function getEntityHitCandidate(entity, pixelX, pixelY, priority = 0) {
+  if (!entity?.type) return null
+
+  if (entity.type === 'anchor') {
+    const point = mapToPixel(entity.x, entity.y)
+    return {
+      ...entity,
+      priority,
+      distance: Math.hypot(point.x - pixelX, point.y - pixelY),
+      threshold: 24 / Math.max(viewport.scale, 0.3)
+    }
+  }
+
+  if (entity.type === 'slot') {
+    const pose = entity.nav_pose || entity.service_pose || { x: 0, y: 0 }
+    const point = mapToPixel(pose.x, pose.y)
+    return {
+      ...entity,
+      priority,
+      distance: Math.hypot(point.x - pixelX, point.y - pixelY),
+      threshold: 20 / Math.max(viewport.scale, 0.3)
+    }
+  }
+
+  if (entity.type === 'rack') {
+    const point = mapToPixel(entity.x, entity.y)
+    const resolution = Number(activeMap.value?.resolution || 0.03)
+    const halfWidth = Math.max(18, Number(entity.width || 0.8) / resolution) / 2
+    const halfDepth = Math.max(12, Number(entity.depth || 0.4) / resolution) / 2
+    const local = rotatePoint(pixelX - point.x, pixelY - point.y, Number(entity.yaw || 0))
+    const inside = Math.abs(local.x) <= halfWidth && Math.abs(local.y) <= halfDepth
+    return {
+      ...entity,
+      priority: inside ? priority : priority + 0.5,
+      distance: inside ? 0 : Math.hypot(point.x - pixelX, point.y - pixelY),
+      threshold: inside ? Infinity : 34 / Math.max(viewport.scale, 0.3)
+    }
+  }
+
+  return null
+}
+
 function getEntityPose(entity) {
   if (entity.type === 'slot') {
     return entity.nav_pose || entity.service_pose || { x: 0, y: 0 }
@@ -748,6 +909,21 @@ function getEntityPose(entity) {
     x: Number(entity.x || 0),
     y: Number(entity.y || 0)
   }
+}
+
+function getEntityYaw(entity) {
+  if (entity.type === 'slot') {
+    return Number(entity.nav_pose?.yaw ?? entity.service_pose?.yaw ?? 0)
+  }
+  return Number(entity.yaw || 0)
+}
+
+function isLayerVisibleForType(type) {
+  if (type === 'anchor') return props.visibleLayers?.anchors !== false
+  if (type === 'rack') return props.visibleLayers?.racks !== false
+  if (type === 'slot') return props.visibleLayers?.slots !== false
+  if (type === 'robot') return !!props.visibleLayers?.robots
+  return true
 }
 
 function rotatePoint(x, y, yaw) {

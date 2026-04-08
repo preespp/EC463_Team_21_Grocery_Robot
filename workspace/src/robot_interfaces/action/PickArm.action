@@ -7,6 +7,7 @@ float32 retreat_offset_m
 float32 gripper_close_position
 bool use_cartesian_approach
 bool require_orientation_match
+float32 waist_delta_rad
 
 ---
 # Result

@@ -194,7 +194,7 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
         bb=None,
         detections_topic: str = "/detections_json",
         target_frame: str = "base_link",
-        min_confidence: float = 0.60,
+        min_confidence: float = 0.40,
         min_depth_m: float = 0.08,
         max_depth_m: float = 0.90,
         position_tolerance_m: float = 0.05,
@@ -255,6 +255,8 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
             detected_words = set(detected.replace("_", " ").split())
             expected_words = set(expected_clean.replace("_", " ").split())
             if expected_words and detected_words:
+                if detected_words.issubset(expected_words) or expected_words.issubset(detected_words):
+                    return True
                 if len(detected_words & expected_words) >= len(expected_words) * 0.8:
                     return True
         return False

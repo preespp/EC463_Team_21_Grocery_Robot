@@ -21,7 +21,7 @@ class BTExecutor(Node):
 
         self.bb = setup_blackboard()
         self.declare_parameter("skip_navigation", False)
-        self.declare_parameter("detection_min_confidence", 0.50)
+        self.declare_parameter("detection_min_confidence", 0.40)
         self.bb.skip_navigation = bool(self.get_parameter("skip_navigation").value)
         self.bb.viperx_detection_min_confidence = float(
             self.get_parameter("detection_min_confidence").value

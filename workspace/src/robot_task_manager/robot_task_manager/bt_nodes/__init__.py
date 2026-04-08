@@ -10,10 +10,12 @@ from .rack_nodes import RepositionRackToGoalLevel
 from .viperx_nodes import (
     RepositionViperXArm,
     VerifyViperXPosition,
+    PrepareWaistCenteringGoal,
     LockCurrentViperXOrientation,
     PrepareDetectedPickPoses,
     MoveViperXGripper,
     SelectBasketSlot,
+    MarkBasketSlotOccupied,
     MoveToDetectedPose,
 )
 from .inventory_nodes import ChangeInventory

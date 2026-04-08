@@ -18,6 +18,7 @@ def create_customer_viperx_tree(bb):
     """
 
     search_timeout_sec = float(getattr(bb, "viperx_search_timeout_sec", 3.0))
+    grasp_retry_attempts = int(getattr(bb, "viperx_grasp_retry_attempts", 2))
 
     detect_center = py_trees.composites.Sequence(
         "DetectFromCenter",
@@ -25,6 +26,9 @@ def create_customer_viperx_tree(bb):
         children=[
             bt_nodes.RepositionViperXArm(goal_key="scan_center_pose", bb=bb),
             bt_nodes.LockCurrentViperXOrientation(bb=bb),
+            bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
+            bt_nodes.PrepareWaistCenteringGoal(bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="waist_center_pose", bb=bb),
             bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
         ],
     )
@@ -35,6 +39,9 @@ def create_customer_viperx_tree(bb):
         children=[
             bt_nodes.RepositionViperXArm(goal_key="scan_left_pose", bb=bb),
             bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
+            bt_nodes.PrepareWaistCenteringGoal(bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="waist_center_pose", bb=bb),
+            bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
         ],
     )
 
@@ -43,6 +50,9 @@ def create_customer_viperx_tree(bb):
         memory=True,
         children=[
             bt_nodes.RepositionViperXArm(goal_key="scan_right_pose", bb=bb),
+            bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
+            bt_nodes.PrepareWaistCenteringGoal(bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="waist_center_pose", bb=bb),
             bt_nodes.VerifyViperXPosition(bb=bb, search_timeout_sec=search_timeout_sec),
         ],
     )
@@ -66,16 +76,30 @@ def create_customer_viperx_tree(bb):
         ],
     )
 
+    grab_motion = py_trees.composites.Sequence(
+        "GrabMotion",
+        memory=True,
+        children=[
+            bt_nodes.RepositionViperXArm(goal_key="pregrasp_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="grasp_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="post_grasp_lift_pose", bb=bb),
+            bt_nodes.RepositionViperXArm(goal_key="post_lift_pose", bb=bb),
+        ],
+    )
+
+    retry_grab_from_pregrasp = py_trees.decorators.Retry(
+        name="RetryGrabFromPregrasp",
+        child=grab_motion,
+        num_failures=grasp_retry_attempts,
+    )
+
     # Old-style pick sequence: open -> pregrasp -> grasp(and close) -> lift
     approach_and_grab = py_trees.composites.Sequence(
         "ApproachAndGrab",
         memory=True,
         children=[
             bt_nodes.MoveViperXGripper(command="open", bb=bb),
-            bt_nodes.RepositionViperXArm(goal_key="pregrasp_pose", bb=bb),
-            bt_nodes.RepositionViperXArm(goal_key="grasp_pose", bb=bb),
-            bt_nodes.RepositionViperXArm(goal_key="lift_pose", bb=bb),
-            bt_nodes.RepositionViperXArm(goal_key="post_lift_pose", bb=bb),
+            retry_grab_from_pregrasp,
         ],
     )
 
@@ -84,9 +108,10 @@ def create_customer_viperx_tree(bb):
         "PlaceInBasket",
         memory=True,
         children=[
-            bt_nodes.SelectBasketSlot(bb=bb),  # Select basket slot based on item type
+            bt_nodes.SelectBasketSlot(bb=bb),  # Select the next free basket slot
             bt_nodes.RepositionViperXArm(goal_key="basket_pose", bb=bb),  # Move to basket position
             bt_nodes.MoveViperXGripper(command="open", bb=bb),  # Release item
+            bt_nodes.MarkBasketSlotOccupied(bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="post_place_pose", bb=bb),
             bt_nodes.RepositionViperXArm(goal_key="pre_return_pose", bb=bb),
         ],
