@@ -400,3 +400,46 @@ ros2 service list | grep order
 - Nav2 是否真的到位
 - `/detections_json` 是否有目标
 - `/pick_viperx` 是否执行成功
+
+## 11. Patch Log 2026-04-08
+
+### 11.1 Nav2 停靠距离调参
+
+本轮 patch 的目标是：
+
+- 验证 pickup 最后停靠阶段是否主要被 `local_costmap` 的 inflation 往货架外推
+- 只改局部 costmap 的 inflation，不同时放松 global route planning
+
+应用位置：
+
+- `workspace/src/robot_navigation/config/nav2_params_smac_mppi_omni.yaml`
+
+本轮范围：
+
+- 只改 `local_costmap.inflation_layer`
+- 保持 `global_costmap` 不变
+- 保持 `robot_radius` 不变
+- 保持 semantic `nav_pose` 不变
+
+改前改后：
+
+| 参数 | 改前 | 改后 |
+| --- | --- | --- |
+| `local_costmap.inflation_layer.inflation_radius` | `0.55` | `0.42` |
+| `local_costmap.inflation_layer.cost_scaling_factor` | `3.0` | `6.0` |
+| `global_costmap.inflation_layer.inflation_radius` | `0.55` | `0.55` |
+| `global_costmap.inflation_layer.cost_scaling_factor` | `3.0` | `3.0` |
+
+原因：
+
+- 当前问题主要出在目标货架附近的最终停靠，而不是全局路径规划过远
+- `local_costmap` 更直接影响 MPPI 最后 1 米左右的靠近与停车行为
+- 把 local `inflation_radius` 调小，可以缩短货架外侧的 inflated keep-away 带
+- 把 local `cost_scaling_factor` 调大，可以让 inflation 代价离开障碍边界后下降得更快，减少“还没到目标就被挤停”的情况
+- `global_costmap` 本轮故意不动，是为了隔离变量，避免先引入整条路径规划的副作用
+
+测试注意：
+
+- 这次 patch 改的是 `robot_navigation` 的源码配置
+- 如果你要让默认 localization stack 真正加载到这版参数，测试前需要重新构建 `robot_navigation`
+- 如果没重建，launch 读到的可能还是旧的安装配置
