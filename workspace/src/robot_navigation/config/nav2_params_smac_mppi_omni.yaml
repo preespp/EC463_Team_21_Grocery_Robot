@@ -129,8 +129,10 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.25
+      # Grasp-approach navigation needs a much tighter final stop than generic
+      # aisle navigation. Keep one precise tolerance profile for all runs.
+      xy_goal_tolerance: 0.08
+      yaw_goal_tolerance: 0.08
 
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
@@ -226,7 +228,10 @@ controller_server:
         enabled: true
         cost_power: 1
         cost_weight: 35.0
-        deadband_velocities: [0.08, 0.07, 0.12]
+        # The STM32 rocker dead zone is fixed at 0.03, so commands below
+        # about 0.09 m/s linear and 0.377 rad/s yaw are liable to be eaten by
+        # the firmware. Bias MPPI toward commands that survive that floor.
+        deadband_velocities: [0.10, 0.10, 0.40]
       TwirlingCritic:
         enabled: true
         twirling_cost_power: 1
