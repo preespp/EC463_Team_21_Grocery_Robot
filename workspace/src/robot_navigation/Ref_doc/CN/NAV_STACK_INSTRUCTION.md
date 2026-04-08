@@ -153,7 +153,7 @@ ros2 launch robot_navigation cartographer_localization.launch.py \
 ### 2.5 串口桥（STM32 -> /odom_raw）
 ```bash
 ros2 run robot_navigation nav2_serial_bridge --ros-args \
-  -p serial_port:=/dev/ttyUSB0 \
+  -p serial_port:=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
   -p baud_rate:=115200 \
   -p cmd_topics:='["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]' \
   -p odom_topic:=/odom_raw \

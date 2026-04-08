@@ -19,6 +19,10 @@ POINTCLOUD_CONFIG = (
 )
 RAW_POINTS_TOPIC = "/cloud_all_fields_fullframe"
 FILTERED_POINTS_TOPIC = "/cloud_all_fields_fullframe_filtered"
+BASE_SERIAL_PORT = (
+    "/dev/serial/by-id/"
+    "usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0"
+)
 
 
 def generate_launch_description():
@@ -213,7 +217,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("hostname", default_value="192.168.8.150"),
             DeclareLaunchArgument("udp_receiver_ip", default_value="192.168.8.249"),
-            DeclareLaunchArgument("serial_port", default_value="/dev/ttyUSB0"),
+            DeclareLaunchArgument("serial_port", default_value=BASE_SERIAL_PORT),
             DeclareLaunchArgument("baud_rate", default_value="115200"),
             DeclareLaunchArgument(
                 "cmd_topics",

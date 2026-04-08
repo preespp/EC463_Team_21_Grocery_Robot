@@ -9,6 +9,12 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 
+ARM_MOTOR_PORT = (
+    "/dev/serial/by-id/"
+    "usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0"
+)
+
+
 def generate_launch_description():
     manipulation_share = get_package_share_directory("robot_manipulation")
 
@@ -77,7 +83,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("robot_model", default_value="vx300s"),
         DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
-        DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB0"),
+        DeclareLaunchArgument("motor_port", default_value=ARM_MOTOR_PORT),
         DeclareLaunchArgument("use_moveit_rviz", default_value="true"),
         DeclareLaunchArgument("use_viperx_preview", default_value="false"),
         DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),

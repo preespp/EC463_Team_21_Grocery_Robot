@@ -35,7 +35,7 @@ Working VX300S MoveIt launch on this machine:
 source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
-ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s motor_port:=/dev/ttyUSB1
+ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 This launch should open the MoveIt RViz window automatically.
@@ -49,7 +49,7 @@ It now also starts `viperx_arm_server` by default (`use_viperx_arm_server:=true`
 source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
-ros2 launch robot_manipulation vx300_auto_pick.launch.py robot_model:=vx300s motor_port:=/dev/ttyUSB1
+ros2 launch robot_manipulation vx300_auto_pick.launch.py robot_model:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 2. If `camera_vision` is not already running, launch it in another terminal:
@@ -66,7 +66,7 @@ ros2 run robot_vision camera_vision --ros-args \
 3. Optional safety/debug mode first (`dry_run=true`, no arm motion):
 
 ```bash
-ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s motor_port:=/dev/ttyUSB1 use_auto_pick:=true \
+ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 use_auto_pick:=true \
   auto_pick_config:=/home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/src/robot_manipulation/config/vx300_auto_pick.yaml
 ```
 

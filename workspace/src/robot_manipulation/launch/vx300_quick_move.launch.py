@@ -6,6 +6,12 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+ARM_MOTOR_PORT = (
+    "/dev/serial/by-id/"
+    "usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0"
+)
+
+
 def generate_launch_description():
     bringup_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -44,7 +50,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("robot_model", default_value="vx300s"),
         DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
-        DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB0"),
+        DeclareLaunchArgument("motor_port", default_value=ARM_MOTOR_PORT),
         DeclareLaunchArgument("use_sim", default_value="false"),
         DeclareLaunchArgument("load_configs", default_value="false"),
         DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),

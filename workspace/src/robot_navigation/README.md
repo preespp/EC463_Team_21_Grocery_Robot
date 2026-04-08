@@ -226,7 +226,7 @@ ros2 run robot_navigation nav_assistant quick-check
 
 ## Notes
 
-- Default serial port is `/dev/ttyUSB0` and default baud is `115200`.
+- Default serial port is `/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0` and default baud is `115200`.
 - Default command topics bridged to STM32 are:
   `[/cmd_vel, /cmd_vel_nav, /cmd_vel_smoothed]`
 - Default command topics in `localization-stack` are:

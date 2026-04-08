@@ -69,7 +69,7 @@ colcon build --base-paths src --packages-select robot_manipulation robot_vision
 
 ```bash
 ros2 launch robot_manipulation vx300_auto_pick_measured_tf.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 This starts:
@@ -88,7 +88,7 @@ Use this path when you want the older hand-measured TF that was stable in previo
 
 ```bash
 ros2 launch robot_manipulation vx300_auto_pick.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 \
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 \
   launch_camera_vision:=true
 ```
 
@@ -119,7 +119,7 @@ Use this when you only want the arm, MoveIt, and RViz:
 
 ```bash
 ros2 launch robot_manipulation vx300_moveit.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 \
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 \
   use_moveit_rviz:=true
 ```
 
@@ -129,7 +129,7 @@ Use preview mode when validating trajectories:
 
 ```bash
 ros2 launch robot_manipulation vx300_auto_pick_measured_tf.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 \
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 \
   use_viperx_preview:=true
 ```
 
@@ -336,10 +336,11 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/se
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/install/setup.bash
 
 ros2 launch robot_manipulation vx300_moveit.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB0 use_moveit_rviz:=true
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 use_moveit_rviz:=true
 ```
 
-** Need to check port of robotic arm every time you run the setup
+Stable arm port on this robot:
+`/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0`
 
 ### Preferred camera launch for calibration
 
@@ -469,7 +470,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
 
 ros2 launch robot_manipulation vx300_bringup.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1 \
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 \
   load_configs:=true
 ```
 

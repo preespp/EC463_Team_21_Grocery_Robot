@@ -84,7 +84,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/se
 
 ```bash
 ros2 launch robot_manipulation vx300_moveit.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 This launches:
@@ -160,7 +160,7 @@ Terminal 1:
 source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
-ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1
+ros2 launch robot_manipulation vx300_moveit.launch.py robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 Terminal 2:
@@ -198,7 +198,7 @@ Use this only if you want the full stack including backend/UI.
 
 ```bash
 ros2 launch robot_manipulation vx300_moveit.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1
+  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 ### Terminal 2: Camera vision

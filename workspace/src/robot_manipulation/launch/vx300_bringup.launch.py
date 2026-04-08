@@ -9,6 +9,12 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
+ARM_MOTOR_PORT = (
+    "/dev/serial/by-id/"
+    "usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0"
+)
+
+
 def resolve_model_config_path(pkg_dir: str, robot_model: str, suffix: str, fallback_name: str) -> str:
     model_specific = os.path.join(pkg_dir, "config", f"{robot_model}{suffix}")
     if os.path.exists(model_specific):
@@ -120,7 +126,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "motor_port",
-            default_value="/dev/ttyUSB0",
+            default_value=ARM_MOTOR_PORT,
             description="Serial port for the Dynamixel adapter when using real hardware.",
         ),
         DeclareLaunchArgument(

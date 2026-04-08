@@ -32,6 +32,12 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 
 
+BASE_SERIAL_PORT = (
+    "/dev/serial/by-id/"
+    "usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0"
+)
+
+
 def _find_repo_root() -> Path:
     here = Path(__file__).resolve()
     for parent in [here.parent, *here.parents]:
@@ -693,7 +699,7 @@ def build_parser() -> argparse.ArgumentParser:
     stack_common = argparse.ArgumentParser(add_help=False)
     stack_common.add_argument("--hostname", default="192.168.8.150")
     stack_common.add_argument("--udp-receiver-ip", default="192.168.8.249")
-    stack_common.add_argument("--serial-port", default="/dev/ttyUSB1")
+    stack_common.add_argument("--serial-port", default=BASE_SERIAL_PORT)
     stack_common.add_argument("--baud-rate", type=int, default=115200)
     stack_common.add_argument("--cmd-topics", default=None)
     stack_common.add_argument(

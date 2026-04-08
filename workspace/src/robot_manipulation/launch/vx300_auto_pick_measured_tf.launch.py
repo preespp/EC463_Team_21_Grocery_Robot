@@ -7,6 +7,12 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 
+ARM_MOTOR_PORT = (
+    "/dev/serial/by-id/"
+    "usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0"
+)
+
+
 def generate_launch_description():
     manipulation_share = get_package_share_directory("robot_manipulation")
 
@@ -61,7 +67,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("robot_model", default_value="vx300s"),
             DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
-            DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB1"),
+            DeclareLaunchArgument("motor_port", default_value=ARM_MOTOR_PORT),
             DeclareLaunchArgument("use_moveit_rviz", default_value="true"),
             DeclareLaunchArgument("use_viperx_preview", default_value="false"),
             DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),
