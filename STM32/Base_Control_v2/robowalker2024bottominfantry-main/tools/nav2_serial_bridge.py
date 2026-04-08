@@ -34,6 +34,12 @@ except ImportError as exc:  # pragma: no cover - surfaced during node startup
     raise SystemExit("pyserial is required: pip install pyserial") from exc
 
 
+BASE_SERIAL_PORT = (
+    "/dev/serial/by-id/"
+    "usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0"
+)
+
+
 HEADER = 0xAC
 COMMAND_STRUCT = struct.Struct("<5fHBB")
 KEY_BITS = {
@@ -74,7 +80,7 @@ class Nav2SerialBridge(Node):
         super().__init__("pc_serial_bridge")
 
         # Command path configuration
-        self.declare_parameter("serial_port", "/dev/ttyUSB0")
+        self.declare_parameter("serial_port", BASE_SERIAL_PORT)
         self.declare_parameter("baud_rate", 115200)
         self.declare_parameter("send_rate", 50.0)
         self.declare_parameter("cmd_topic", "/cmd_vel")

@@ -54,16 +54,14 @@ ros2 launch robot_manipulation vx300_auto_pick.launch.py ...
 - 视觉单独起 `camera_vision`
 - 任务树单独起 `bt_executor_viperX`
 
-### 2.2 串口不要吃默认值
+### 2.2 串口使用稳定 by-id 名称
 
-当前仓库里默认串口并不完全统一。
+当前仓库默认已经切到稳定的 USB 设备路径，不再依赖 `ttyUSB0` / `ttyUSB1` 的分配顺序。
 
-为了让测试者少踩坑，完整系统测试时请**显式指定**：
+完整系统测试时，底盘和机械臂分别固定为：
 
-- 底盘：`/dev/ttyUSB0`
-- 机械臂：`/dev/ttyUSB1`
-
-不要完全依赖 launch 默认值。
+- 底盘：`/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
+- 机械臂：`/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0`
 
 ### 2.3 BT 主入口
 
@@ -146,7 +144,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/se
 ros2 run robot_navigation nav_assistant localization-stack \
   --map-name testmapMain \
   --with-nav2-rviz true \
-  --serial-port /dev/ttyUSB0
+  --serial-port /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 ```
 
 这一步会启动：
@@ -166,7 +164,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/se
 ros2 launch robot_manipulation vx300_moveit.launch.py \
   robot_model:=vx300s \
   robot_name:=vx300s \
-  motor_port:=/dev/ttyUSB1
+  motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 这一步会提供：
@@ -358,8 +356,8 @@ ros2 service list | grep order
 
 完整系统测试时请固定写成：
 
-- 导航：`--serial-port /dev/ttyUSB0`
-- 机械臂：`motor_port:=/dev/ttyUSB1`
+- 导航：`--serial-port /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
+- 机械臂：`motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0`
 
 ### 问题 3: 商品名不一致
 
