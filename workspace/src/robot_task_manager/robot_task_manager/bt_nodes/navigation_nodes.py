@@ -3,6 +3,7 @@ import rclpy
 import threading
 import time
 import math
+from typing import Optional
 
 from rclpy.action import ActionClient
 from geometry_msgs.msg import PoseStamped, Twist
@@ -21,7 +22,14 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
     """
     BT Leaf Node that sends a NavigateToPose goal to the nav2 action server.
     """
-    def __init__(self, goal_key: str, bb=None, yaw: float = 0.0, frame_id: str = "map"):
+    def __init__(
+        self,
+        goal_key: str,
+        bb=None,
+        yaw: float = 0.0,
+        frame_id: str = "map",
+        timeout_sec: Optional[float] = None,
+    ):
         super().__init__(f"NavigateToGoalPose[{goal_key}]")
         self.goal_key = goal_key
         self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
@@ -37,11 +45,36 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
         self.goal_handle = None
         self.result_future = None
         self.send_future = None
+        self.cancel_future = None
         self.start_time = None
-        self.timeout_sec = 30.0
+        self.timeout_sec = None if timeout_sec is None else float(timeout_sec)
+        self.active_timeout_sec = None
 
     def _dbg(self, msg: str):
         print(f"[NavigateToGoalPose] {msg}", flush=True)
+
+    def _resolve_timeout_sec(self) -> Optional[float]:
+        bb_timeout = getattr(self.bb, "nav_timeout_sec", None)
+        if bb_timeout is not None:
+            try:
+                bb_timeout = float(bb_timeout)
+            except (TypeError, ValueError):
+                bb_timeout = None
+            else:
+                if bb_timeout > 0.0:
+                    return bb_timeout
+                return None
+
+        if self.timeout_sec is not None and self.timeout_sec > 0.0:
+            return self.timeout_sec
+        return None
+
+    def _cancel_goal(self, reason: str):
+        if self.goal_handle is None or self.cancel_future is not None:
+            return
+        self.feedback_message = reason
+        self._dbg(reason)
+        self.cancel_future = self.goal_handle.cancel_goal_async()
 
     def setup(self, **kwargs):
         if self.client is not None:
@@ -57,6 +90,12 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
 
     def initialise(self):
         self.initialise_error = False
+        self.goal_handle = None
+        self.result_future = None
+        self.send_future = None
+        self.cancel_future = None
+        self.start_time = None
+        self.active_timeout_sec = self._resolve_timeout_sec()
 
         goal = getattr(self.bb, self.goal_key, None)
         self._dbg(f"initialise: bb.{self.goal_key} raw={goal}")
@@ -75,7 +114,9 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
             self._dbg(f"FAIL: {self.feedback_message}")
             return
 
-        if not self.client.wait_for_server(timeout_sec=self.timeout_sec):
+        wait_for_server_timeout = self.active_timeout_sec if self.active_timeout_sec is not None else 2.0
+        wait_for_server_timeout = max(2.0, wait_for_server_timeout)
+        if not self.client.wait_for_server(timeout_sec=wait_for_server_timeout):
             self.feedback_message = f"Action server {self.action_name} not available"
             self.initialise_error = True
             self._dbg(f"FAIL: {self.feedback_message}")
@@ -130,6 +171,10 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
             self._dbg(f"update -> FAILURE (initialise_error): {self.feedback_message}")
             return py_trees.common.Status.FAILURE
 
+        elapsed = None
+        if self.start_time is not None:
+            elapsed = time.monotonic() - self.start_time
+
         if self.send_future is not None:
             rclpy.spin_once(self.node, timeout_sec=0.1)
             if self.send_future.done():
@@ -144,6 +189,16 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
                 self._dbg("goal accepted, waiting for result")
                 return py_trees.common.Status.RUNNING
             else:
+                if (
+                    self.active_timeout_sec is not None
+                    and elapsed is not None
+                    and elapsed > self.active_timeout_sec
+                ):
+                    self.feedback_message = (
+                        f"Goal send timed out after {elapsed:.1f}s before acceptance"
+                    )
+                    self._dbg(f"update -> FAILURE: {self.feedback_message}")
+                    return py_trees.common.Status.FAILURE
                 return py_trees.common.Status.RUNNING
 
         if self.result_future is not None:
@@ -163,19 +218,37 @@ class NavigateToGoalPose(py_trees.behaviour.Behaviour):
                     self._dbg(f"update -> FAILURE: {self.feedback_message}")
                     return py_trees.common.Status.FAILURE
             else:
-                # optional timeout check
-                if time.monotonic() - self.start_time > self.timeout_sec:
-                    self.feedback_message = "Goal timed out"
-                    self._dbg("update -> FAILURE: goal timed out")
-                    return py_trees.common.Status.FAILURE
+                if (
+                    self.active_timeout_sec is not None
+                    and elapsed is not None
+                    and elapsed > self.active_timeout_sec
+                ):
+                    self._cancel_goal(
+                        f"Goal timed out after {elapsed:.1f}s; canceling active Nav2 goal"
+                    )
+                if self.cancel_future is not None:
+                    if self.cancel_future.done():
+                        self.feedback_message = "Waiting for canceled Nav2 goal result..."
+                    else:
+                        self.feedback_message = "Canceling timed-out Nav2 goal..."
                 return py_trees.common.Status.RUNNING
 
         return py_trees.common.Status.RUNNING
 
     def terminate(self, new_status):
+        if (
+            new_status == py_trees.common.Status.INVALID
+            and self.goal_handle is not None
+            and self.result_future is not None
+            and not self.result_future.done()
+        ):
+            self._cancel_goal("BT invalidated navigation goal; canceling active Nav2 goal")
         self.send_future = None
         self.result_future = None
         self.goal_handle = None
+        self.cancel_future = None
+        self.start_time = None
+        self.active_timeout_sec = None
 
 
 class MaybeNavigateToGoalPose(NavigateToGoalPose):

@@ -18,15 +18,15 @@ class RepositionArmToGoalPose(py_trees.behaviour.Behaviour):
     """
     Reads a target from bb.<goal_key> and commands the servo arm.
 
-    Pose targets go to `/pick_arm_demo`, which computes joint targets and feeds
-    them to the motor bridge. Command targets (e.g. `home`) go to the waypoint server.
+    Pose targets go to the configured pose action server (default `/pick_arm`).
+    Command targets (e.g. `home`) go to the configured waypoint server.
     """
     def __init__(
         self,
         goal_key: str,
         bb=None,
-        pose_action_name: str = "/pick_arm_demo",
-        command_action_name: str = "/pick_arm_waypoint",
+        pose_action_name: Optional[str] = None,
+        command_action_name: Optional[str] = None,
     ):
         super().__init__(f"RepositionArmToGoalPose[{goal_key}]")
         self.goal_key = goal_key
@@ -47,6 +47,16 @@ class RepositionArmToGoalPose(py_trees.behaviour.Behaviour):
             return False
         node_name = f"bt_servo_arm_{id(self) & 0xFFFF:x}"
         self.node = rclpy.create_node(node_name)
+        self.pose_action_name = (
+            self.pose_action_name
+            or str(getattr(self.bb, "arm_pose_action_name", "/pick_arm")).strip()
+            or "/pick_arm"
+        )
+        self.command_action_name = (
+            self.command_action_name
+            or str(getattr(self.bb, "arm_command_action_name", "/pick_arm_waypoint")).strip()
+            or "/pick_arm_waypoint"
+        )
         self.pose_client = ActionClient(self.node, PickArm, self.pose_action_name)
         self.command_client = ActionClient(self.node, PickArm, self.command_action_name)
         return True
@@ -199,6 +209,7 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
         max_depth_m: float = 0.90,
         position_tolerance_m: float = 0.05,
         success_on_detect: bool = False,
+        search_timeout_sec: float = 3.0,
     ):
         super().__init__("VerifyPosition")
         self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
@@ -209,12 +220,14 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
         self.max_depth_m = max_depth_m
         self.position_tolerance_m = position_tolerance_m
         self.success_on_detect = success_on_detect
+        self.search_timeout_sec = float(search_timeout_sec)
 
         self.node = None
         self.sub = None
         self.last_detections_json = None
         self.last_detection_time = None
         self.detection_timeout_sec = 2.0
+        self.search_start_time = None
         self.tf_buffer = None
         self.tf_listener = None
         self.last_tf_error_time = None
@@ -233,6 +246,22 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
             10,
         )
         return True
+
+    def initialise(self):
+        self.search_start_time = time.monotonic()
+
+    def _running_or_timeout(self, waiting_message: str, timeout_message: str):
+        if self.search_timeout_sec <= 0.0 or self.search_start_time is None:
+            self.feedback_message = waiting_message
+            return py_trees.common.Status.RUNNING
+
+        elapsed = time.monotonic() - self.search_start_time
+        if elapsed < self.search_timeout_sec:
+            self.feedback_message = f"{waiting_message} ({elapsed:.1f}s)"
+            return py_trees.common.Status.RUNNING
+
+        self.feedback_message = f"{timeout_message} after {elapsed:.1f}s"
+        return py_trees.common.Status.FAILURE
 
     def _on_detections(self, msg: String):
         self.last_detections_json = msg.data
@@ -334,12 +363,19 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
         rclpy.spin_once(self.node, timeout_sec=0.05)
 
         if self.last_detections_json is None:
-            self.feedback_message = "Waiting for camera detections..."
-            return py_trees.common.Status.RUNNING
+            return self._running_or_timeout(
+                "Waiting for camera detections",
+                "No detections received",
+            )
 
-        if time.time() - self.last_detection_time > self.detection_timeout_sec:
-            self.feedback_message = "Detection stream stale (timeout)"
-            return py_trees.common.Status.FAILURE
+        if (
+            self.last_detection_time is None
+            or time.time() - self.last_detection_time > self.detection_timeout_sec
+        ):
+            return self._running_or_timeout(
+                "Waiting for fresh detection messages",
+                "Detection stream stale",
+            )
 
         try:
             payload = json.loads(self.last_detections_json)
@@ -350,15 +386,22 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.FAILURE
 
         if not detections:
-            self.feedback_message = "Camera sees no objects"
-            return py_trees.common.Status.FAILURE
+            return self._running_or_timeout(
+                "Camera sees no objects yet",
+                "Camera never reported any objects",
+            )
         if not camera_frame:
-            self.feedback_message = "detections_json missing camera_optical_frame"
-            return py_trees.common.Status.FAILURE
+            return self._running_or_timeout(
+                "Waiting for detection frame metadata",
+                "detections_json missing camera_optical_frame",
+            )
 
         best_detection = self._filter_detections(detections)
         if best_detection is None:
-            return py_trees.common.Status.FAILURE
+            return self._running_or_timeout(
+                "Waiting for matching detection",
+                self.feedback_message or "No matching detection passed filtering",
+            )
 
         raw_point = best_detection.get("point_camera_optical_m", [])
         if not isinstance(raw_point, list) or len(raw_point) != 3:
@@ -367,7 +410,10 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
 
         target_xyz = self._transform_point_to_target(raw_point, camera_frame)
         if target_xyz is None:
-            return py_trees.common.Status.FAILURE
+            return self._running_or_timeout(
+                "Waiting for TF transform into arm frame",
+                self.feedback_message or "TF transform into arm frame failed",
+            )
 
         detected_pose = {
             "frame_id": self.target_frame,
@@ -412,14 +458,16 @@ class VerifyPosition(py_trees.behaviour.Behaviour):
     def terminate(self, new_status):
         del new_status
         self.last_detections_json = None
+        self.search_start_time = None
 
 class MoveGripper(py_trees.behaviour.Behaviour):
     """
     command: "open" or "close"
     """
-    def __init__(self, command: str, action_name: str = "/pick_arm_waypoint"):
+    def __init__(self, command: str, bb=None, action_name: Optional[str] = None):
         super().__init__(f"MoveGripper[{command}]")
         self.command = command
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
         self.action_name = action_name
         self.node = None
         self.client = None
@@ -432,6 +480,11 @@ class MoveGripper(py_trees.behaviour.Behaviour):
             return False
         node_name = f"bt_servo_gripper_{id(self) & 0xFFFF:x}"
         self.node = rclpy.create_node(node_name)
+        self.action_name = (
+            self.action_name
+            or str(getattr(self.bb, "arm_command_action_name", "/pick_arm_waypoint")).strip()
+            or "/pick_arm_waypoint"
+        )
         self.client = ActionClient(self.node, PickArm, self.action_name)
         return True
 

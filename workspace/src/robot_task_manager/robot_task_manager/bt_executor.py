@@ -18,6 +18,26 @@ class BTExecutor(Node):
         super().__init__("bt_executor")
 
         self.bb = setup_custom_blackboard()
+        self.declare_parameter("skip_navigation", False)
+        self.declare_parameter("navigation_timeout_sec", 0.0)
+        self.declare_parameter("navigation_retry_attempts", 3)
+        self.declare_parameter("return_home_retry_attempts", 3)
+        self.declare_parameter("arm_pose_action_name", "/pick_arm")
+        self.declare_parameter("arm_command_action_name", "/pick_arm_waypoint")
+        self.declare_parameter("detection_search_timeout_sec", 3.0)
+        self.bb.skip_navigation = bool(self.get_parameter("skip_navigation").value)
+        self.bb.nav_timeout_sec = float(self.get_parameter("navigation_timeout_sec").value)
+        self.bb.nav_retry_attempts = int(self.get_parameter("navigation_retry_attempts").value)
+        self.bb.return_home_retry_attempts = int(
+            self.get_parameter("return_home_retry_attempts").value
+        )
+        self.bb.arm_pose_action_name = str(self.get_parameter("arm_pose_action_name").value)
+        self.bb.arm_command_action_name = str(
+            self.get_parameter("arm_command_action_name").value
+        )
+        self.bb.detection_search_timeout_sec = float(
+            self.get_parameter("detection_search_timeout_sec").value
+        )
 
         self.current_order: Order | None = None
         self.robot_busy = False
@@ -29,7 +49,14 @@ class BTExecutor(Node):
         self.tree: py_trees.trees.BehaviourTree | None = None
         self.bt_tick_timer = self.create_timer(0.1, self.tick_bt)
 
-        self.get_logger().info("BTExecutor ready (order intake + blackboard + BT)")
+        self.get_logger().info(
+            "BTExecutor ready (order intake + blackboard + BT) "
+            f"| skip_navigation={self.bb.skip_navigation} "
+            f"| nav_timeout_sec={self.bb.nav_timeout_sec:.1f} "
+            f"| nav_retry_attempts={self.bb.nav_retry_attempts} "
+            f"| arm_pose_action={self.bb.arm_pose_action_name} "
+            f"| arm_command_action={self.bb.arm_command_action_name}"
+        )
 
     def new_order_cb(self, request, response):
         if self.current_order is not None:

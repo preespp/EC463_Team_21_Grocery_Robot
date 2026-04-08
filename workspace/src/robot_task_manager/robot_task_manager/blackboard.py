@@ -173,6 +173,8 @@ def setup_blackboard():
 
     # For navigation
     bb.skip_navigation = False
+    bb.nav_timeout_sec = 0.0
+    bb.nav_retry_attempts = 3
     bb.nav_goal = (0.0, 0.0, 0.0)
     bb.home_goal = (0.0, 0.0, 0.0)
     bb.slot_id = None
@@ -204,7 +206,10 @@ def setup_custom_blackboard():
 
     # Servo-arm blackboard uses Cartesian targets in base_link.
     # robot_manipulation converts these into joint targets for the motors.
+    bb.arm_pose_action_name = "/pick_arm"
+    bb.arm_command_action_name = "/pick_arm_waypoint"
     bb.home_pose = _make_pose(0.18, 0.00, 0.28)
+    bb.observation_pose = _make_pose(0.18, 0.00, 0.28)
     bb.basket_pose = _make_pose(0.16, -0.18, 0.16)
     bb.pose = _make_pose(0.30, 0.00, 0.18)
     bb.goal_pose = None
@@ -212,12 +217,16 @@ def setup_custom_blackboard():
     bb.arm_last_commanded_pose = None
 
     bb.detected_object_pose = None
+    bb.detection_search_timeout_sec = 3.0
 
     bb.current_rack = 1
     bb.rack_goal = 1
     bb.home_rack = 1
 
     bb.skip_navigation = False
+    bb.nav_timeout_sec = 0.0
+    bb.nav_retry_attempts = 3
+    bb.return_home_retry_attempts = 3
     bb.nav_goal = (0.0, 0.0, 0.0)
     bb.home_goal = (0.0, 0.0, 0.0)
     bb.slot_id = None

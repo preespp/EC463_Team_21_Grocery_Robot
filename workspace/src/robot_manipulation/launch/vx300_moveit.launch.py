@@ -165,7 +165,7 @@ def generate_launch_description():
         DeclareLaunchArgument("robot_model", default_value="vx300s"),
         DeclareLaunchArgument("robot_name", default_value=LaunchConfiguration("robot_model")),
         DeclareLaunchArgument("motor_port", default_value=ARM_MOTOR_PORT),
-        DeclareLaunchArgument("use_moveit_rviz", default_value="true"),
+        DeclareLaunchArgument("use_moveit_rviz", default_value="false"),
         DeclareLaunchArgument("use_viperx_arm_server", default_value="true"),
         DeclareLaunchArgument("use_viperx_preview", default_value="false"),
         DeclareLaunchArgument("use_auto_pick", default_value="false"),
