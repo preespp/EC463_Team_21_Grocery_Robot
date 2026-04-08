@@ -19,9 +19,10 @@ So the most reliable method right now is not to search for a universal launch fi
 1. backend
 2. optional UI
 3. navigation stack
-4. MoveIt + `/pick_viperx`
-5. `camera_vision`
-6. `bt_executor_viperX`
+4. optional `rosbridge_server` for remote SLAM map viewing
+5. MoveIt + `/pick_viperx`
+6. `camera_vision`
+7. `bt_executor_viperX`
 
 Then drive the full pickup flow either through:
 
@@ -61,7 +62,25 @@ For full-system testing, the base and arm should stay fixed as:
 - mobile base: `/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
 - arm: `/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0`
 
-### 2.3 BT main entry point
+### 2.3 Keep Nav2 RViz off by default in this runbook
+
+This runbook keeps Nav2 RViz disabled by default.
+
+Reason:
+
+- this path is intended to be usable from a headless or remote machine
+- we want remote live-map display to go through `rosbridge_server`
+- this avoids depending on a local desktop session just to watch the map
+
+If you do want a local Nav2 RViz window for debugging, you can manually change:
+
+- `--with-nav2-rviz false`
+
+to:
+
+- `--with-nav2-rviz true`
+
+### 2.4 BT main entry point
 
 The entry point for the full pickup flow is:
 
@@ -90,7 +109,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
 ```
 
-To reduce operator mistakes, the command blocks for terminals 3 through 6 already include the full `cd` and `source` setup and can be copied directly.
+To reduce operator mistakes, the command blocks for terminals 3 through 7 already include the full `cd` and `source` setup and can be copied directly.
 
 ## 4. Standard Full Startup Order
 
@@ -141,7 +160,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
 ros2 run robot_navigation nav_assistant localization-stack \
   --map-name testmapMain \
-  --with-nav2-rviz true \
+  --with-nav2-rviz false \
   --serial-port /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 ```
 
@@ -152,7 +171,37 @@ This starts:
 - semantic map service
 - serial bridge
 
-### Terminal 4: MoveIt + `/pick_viperx`
+This runbook intentionally keeps local Nav2 RViz off by default.
+
+### Terminal 4: Optional rosbridge for remote real-time SLAM map
+
+One-time install if it is not already present:
+
+```bash
+sudo apt install ros-$ROS_DISTRO-rosbridge-server
+```
+
+Startup command:
+
+```bash
+cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
+source /opt/ros/humble/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+```
+
+Inside the embedded app, connect to:
+
+- `ws://192.168.8.249:9090`
+
+Notes:
+
+- the connection page defaults to the current hostname and port `9090`
+- if you are connecting from another machine, make sure the hostname/IP is changed to the robot host
+- this is the recommended way to show the real-time SLAM map remotely in this runbook
+
+### Terminal 5: MoveIt + `/pick_viperx`
 
 ```bash
 cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
@@ -171,7 +220,7 @@ This provides:
 - ViperX controllers
 - `/pick_viperx`
 
-### Terminal 5: Camera Vision
+### Terminal 6: Camera Vision
 
 ```bash
 cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
@@ -190,7 +239,7 @@ If you want the live image window, add:
 -p show_live_window:=true
 ```
 
-### Terminal 6: BT Executor
+### Terminal 7: BT Executor
 
 ```bash
 cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
@@ -321,6 +370,18 @@ Open this in a browser:
 
 At minimum, confirm that the backend process is actually listening.
 
+### Check 7: rosbridge for remote map viewing
+
+If you launched the optional bridge terminal:
+
+```bash
+ros2 node list | grep rosbridge
+```
+
+Inside the embedded app, confirm it connects to:
+
+- `ws://192.168.8.249:9090`
+
 ## 8. Expected Behavior of a Full Pickup Run
 
 After an order truly enters the system, the current main flow should look like this:
@@ -383,13 +444,21 @@ So if the UI opens, that does not mean:
 
 You still need to check each item in Section 7.
 
+### Problem 5: The remote SLAM page cannot connect
+
+Common causes:
+
+- `rosbridge_server` is not running
+- the embedded app is still trying to use the wrong hostname
+- port `9090` is blocked by the network or firewall
+
 ## 10. Final Advice for Testers
 
-If your goal is to answer "can the full system actually run pickup", then stop separating minimal mode and full mode and just launch the six terminals in the order shown in this document.
+If your goal is to answer "can the full system actually run pickup", then stop separating minimal mode and full mode and just launch the terminals in the order shown in this document.
 
 The standard full-system startup order is:
 
-**backend -> UI -> navigation -> MoveIt -> camera_vision -> bt_executor_viperX**
+**backend -> UI -> navigation -> optional rosbridge -> MoveIt -> camera_vision -> bt_executor_viperX**
 
 After that point, problems should no longer be blamed on "the wrong entry point was launched". You should instead check:
 

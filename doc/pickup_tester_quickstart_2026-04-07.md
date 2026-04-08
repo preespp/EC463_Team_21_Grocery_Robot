@@ -19,9 +19,10 @@
 1. backend
 2. 可选 UI
 3. navigation stack
-4. MoveIt + `/pick_viperx`
-5. `camera_vision`
-6. `bt_executor_viperX`
+4. 可选 `rosbridge_server`，用于远端实时 SLAM 地图展示
+5. MoveIt + `/pick_viperx`
+6. `camera_vision`
+7. `bt_executor_viperX`
 
 然后通过：
 
@@ -63,7 +64,25 @@ ros2 launch robot_manipulation vx300_auto_pick.launch.py ...
 - 底盘：`/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`
 - 机械臂：`/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0`
 
-### 2.3 BT 主入口
+### 2.3 这份 runbook 默认关闭 Nav2 RViz
+
+这份 runbook 默认把 Nav2 的 RViz 关掉。
+
+原因是：
+
+- 这条路径默认按远端 / 无桌面环境使用来写
+- 我们希望实时地图展示走 `rosbridge_server`
+- 这样不需要依赖本地桌面会话才能看地图
+
+如果你确实要本地打开 Nav2 RViz 做调试，可以把：
+
+- `--with-nav2-rviz false`
+
+改成：
+
+- `--with-nav2-rviz true`
+
+### 2.4 BT 主入口
 
 完整 pickup 主流程的入口是：
 
@@ -92,7 +111,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
 ```
 
-为了减少测试者出错，下面第 3 到第 6 个终端的命令块都已经把 `cd` 和 `source` 写完整了，可以直接复制。
+为了减少测试者出错，下面第 3 到第 7 个终端的命令块都已经把 `cd` 和 `source` 写完整了，可以直接复制。
 
 ## 4. 标准完整启动顺序
 
@@ -143,7 +162,7 @@ source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
 ros2 run robot_navigation nav_assistant localization-stack \
   --map-name testmapMain \
-  --with-nav2-rviz true \
+  --with-nav2-rviz false \
   --serial-port /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 ```
 
@@ -154,7 +173,37 @@ ros2 run robot_navigation nav_assistant localization-stack \
 - semantic map service
 - serial bridge
 
-### Terminal 4: MoveIt + `/pick_viperx`
+这份 runbook 故意把本地 Nav2 RViz 默认关掉。
+
+### Terminal 4: 可选 rosbridge，用于远端实时 SLAM 地图
+
+如果机器上还没装过，只需要安装一次：
+
+```bash
+sudo apt install ros-$ROS_DISTRO-rosbridge-server
+```
+
+启动命令：
+
+```bash
+cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
+source /opt/ros/humble/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
+source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+```
+
+在 embedded app 里连接：
+
+- `ws://192.168.8.249:9090`
+
+说明：
+
+- 连接页默认会填当前 hostname 和端口 `9090`
+- 如果是从另一台机器访问，记得把 hostname / IP 改成机器人主机地址
+- 这就是本 runbook 推荐的远端实时 SLAM 地图展示方式
+
+### Terminal 5: MoveIt + `/pick_viperx`
 
 ```bash
 cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
@@ -173,7 +222,7 @@ ros2 launch robot_manipulation vx300_moveit.launch.py \
 - ViperX 控制器
 - `/pick_viperx`
 
-### Terminal 5: Camera Vision
+### Terminal 6: Camera Vision
 
 ```bash
 cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
@@ -192,7 +241,7 @@ ros2 run robot_vision camera_vision --ros-args \
 -p show_live_window:=true
 ```
 
-### Terminal 6: BT Executor
+### Terminal 7: BT Executor
 
 ```bash
 cd /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace
@@ -323,6 +372,18 @@ ros2 service list | grep order
 
 至少要确认 backend 进程已经正常监听。
 
+### 检查 7: rosbridge 远端地图桥接
+
+如果你起了可选的 bridge 终端，可以检查：
+
+```bash
+ros2 node list | grep rosbridge
+```
+
+然后在 embedded app 里确认连接地址是：
+
+- `ws://192.168.8.249:9090`
+
 ## 8. 完整 pickup 的预期行为
 
 当订单真正进入系统后，当前主流程应该表现为：
@@ -385,13 +446,21 @@ ros2 service list | grep order
 
 必须按第 7 节逐项检查。
 
+### 问题 5: 远端 SLAM 页面连不上
+
+常见原因：
+
+- `rosbridge_server` 没有启动
+- embedded app 里还是错误的 hostname / IP
+- 网络或防火墙没有放行 `9090` 端口
+
 ## 10. 给测试者的最终建议
 
-如果你的目标是“完整系统能不能跑 pickup”，那就不要再区分最小模式了，直接按这份文档的 6 个终端顺序起。
+如果你的目标是“完整系统能不能跑 pickup”，那就不要再区分最小模式了，直接按这份文档给出的终端顺序起。
 
 当前标准 full-system 启动顺序就是：
 
-**backend -> UI -> navigation -> MoveIt -> camera_vision -> bt_executor_viperX**
+**backend -> UI -> navigation -> 可选 rosbridge -> MoveIt -> camera_vision -> bt_executor_viperX**
 
 再往后，问题就不该再归因于“没起对入口”，而应该开始检查：
 
