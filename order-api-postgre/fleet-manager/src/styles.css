@@ -66,6 +66,7 @@ h1,h2,h3 { margin: 0 0 12px; }
   display: flex;
   align-items: center;
   gap: 9px;
+  white-space: normal;
 }
 
 .sidebar a.router-link-active {
@@ -119,6 +120,8 @@ h1,h2,h3 { margin: 0 0 12px; }
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .profile-icon {
   display: inline-flex;
@@ -956,7 +959,14 @@ input, select {
 @media (max-width: 1024px) {
   .fleet-shell { grid-template-columns: 1fr; }
   .sidebar { gap: 8px; }
-  .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+  .sidebar nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+  .sidebar nav a {
+    flex: 1 1 220px;
+  }
   .map-workspace { grid-template-columns: 1fr; }
   .map-toolbar-actions { justify-items: stretch; }
   .map-action-row,
@@ -978,6 +988,59 @@ input, select {
   .embedded-slam-stage {
     min-height: 460px;
     height: min(68vh, 640px);
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .top-left {
+    width: 100%;
+  }
+
+  .search {
+    min-width: 0;
+  }
+
+  .top-right {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .who {
+    flex-basis: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .lang-switch {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .lang-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+  }
+
+  .flag-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .help-btn {
+    flex: 0 0 auto;
+    min-width: 96px;
+  }
+
+  .sidebar nav a {
+    flex-basis: 100%;
   }
 }
 

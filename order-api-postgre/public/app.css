@@ -190,7 +190,7 @@ hr{
 .scroll-box{
   height: 52vh;             /* pick a fixed height; 50-60vh is good */
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   padding-right: 6px;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -248,16 +248,26 @@ hr{
 }
 
 .customer-grid {
+  grid-template-areas: "inventory toggle cart";
   grid-template-columns: 1fr auto 1fr;
   align-items: stretch;
+}
+
+.customer-grid .inventory-panel {
+  grid-area: inventory;
 }
 
 .customer-grid .panel {
   min-width: 0;
 }
 
+.customer-grid #cartPanel {
+  grid-area: cart;
+}
+
 .customer-grid.cart-hidden {
   grid-template-columns: 1fr auto;
+  grid-template-areas: "inventory toggle";
 }
 
 .customer-grid.cart-hidden #cartPanel {
@@ -284,6 +294,7 @@ hr{
 .middle-toggle {
   align-self: center;
   justify-self: center;
+  grid-area: toggle;
 }
 
 /* Smaller +/- controls inside customer cart row */
@@ -535,4 +546,67 @@ hr{
   background:#3b82f6;
   color:white;
   cursor:pointer;
+}
+
+@media (max-width: 900px) {
+  .customer-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "inventory"
+      "toggle"
+      "cart";
+  }
+
+  .customer-grid.cart-hidden {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "inventory"
+      "toggle";
+  }
+
+  .middle-toggle {
+    transform: rotate(90deg);
+  }
+
+  .customer-grid.cart-hidden .middle-toggle {
+    transform: rotate(-90deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 16px;
+  }
+
+  .customer-grid {
+    gap: 12px;
+  }
+
+  .customer-grid .panel {
+    padding: 14px;
+  }
+
+  .customer-grid .inventory-panel .row:first-child,
+  .customer-grid #cartPanel .row:first-child,
+  .customer-grid #cartPanel .row:last-child {
+    align-items: stretch;
+  }
+
+  .customer-grid .inventory-panel .row:first-child label,
+  .customer-grid #cartPanel .row:last-child .btn.primary {
+    width: 100%;
+  }
+
+  .customer-grid .inventory-panel .row:first-child select {
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .scroll-box table {
+    min-width: 720px;
+  }
+
+  .scroll-box {
+    padding-right: 10px;
+  }
 }

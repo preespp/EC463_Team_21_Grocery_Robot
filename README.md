@@ -5,6 +5,13 @@
 Our group’s vision is to make everyday shopping more efficient and inclusive. We aim to address issues that would benefit both owners and customers through an intelligent, multi-functional robotic system to improve shelf management and customer experience. Our final delivery would be a multi-wheel robot with functional robotic arm(s), sensors, cameras, and artificial intelligence to assist in employee stocking and customer shopping.
 
 <p align="center">
+<img src="./images/GOFR.png" width="50%">
+</p>
+<p align="center">
+GOFR
+</p>
+
+<p align="center">
 <img src="./images/Team 21.jpg" width="50%">
 </p>
 <p align="center">
@@ -18,9 +25,12 @@ Darren Figo Sajino, Pree Simphliphan, Bach Thien Nguyen, Bernie Xu, Xingjian Jia
 4. [Goals](#goals)
 5. [System Architecture](#system-architecture)
 6. [Repository Guide](#repository-guide)
-7. [Team Members](#team-members)
-8. [Advisor](#advisor)
-9. [Additional Links](#team-links)
+7. [Setup and Instructions](#setup-and-instructions)
+8. [Future Development](#future-development)
+9. [Team Members](#team-members)
+10. [Advisor](#advisor)
+11. [Additional Documentations](#additional-documentations)
+12. [Additional Links](#team-links)
 
 ---
 ## Mission
@@ -96,6 +106,17 @@ Communication Diagram
 CAD Mechanical Design
 </p>
 
+The current production software path is:
+
+1. Customer or employee requests are created from the app and backend in `order-api-postgre`.
+2. The backend stores inventory, user, and semantic-map data in PostgreSQL and exposes APIs used by the web app and the robot.
+3. `robot_task_manager` polls or receives orders, resolves semantic targets, and runs the ViperX/customer or restock Behavior Tree.
+4. `robot_navigation` localizes the robot with LiDAR, odometry, and IMU, then executes mobile-base navigation through Cartographer and Nav2.
+5. `robot_vision` publishes RealSense detections and camera TF data on `/detections_json` and related topics.
+6. `robot_manipulation` executes ViperX arm motions through MoveIt and the `/pick_viperx` action server.
+7. `robot_perception` publishes ultrasonic collision-alert topics used for safety.
+8. The embedded layer is split between `STM32` for the mobile base and `ESP32` projects for ultrasonic sensing, servo experiments, and actuator-side prototyping.
+
 ### Software Stack
 - Python
 - C++
@@ -136,20 +157,206 @@ CAD Mechanical Design
 - Remote E-Stop
 - NVIDIA Jetson Nano
 
+### Current Status Notes
+
+- The ViperX arm path is the most complete end-to-end manipulation path in the repository today.
+- The custom servo-arm and rack path exists in software and mechanical design, but it is still under hardware development and is not yet the main validated runtime path.
+- The app, backend, navigation, camera, BT, and ViperX arm flow are already integrated in the repository as the primary demoable full-stack system.
+
 ## Repository Guide
 
 The repository is organized around those major subsystems:
 
 - `workspace/src/robot_navigation`: ROS 2 navigation, mapping, localization, Nav2 tuning, semantic map serving, teleoperation, and STM32 serial bridging
-- `workspace/src/robot_interfaces`: shared ROS 2 custom message, service, and action definitions used across navigation, manipulation, and task execution modules
-- `workspace/src/robot_manipulation`: robotic arm control, MoveIt integration, Gazebo simulation assets, waypoint/action servers, and rack interaction logic
-- `workspace/src/robot_task_manager`: Behavior Tree-based task orchestration for customer and restock workflows, blackboard state management, order intake, semantic target resolution, and robot action sequencing
-- `workspace/src/robot_vision`: RealSense and camera perception nodes, barcode utilities, and YOLO-based vision components
-- `workspace/src/robot_perception`: Ultrasonic Sensors nodes for collision detection
-- `order-api-postgre`: Node.js + PostgreSQL backend for customer orders, inventory, authentication, and semantic map data
-- `order-api-postgre/fleet-manager`: Vue-based fleet and operations dashboard for maps, inventory reporting, robot status, and AI-assisted views
-- `ESP32` and `STM32`: embedded control, sensor integration, ultrasonic experiments, and base-control firmware
-- `Maps`, `images`, and `third_party`: saved maps, project assets, and vendored dependencies used by the dashboards and robot stack
+- `workspace/src/robot_interfaces`: shared ROS 2 custom messages, services, and actions used across the robot software stack
+- `workspace/src/robot_manipulation`: ViperX / VX300 manipulation, MoveIt integration, simulation helpers, BT-facing arm action servers, and rack-related code
+- `workspace/src/robot_task_manager`: Behavior Tree orchestration, order intake, blackboard state, semantic target resolution, and task sequencing
+- `workspace/src/robot_vision`: RealSense, YOLO-based detection, barcode utilities, and camera TF publishing
+- `workspace/src/robot_perception`: ultrasonic collision sensing nodes
+- `workspace/src/mvp_robot`: older MVP prototype package kept for reference and legacy experiments
+- `order-api-postgre`: Node.js + PostgreSQL backend for orders, inventory, authentication, and semantic-map data
+- `order-api-postgre/fleet-manager`: Vue-based operations and fleet dashboard
+- `ESP32`: actuator and sensor firmware projects such as ultrasonic I2C, arm servo I2C, and linear-actuator experiments
+- `STM32`: mobile-base motor-control firmware and base-control logic
+- `Maps`: saved `.pbstream`, `.yaml`, and `.pgm` navigation maps
+- `files`: proposal, report PDFs, and exported architecture graphs
+- `images`: diagrams, logos, CAD renders, and presentation assets
+- `third_party`: vendored dependencies used by the dashboards and robot stack
+
+Sections 5 and 6 have been updated to match the current repository structure and the present validated software flow.
+
+## Setup and Instructions
+
+This section describes the typical software bring-up after the hardware build is complete.
+
+### 1. Finish Hardware Integration First
+
+Before software bring-up, make sure the robot hardware is physically assembled and wired:
+
+- Jetson Nano or robot computer installed and powered
+- STM32 base controller connected to motor drivers and serial link
+- LiDAR and IMU mounted and wired
+- Intel RealSense camera mounted on the ViperX end effector
+- ViperX / VX300S arm powered and connected by USB
+- ESP32 boards connected for the ultrasonic and actuator subsystems that you plan to use
+
+### 2. Flash Embedded Controllers
+
+#### ESP32
+
+Use the ESP32 folder that matches the hardware subsystem you are flashing:
+
+- `ESP32/ultrasonic_I2C`: ultrasonic-sensor firmware used by the ROS ultrasonic collision stack
+- `ESP32/arm_servo_I2C`: custom servo-arm I2C firmware prototype
+- `ESP32/linear_actuator`: linear-actuator firmware prototype
+- `ESP32/ultrasonic` and `ESP32/servo-component-testing`: Arduino-based bench tests
+
+Typical ESP-IDF flow:
+
+```bash
+cd ESP32/ultrasonic_I2C
+idf.py set-target esp32
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+Repeat the same pattern for `arm_servo_I2C` or `linear_actuator`, changing the folder and serial port as needed.
+
+For Arduino sketches, flash them from the Arduino IDE with ESP32 board support.
+
+#### STM32
+
+The current mobile-base firmware is in:
+
+```text
+STM32/Base_Control_v2/robowalker2024bottominfantry-main/test
+```
+
+Open the project from:
+
+```text
+STM32/Base_Control_v2/robowalker2024bottominfantry-main/test/test.ioc
+```
+
+Then build and flash it with STM32CubeIDE or a compatible STM32 toolchain. This firmware is the base motor-control side used by the ROS navigation serial bridge.
+
+### 3. Install Robot Software On The Jetson / Linux Host
+
+At minimum, install and prepare:
+
+- ROS 2 Humble
+- PostgreSQL
+- Node.js and npm
+- Python 3
+- Interbotix dependencies for the ViperX / VX300S arm
+- Intel RealSense SDK dependencies
+
+### 4. Build The ROS 2 Workspaces
+
+Build the Interbotix workspace first, then the main robot workspace.
+
+Example:
+
+```bash
+cd /Users/preejedi/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws
+source /opt/ros/humble/setup.bash
+colcon build
+```
+
+```bash
+cd /Users/preejedi/Desktop/EC463_Team_21_Grocery_Robot/workspace
+source /opt/ros/humble/setup.bash
+source /Users/preejedi/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
+colcon build --base-paths src
+source install/setup.bash
+```
+
+### 5. Set Up The App And Backend
+
+Follow the backend setup in `order-api-postgre/README.md`.
+
+Typical order:
+
+1. create the PostgreSQL database and seed it
+2. start the Node.js backend
+3. start the Vue fleet-manager app
+
+Typical commands:
+
+```bash
+cd order-api-postgre
+npm install
+npm run dev
+```
+
+```bash
+cd order-api-postgre/fleet-manager
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+### 6. Run The Robot Software Stack
+
+For the current ViperX-based integrated stack with the app/backend, use separate terminals and source the environment in each one:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /Users/preejedi/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
+source /Users/preejedi/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
+```
+
+If you want the one-command integrated ROS stack:
+
+```bash
+ros2 launch robot_task_manager viperx_nav_camera_bt.launch.py \
+  motor_port:=/dev/ttyUSB1 \
+  serial_port:=/dev/ttyUSB0 \
+  include_ultrasonic:=true
+```
+
+This launch is the current combined ROS bring-up for:
+
+- ViperX arm + MoveIt + `/pick_viperx`
+- navigation + semantic map
+- camera vision
+- task-manager BT
+- optional ultrasonic sensing
+
+Then run the backend and app in separate terminals:
+
+```bash
+cd order-api-postgre
+npm run dev
+```
+
+```bash
+cd order-api-postgre/fleet-manager
+npm run dev -- --host 0.0.0.0
+```
+
+### 7. Recommended Bring-Up Order For The ViperX + App Demo
+
+1. power the robot and verify STM32 / ESP32 boards are flashed
+2. start PostgreSQL, backend, and app
+3. source the ROS environments
+4. launch `robot_task_manager viperx_nav_camera_bt.launch.py`
+5. verify LiDAR, Nav2, camera, and `/pick_viperx` are up
+6. log in to the app and create an order or restock task
+7. let `robot_task_manager` consume the order and run the BT
+
+### 8. Notes
+
+- The ViperX path is the most complete software path today.
+- The custom servo-arm and rack path is still under active hardware development, so its full hardware bring-up is not yet the default deployment workflow.
+- If you only want a quick arm-and-camera test, use the package-level instructions in `workspace/src/robot_task_manager/README.md` and `workspace/src/robot_manipulation/README.md`.
+
+## Future Development
+
+- Custom robotic servo arm with racking system: the custom lightweight arm and rack system is still under development and needs components that are light enough for the platform while still handling grocery payloads and arm loads. The related BT logic for the custom rack and servo arm exists in the repository but remains untested on final hardware because that hardware is still under development.
+- Integration of camera with the custom servo arm: after the custom arm hardware stabilizes, the next step is to mount and calibrate the camera pipeline for that arm the way the ViperX path already does today.
+- Integration of VLA/VLM with the robotic arm: future manipulation work includes using vision-language or vision-language-action systems for higher-level scene understanding, grasp selection, and more adaptive arm behavior.
+- Cloud system for the app and our own AI model without relying on Gemini API: the current app uses a Gemini-based integration path, but a future goal is to migrate toward a cloud-hosted system owned by the project, including our own model-serving pipeline.
+- Multiple robots working together under one fleet manager: the current software is centered on one robot, but the long-term direction is coordinated multi-robot operation under a single fleet-management interface.
 
 ## Team Members
 - Bach Thien Nguyen, Mechanical Engineering
@@ -166,6 +373,31 @@ The repository is organized around those major subsystems:
 - Professor Thomas Little
 - Professor Ryan Lagoy
 - Professor Osama Alshaykh
+
+## Additional Documentations
+
+### Embedded And Backend
+
+- [ESP32 README](./ESP32/README.md)
+- [STM32 README](./STM32/README.md)
+- [Order API + PostgreSQL README](./order-api-postgre/README.md)
+
+### ROS 2 Packages In `workspace/src`
+
+- [mvp_robot README](./workspace/src/mvp_robot/README.md)
+- [robot_interfaces README](./workspace/src/robot_interfaces/README.md)
+- [robot_manipulation README](./workspace/src/robot_manipulation/README.md)
+- [robot_navigation README](./workspace/src/robot_navigation/README.md)
+- [robot_perception README](./workspace/src/robot_perception/README.md)
+- [robot_task_manager README](./workspace/src/robot_task_manager/README.md)
+- [robot_vision README](./workspace/src/robot_vision/README.md)
+
+### Reports And Project Files In `files`
+
+- [Final Report PDF](./files/BU_GOFR_Grocery_Operations_Fulfillment_Robot.pdf)
+- [Project Proposal PDF](./files/Proposal%20for%20EC463.pdf)
+
+## Additional Links
 
 ## Team links
 - [Team Google Drive](https://drive.google.com/drive/folders/1yiAgVb-4LaUo8HKmD3yormvIIuaboWg9)
