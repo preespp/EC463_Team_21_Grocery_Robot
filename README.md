@@ -151,11 +151,11 @@ The current production software path is:
 - Odometry Sensor (MCU Gyroscope)
 - IntelRealSense Camera
 - Ultrasonic Sensors
-- 12V lead-acid batteries (+ Fuse and Power Distribution)
+- 24V LiFePO4 batteries (+ Fuse and Power Distribution)
 - ESP32
 - STM32
 - Remote E-Stop
-- NVIDIA Jetson Nano
+- NVIDIA Jetson Nano Orin
 
 ### Current Status Notes
 
