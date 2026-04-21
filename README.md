@@ -1,4 +1,4 @@
-# Team 21 GOFR: Grocery Operations & Fulfillment Robot
+# [Team 21 GOFR: Grocery Operations & Fulfillment Robot](https://gofr-2026.github.io/)
 <p align="center">
 <img src="./images/Logo_grey.png" width="50%">
 </p>
@@ -408,3 +408,5 @@ npm run dev -- --host 0.0.0.0
 
 ## Optional features links
 - [Team Jira](https://seniordesign-team-21.atlassian.net/jira/software/projects/SCRUM/summary)
+- [Project Website](https://gofr-2026.github.io/)
+- [YouTube Demo Video](https://www.youtube.com/watch?v=yoCo3-0eruo&t=9s)
