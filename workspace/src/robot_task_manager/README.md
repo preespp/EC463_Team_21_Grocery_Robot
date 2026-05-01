@@ -74,8 +74,8 @@ Use the package launch file that starts arm, navigation, camera, BT, and optiona
 
 ```bash
 ros2 launch robot_task_manager viperx_nav_camera_bt.launch.py \
-  motor_port:=/dev/ttyUSB1 \
-  serial_port:=/dev/ttyUSB0 \
+  motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 \
+  serial_port:=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
   include_ultrasonic:=true
 ```
 
@@ -94,7 +94,8 @@ Terminal 1:
 
 ```bash
 ros2 launch robot_manipulation vx300_moveit.launch.py \
-  robot_model:=vx300s robot_name:=vx300s motor_port:=/dev/ttyUSB1
+  robot_model:=vx300s robot_name:=vx300s \
+  motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0
 ```
 
 Terminal 2:

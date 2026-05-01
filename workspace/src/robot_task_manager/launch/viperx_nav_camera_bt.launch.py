@@ -22,11 +22,11 @@ def generate_launch_description():
     repo_root = _find_repo_root()
     navigation_share = Path(get_package_share_directory("robot_navigation"))
 
-    default_pbstream = str(repo_root / "Maps" / "testmapMain.pbstream")
-    default_map_yaml = str(repo_root / "Maps" / "testmapMain.yaml")
+    default_pbstream = str(repo_root / "Maps" / "ECEMain.pbstream")
+    default_map_yaml = str(repo_root / "Maps" / "ECEMain.yaml")
     default_nav2_params = str(navigation_share / "config" / "nav2_params_smac_mppi_omni.yaml")
     default_ekf_params = str(navigation_share / "config" / "ekf_odom_base_imu.yaml")
-    default_semantic_map = str(navigation_share / "config" / "semantic_map_testmapMain.yaml")
+    default_semantic_map = str(navigation_share / "config" / "semantic_map_ECEMain.yaml")
 
     robot_model = LaunchConfiguration("robot_model")
     robot_name = LaunchConfiguration("robot_name")
@@ -163,7 +163,7 @@ def generate_launch_description():
             DeclareLaunchArgument("robot_model", default_value="vx300s"),
             DeclareLaunchArgument("robot_name", default_value=robot_model),
             DeclareLaunchArgument("motor_port", default_value="/dev/ttyUSB0"),
-            DeclareLaunchArgument("use_moveit_rviz", default_value="true"),
+            DeclareLaunchArgument("use_moveit_rviz", default_value="false"),
             DeclareLaunchArgument("use_viperx_preview", default_value="false"),
             DeclareLaunchArgument("xs_driver_logging_level", default_value="INFO"),
             DeclareLaunchArgument("launch_navigation", default_value="true"),
@@ -232,7 +232,7 @@ def generate_launch_description():
             DeclareLaunchArgument("crop_max_y", default_value="0.2794"),
             DeclareLaunchArgument("crop_min_z", default_value="-1.0"),
             DeclareLaunchArgument("crop_max_z", default_value="1.0"),
-            DeclareLaunchArgument("with_nav2_rviz", default_value="false"),
+            DeclareLaunchArgument("with_nav2_rviz", default_value="true"),
             moveit_launch,
             navigation_launch,
             camera_node,
