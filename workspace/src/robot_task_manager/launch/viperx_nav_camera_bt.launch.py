@@ -10,6 +10,12 @@ from ament_index_python.packages import get_package_share_directory
 from launch_ros.substitutions import FindPackageShare
 
 
+BASE_SERIAL_PORT = (
+    "/dev/serial/by-id/"
+    "usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0"
+)
+
+
 def _find_repo_root() -> Path:
     current = Path(__file__).resolve()
     for parent in [current.parent, *current.parents]:
@@ -179,14 +185,14 @@ def generate_launch_description():
             DeclareLaunchArgument("detection_min_confidence", default_value="0.40"),
             DeclareLaunchArgument("hostname", default_value="192.168.8.150"),
             DeclareLaunchArgument("udp_receiver_ip", default_value="192.168.8.249"),
-            DeclareLaunchArgument("serial_port", default_value="/dev/ttyUSB0"),
+            DeclareLaunchArgument("serial_port", default_value=BASE_SERIAL_PORT),
             DeclareLaunchArgument("baud_rate", default_value="115200"),
             DeclareLaunchArgument("cmd_topics", default_value='["/cmd_vel"]'),
             DeclareLaunchArgument("telemetry_enabled", default_value="true"),
             DeclareLaunchArgument("bridge_max_linear_speed", default_value="3.0"),
             DeclareLaunchArgument("bridge_max_lateral_speed", default_value="3.0"),
             DeclareLaunchArgument("bridge_max_yaw_speed", default_value="12.566370614359172"),
-            DeclareLaunchArgument("bridge_axis_deadband", default_value="0.05"),
+            DeclareLaunchArgument("bridge_axis_deadband", default_value="0.03"),
             DeclareLaunchArgument("left_switch", default_value="1"),
             DeclareLaunchArgument("right_switch", default_value="1"),
             DeclareLaunchArgument("odom_topic", default_value="/odom_raw"),
@@ -224,7 +230,7 @@ def generate_launch_description():
             DeclareLaunchArgument("imu_roll", default_value="0.0"),
             DeclareLaunchArgument("imu_pitch", default_value="0.0"),
             DeclareLaunchArgument("imu_yaw", default_value="0.0"),
-            DeclareLaunchArgument("with_base_link_crop", default_value="false"),
+            DeclareLaunchArgument("with_base_link_crop", default_value="true"),
             DeclareLaunchArgument("crop_box_frame", default_value="base_link"),
             DeclareLaunchArgument("crop_min_x", default_value="-0.2540"),
             DeclareLaunchArgument("crop_max_x", default_value="0.1397"),
