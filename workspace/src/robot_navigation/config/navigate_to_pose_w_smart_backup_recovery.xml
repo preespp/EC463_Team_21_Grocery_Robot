@@ -3,7 +3,7 @@
 -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+    <RecoveryNode number_of_retries="4" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
         <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath"/>
         <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased"/>
@@ -38,9 +38,9 @@
               name="ClearGlobalCostmap-Recovery"
               service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Wait wait_duration="1.0"/>
           <BackUp backup_dist="0.30" backup_speed="0.15"/>
           <BackUp backup_dist="0.50" backup_speed="0.15"/>
+          <Wait wait_duration="0.2"/>
         </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>

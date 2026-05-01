@@ -37,8 +37,8 @@ slots:
     product_ids: ["1"]
     product_names: ["GreenTea"]
     nav_pose:
-      x: 1.512988
-      y: -0.079126
+      x: 1.114712
+      y: 0.083047
       yaw: 0.0
     service_pose:
       x: 1.984404
@@ -53,8 +53,8 @@ slots:
     product_ids: ["3"]
     product_names: ["Chips"]
     nav_pose:
-      x: 1.498765
-      y: 0.285752
+      x: 1.114712
+      y: 0.083047
       yaw: 0.0
     service_pose:
       x: 1.967277
@@ -69,8 +69,8 @@ slots:
     product_ids: ["2"]
     product_names: ["Water"]
     nav_pose:
-      x: 1.501958
-      y: 0.1875
+      x: 1.114712
+      y: 0.083047
       yaw: 0.0
     service_pose:
       x: 1.973866

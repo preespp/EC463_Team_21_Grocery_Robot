@@ -7,7 +7,8 @@ from typing import Optional
 
 from rclpy.action import ActionClient
 from geometry_msgs.msg import PoseStamped, Twist
-from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import BackUp, NavigateToPose
+from nav2_msgs.srv import ClearEntireCostmap
 from action_msgs.msg import GoalStatus
 
 
@@ -292,6 +293,265 @@ class MaybeNavigateToGoalPose(NavigateToGoalPose):
     def terminate(self, new_status):
         self.skip_navigation = False
         super().terminate(new_status)
+
+
+class ClearLocalCostmapAndSmartBackUp(py_trees.behaviour.Behaviour):
+    """
+    Clear the local costmap, then call Nav2's BackUp behavior action.
+
+    The configured behavior plugin is robot_nav2_plugins/SmartBackUp, so this
+    reuses the same free-space-aware retreat logic as the Nav2 recovery tree.
+    The step is best-effort: return-home navigation still runs if backup fails.
+    """
+
+    def __init__(
+        self,
+        bb=None,
+        clear_service_name: str = "local_costmap/clear_entirely_local_costmap",
+        backup_action_name: str = "/backup",
+        backup_distance_m: float = 0.12,
+        backup_speed_mps: float = 0.18,
+        clear_timeout_sec: float = 1.0,
+        wait_after_clear_sec: float = 0.10,
+        action_server_timeout_sec: float = 1.0,
+        action_time_allowance_sec: float = 3.0,
+    ):
+        super().__init__("ClearLocalCostmapAndSmartBackUp")
+        self.bb = bb if bb is not None else py_trees.blackboard.Blackboard()
+        self.clear_service_name = clear_service_name
+        self.backup_action_name = backup_action_name
+        self.backup_distance_m = abs(float(backup_distance_m))
+        self.backup_speed_mps = abs(float(backup_speed_mps))
+        self.clear_timeout_sec = float(clear_timeout_sec)
+        self.wait_after_clear_sec = max(0.0, float(wait_after_clear_sec))
+        self.action_server_timeout_sec = float(action_server_timeout_sec)
+        self.action_time_allowance_sec = float(action_time_allowance_sec)
+
+        self.node = None
+        self.clear_client = None
+        self.backup_client = None
+        self.clear_future = None
+        self.clear_request_start_time = None
+        self.send_future = None
+        self.goal_handle = None
+        self.result_future = None
+        self.cancel_future = None
+        self.start_time = None
+        self.initialise_error = False
+        self.done = False
+
+    def _dbg(self, msg: str):
+        print(f"[ClearLocalCostmapAndSmartBackUp] {msg}", flush=True)
+
+    def setup(self, **kwargs):
+        if self.clear_client is not None and self.backup_client is not None:
+            return True
+
+        if not rclpy.ok():
+            self._dbg("setup failed: rclpy not ok")
+            return False
+
+        node_name = f"bt_clear_and_smart_backup_{id(self) & 0xFFFF:x}"
+        self.node = rclpy.create_node(node_name)
+        self.clear_client = self.node.create_client(
+            ClearEntireCostmap,
+            self.clear_service_name,
+        )
+        self.backup_client = ActionClient(self.node, BackUp, self.backup_action_name)
+        self._dbg(
+            f"setup ok: clear_service={self.clear_service_name}, "
+            f"backup_action={self.backup_action_name}"
+        )
+        return True
+
+    def initialise(self):
+        self.initialise_error = False
+        self.clear_future = None
+        self.clear_request_start_time = None
+        self.send_future = None
+        self.goal_handle = None
+        self.result_future = None
+        self.cancel_future = None
+        self.start_time = time.monotonic()
+        self.done = False
+
+        if self.clear_client is None or self.backup_client is None:
+            self.initialise_error = True
+            self.feedback_message = "clear client or backup action client not initialized"
+            self._dbg(f"FAIL: {self.feedback_message}")
+            return
+
+        if bool(getattr(self.bb, "skip_navigation", False)):
+            self.done = True
+            self.feedback_message = "Skipping SmartBackUp because bb.skip_navigation is true"
+            self._dbg(self.feedback_message)
+            return
+
+        if self.backup_distance_m <= 0.0 or self.backup_speed_mps <= 0.0:
+            self.initialise_error = True
+            self.feedback_message = "backup distance and speed must be > 0"
+            self._dbg(f"FAIL: {self.feedback_message}")
+            return
+
+        if self.clear_client.wait_for_service(timeout_sec=self.clear_timeout_sec):
+            self.clear_future = self.clear_client.call_async(ClearEntireCostmap.Request())
+            self.clear_request_start_time = time.monotonic()
+            self.feedback_message = "Clearing local costmap before SmartBackUp"
+            self._dbg(self.feedback_message)
+        else:
+            self.feedback_message = (
+                f"Local costmap clear service unavailable after "
+                f"{self.clear_timeout_sec:.1f}s; calling SmartBackUp anyway"
+            )
+            self._dbg(self.feedback_message)
+            self._send_backup_goal()
+
+    def update(self):
+        if self.initialise_error:
+            return py_trees.common.Status.FAILURE
+
+        if bool(getattr(self.bb, "skip_navigation", False)):
+            return py_trees.common.Status.SUCCESS
+
+        if self.done:
+            return py_trees.common.Status.SUCCESS
+
+        if self.clear_future is not None:
+            rclpy.spin_once(self.node, timeout_sec=0.02)
+            if not self.clear_future.done():
+                if (
+                    self.clear_request_start_time is not None
+                    and time.monotonic() - self.clear_request_start_time > self.clear_timeout_sec
+                ):
+                    self._dbg(
+                        f"local costmap clear timed out after "
+                        f"{self.clear_timeout_sec:.1f}s; calling SmartBackUp anyway"
+                    )
+                    self.clear_future = None
+                    self.clear_request_start_time = None
+                    self._send_backup_goal()
+                    return py_trees.common.Status.RUNNING
+                return py_trees.common.Status.RUNNING
+            try:
+                self.clear_future.result()
+            except Exception as exc:
+                self._dbg(f"local costmap clear failed; calling SmartBackUp anyway: {exc}")
+            self.clear_future = None
+            self.clear_request_start_time = None
+            if self.wait_after_clear_sec > 0.0:
+                self.start_time = time.monotonic()
+            else:
+                self._send_backup_goal()
+            return py_trees.common.Status.RUNNING
+
+        if self.send_future is None and self.goal_handle is None and self.result_future is None:
+            if (
+                self.start_time is not None
+                and time.monotonic() - self.start_time < self.wait_after_clear_sec
+            ):
+                return py_trees.common.Status.RUNNING
+            self._send_backup_goal()
+            return py_trees.common.Status.RUNNING
+
+        if self.send_future is not None:
+            rclpy.spin_once(self.node, timeout_sec=0.02)
+            if not self.send_future.done():
+                return py_trees.common.Status.RUNNING
+            self.goal_handle = self.send_future.result()
+            self.send_future = None
+            if self.goal_handle is None or not self.goal_handle.accepted:
+                self.done = True
+                self.feedback_message = "SmartBackUp goal rejected; continuing to Nav2 return home"
+                self._dbg(self.feedback_message)
+                return py_trees.common.Status.SUCCESS
+            self.result_future = self.goal_handle.get_result_async()
+            self.feedback_message = "SmartBackUp goal accepted"
+            self._dbg(self.feedback_message)
+            return py_trees.common.Status.RUNNING
+
+        if self.result_future is not None:
+            rclpy.spin_once(self.node, timeout_sec=0.02)
+            if not self.result_future.done():
+                return py_trees.common.Status.RUNNING
+            result = self.result_future.result()
+            status = getattr(result, "status", None)
+            self.result_future = None
+            self.goal_handle = None
+            self.done = True
+            if status == GoalStatus.STATUS_SUCCEEDED:
+                self.feedback_message = (
+                    f"SmartBackUp completed: distance={self.backup_distance_m:.2f}m "
+                    f"speed={self.backup_speed_mps:.2f}m/s"
+                )
+            else:
+                self.feedback_message = (
+                    f"SmartBackUp finished with status {status}; continuing to Nav2 return home"
+                )
+            self._dbg(self.feedback_message)
+            return py_trees.common.Status.SUCCESS
+
+        return py_trees.common.Status.RUNNING
+
+    def terminate(self, new_status):
+        if (
+            new_status == py_trees.common.Status.INVALID
+            and self.goal_handle is not None
+            and self.result_future is not None
+            and not self.result_future.done()
+            and self.cancel_future is None
+        ):
+            self.cancel_future = self.goal_handle.cancel_goal_async()
+        self.clear_future = None
+        self.clear_request_start_time = None
+        self.send_future = None
+        self.result_future = None
+        self.goal_handle = None
+        self.cancel_future = None
+        self.start_time = None
+
+    def shutdown(self):
+        if self.node is not None:
+            self.node.destroy_node()
+            self.node = None
+            self.clear_client = None
+            self.backup_client = None
+
+    def _send_backup_goal(self):
+        if self.backup_client is None:
+            self.done = True
+            self.feedback_message = "SmartBackUp action client missing; continuing"
+            self._dbg(self.feedback_message)
+            return
+
+        if not self.backup_client.wait_for_server(timeout_sec=self.action_server_timeout_sec):
+            self.done = True
+            self.feedback_message = (
+                f"SmartBackUp action unavailable after "
+                f"{self.action_server_timeout_sec:.1f}s; continuing to Nav2 return home"
+            )
+            self._dbg(self.feedback_message)
+            return
+
+        goal_msg = BackUp.Goal()
+        goal_msg.target.x = self.backup_distance_m
+        goal_msg.target.y = 0.0
+        goal_msg.target.z = 0.0
+        goal_msg.speed = self.backup_speed_mps
+        goal_msg.time_allowance.sec = int(self.action_time_allowance_sec)
+        goal_msg.time_allowance.nanosec = int(
+            (self.action_time_allowance_sec - int(self.action_time_allowance_sec)) * 1e9
+        )
+
+        self.send_future = self.backup_client.send_goal_async(goal_msg)
+        self.feedback_message = (
+            f"Sent SmartBackUp: distance={self.backup_distance_m:.2f}m "
+            f"speed={self.backup_speed_mps:.2f}m/s"
+        )
+        self._dbg(self.feedback_message)
+
+
+# Backward-compatible alias for older trees/imports.
+ClearLocalCostmapAndBackAway = ClearLocalCostmapAndSmartBackUp
 
 
 ############## Delete Later Only for Feature 1 Demo Need to Migrate to real auto nav script)

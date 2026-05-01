@@ -161,7 +161,9 @@ source /opt/ros/humble/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/interbotix_ws/install/setup.bash
 source /home/grocerybot/Desktop/EC463_Team_21_Grocery_Robot/workspace/install/setup.bash
 ros2 run robot_navigation nav_assistant localization-stack \
-  --map-name testmapMain \
+  --map-name ECEMain \
+  --with-base-link-crop true \
+  --bridge-axis-deadband 0.03 \
   --with-nav2-rviz false \
   --serial-port /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 ```

@@ -63,7 +63,7 @@ def create_customer_viperx_tree(bb):
 
     search_timeout_sec = float(getattr(bb, "viperx_search_timeout_sec", 3.0))
     grasp_retry_attempts = int(getattr(bb, "viperx_grasp_retry_attempts", 2))
-    return_home_retry_attempts = int(getattr(bb, "viperx_return_home_retry_attempts", 3))
+    return_home_retry_attempts = int(getattr(bb, "viperx_return_home_retry_attempts", 2))
     order_items_completed_key = "customer_order_items_completed"
 
     setattr(bb, order_items_completed_key, False)
@@ -214,6 +214,7 @@ def create_customer_viperx_tree(bb):
         "ReturnHomeOnSuccess",
         memory=True,
         children=[
+            bt_nodes.ClearLocalCostmapAndSmartBackUp(bb=bb),
             bt_nodes.SetHome(bb),
             py_trees.decorators.Retry(
                 name="RetryReturnHomeOnSuccess",

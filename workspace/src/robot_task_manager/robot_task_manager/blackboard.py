@@ -113,7 +113,7 @@ def setup_blackboard():
     bb.viperx_target_match_distance_m = 0.03
     bb.viperx_cooldown_sec = 3.0
     bb.viperx_grasp_retry_attempts = 5
-    bb.viperx_return_home_retry_attempts = 3
+    bb.viperx_return_home_retry_attempts = 2
     bb.viperx_waist_centering_enabled = True
     bb.viperx_waist_centering_gain = 1.0
     bb.viperx_waist_centering_sign = -1.0
