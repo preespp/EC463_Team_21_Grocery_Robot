@@ -13,8 +13,8 @@ anchors:
   - id: main_rack_anchor
     label: Main rack approach
     type: approach
-    x: 1.219826
-    y: 0.029794
+    x: 1.0
+    y: 0.05
     yaw: 0.0
 
 racks:
@@ -37,8 +37,8 @@ slots:
     product_ids: ["1"]
     product_names: ["GreenTea"]
     nav_pose:
-      x: 1.471416
-      y: -0.087103
+      x: 1.0
+      y: -0.10
       yaw: 0.0
     service_pose:
       x: 1.471416
@@ -53,8 +53,8 @@ slots:
     product_ids: ["3"]
     product_names: ["Chips"]
     nav_pose:
-      x: 1.468512
-      y: 0.274809
+      x: 1.0
+      y: 0.20
       yaw: 0.0
     service_pose:
       x: 1.468512
@@ -69,9 +69,9 @@ slots:
     product_ids: ["2"]
     product_names: ["Water"]
     nav_pose:
-      x: 1.471908
-      y: 0.175608
-      yaw: -0.021676
+      x: 1.0
+      y: 0.15
+      yaw: 0.0
     service_pose:
       x: 1.471908
       y: 0.175608
@@ -85,8 +85,8 @@ slots:
     product_ids: ["4"]
     product_names: ["Can"]
     nav_pose:
-      x: 1.467412
-      y: 0.037917
+      x: 1.0
+      y: 0.05
       yaw: 0.0
     service_pose:
       x: 1.467412
