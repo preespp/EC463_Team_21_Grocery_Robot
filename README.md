@@ -309,8 +309,10 @@ If you want the one-command integrated ROS stack:
 
 ```bash
 ros2 launch robot_task_manager viperx_nav_camera_bt.launch.py \
-  motor_port:=/dev/ttyUSB1 \
-  serial_port:=/dev/ttyUSB0 \
+  motor_port:=/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT88YTG6-if00-port0 \
+  serial_port:=/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
+  use_moveit_rviz:=false \
+  with_nav2_rviz:=true \
   include_ultrasonic:=true
 ```
 
