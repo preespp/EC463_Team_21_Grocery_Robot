@@ -1,0 +1,95 @@
+map:
+  name: ECEMain
+  frame_id: map
+  semantic_id: ECEMain
+
+anchors:
+  - id: home
+    label: Home
+    type: home
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  - id: main_rack_anchor
+    label: Main rack approach
+    type: approach
+    x: 0.75
+    y: 0.0
+    yaw: 0.0
+
+racks:
+  - id: main_rack
+    label: Main rack
+    anchor_id: main_rack_anchor
+    x: 1.2
+    y: 0.0
+    yaw: 0.0
+    width: 0.45
+    depth: 0.25
+    levels: 4
+
+slots:
+  - id: main_green_tea_slot
+    label: GreenTea Slot
+    rack_id: main_rack
+    anchor_id: main_rack_anchor
+    rack_level: 1
+    product_ids: ["1"]
+    product_names: ["GreenTea"]
+    nav_pose:
+      x: 0.75
+      y: -0.27
+      yaw: 0.0
+    service_pose:
+      x: 0.75
+      y: -0.27
+      z: 0.45
+      yaw: 0.0
+  - id: main_chips_slot
+    label: Chips Slot
+    rack_id: main_rack
+    anchor_id: main_rack_anchor
+    rack_level: 2
+    product_ids: ["3"]
+    product_names: ["Chips"]
+    nav_pose:
+      x: 0.75
+      y: -0.09
+      yaw: 0.0
+    service_pose:
+      x: 0.75
+      y: -0.09
+      z: 0.75
+      yaw: 0.0
+  - id: main_water_slot
+    label: Water Slot
+    rack_id: main_rack
+    anchor_id: main_rack_anchor
+    rack_level: 3
+    product_ids: ["2"]
+    product_names: ["Water"]
+    nav_pose:
+      x: 0.75
+      y: 0.09
+      yaw: 0.0
+    service_pose:
+      x: 0.75
+      y: 0.09
+      z: 1.05
+      yaw: 0.0
+  - id: main_can_slot
+    label: Can Slot
+    rack_id: main_rack
+    anchor_id: main_rack_anchor
+    rack_level: 4
+    product_ids: ["4"]
+    product_names: ["Can"]
+    nav_pose:
+      x: 0.75
+      y: 0.27
+      yaw: 0.0
+    service_pose:
+      x: 0.75
+      y: 0.27
+      z: 1.35
+      yaw: 0.0

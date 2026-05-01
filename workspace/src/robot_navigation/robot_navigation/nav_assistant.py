@@ -55,7 +55,7 @@ def _find_repo_root() -> Path:
 
 REPO_ROOT = _find_repo_root()
 DEFAULT_MAPS_DIR = str(REPO_ROOT / "Maps")
-DEFAULT_MAP_NAME = "testmapMain"
+DEFAULT_MAP_NAME = "ECEMain"
 DEFAULT_CMD_TOPICS = '["/cmd_vel","/cmd_vel_nav","/cmd_vel_smoothed"]'
 DEFAULT_LOCALIZATION_CMD_TOPICS = '["/cmd_vel"]'
 DEFAULT_RUN_MODE = "normal"
@@ -498,7 +498,7 @@ def build_localization_launch_cmd(args: argparse.Namespace) -> List[str]:
         "localization-stack", args.with_base_link_crop
     )
     with_semantic_map = args.with_semantic_map
-    if not args.semantic_map_file and args.map_name != "testmapMain":
+    if not args.semantic_map_file and args.map_name != DEFAULT_MAP_NAME:
         with_semantic_map = False
     carto_config = args.cartographer_config_basename or LOCALIZATION_CONFIG_BASENAME[run_mode]
     pbstream, _, map_yaml = map_paths(args.maps_dir, args.map_name)

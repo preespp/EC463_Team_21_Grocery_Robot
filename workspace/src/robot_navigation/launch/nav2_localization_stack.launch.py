@@ -43,11 +43,11 @@ def generate_launch_description():
     package_share = Path(get_package_share_directory("robot_navigation"))
     maps_dir = repo_root / "Maps"
 
-    default_pbstream = str(maps_dir / "testmapMain.pbstream")
-    default_map_yaml = str(maps_dir / "testmapMain.yaml")
+    default_pbstream = str(maps_dir / "ECEMain.pbstream")
+    default_map_yaml = str(maps_dir / "ECEMain.yaml")
     default_nav2_params = str(package_share / "config" / "nav2_params_smac_mppi_omni.yaml")
     default_ekf_params = str(package_share / "config" / "ekf_odom_base_imu.yaml")
-    default_semantic_map = str(package_share / "config" / "semantic_map_testmapMain.yaml")
+    default_semantic_map = str(package_share / "config" / "semantic_map_ECEMain.yaml")
     default_nav_to_pose_bt = str(
         package_share / "config" / "navigate_to_pose_w_smart_backup_recovery.xml"
     )

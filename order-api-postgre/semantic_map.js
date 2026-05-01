@@ -213,7 +213,7 @@ function getSemanticFilePath(repoRoot) {
     "src",
     "robot_navigation",
     "config",
-    "semantic_map_testmapMain.yaml"
+    "semantic_map_ECEMain.yaml"
   );
 }
 
@@ -262,7 +262,7 @@ function normalizeSlot(slot, anchorsById) {
 }
 
 function normalizeBundleForSave(bundle) {
-  const mapName = asString(bundle?.map?.name, "testmapMain");
+  const mapName = asString(bundle?.map?.name, "ECEMain");
   const anchors = asArray(bundle?.anchors).map(normalizeAnchor).filter((item) => item.id);
   const anchorsById = new Map(anchors.map((item) => [item.id, item]));
   const racks = asArray(bundle?.racks).map(normalizeRack).filter((item) => item.id);
@@ -372,7 +372,7 @@ export function getMapPgmPath(repoRoot, mapName) {
 export function getSemanticMapBundle(repoRoot) {
   const semanticFilePath = getSemanticFilePath(repoRoot);
   const semanticRaw = parseYamlSubset(fs.readFileSync(semanticFilePath, "utf8"));
-  const mapName = asString(semanticRaw?.map?.name, "testmapMain");
+  const mapName = asString(semanticRaw?.map?.name, "ECEMain");
   const mapYamlPath = path.join(repoRoot, "Maps", `${mapName}.yaml`);
   const mapPgmPath = getMapPgmPath(repoRoot, mapName);
   const cacheKey = [semanticFilePath, mapYamlPath, mapPgmPath]
