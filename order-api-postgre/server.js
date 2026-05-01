@@ -1241,13 +1241,28 @@ app.post("/inventory/add", async (req, res) => {
 
 // UPDATE INVENTORY
 app.post("/inventory/update", async (req, res) => {
-  const { product_id, stock, x, y, z } = req.body;
+  const { product_id, stock, x, y, z, category_id, category_name } = req.body;
+  const parsedCategoryId = Number(category_id);
+  const nextCategoryId =
+    category_id === undefined ||
+    category_id === null ||
+    category_id === "" ||
+    !Number.isFinite(parsedCategoryId)
+      ? null
+      : parsedCategoryId;
+  const nextCategoryName =
+    typeof category_name === "string" ? category_name.trim() || null : null;
 
   await pool.query(
     `UPDATE inventory
-     SET stock=$1, x=$2, y=$3, z=$4
-     WHERE product_id=$5`,
-    [stock, x, y, z, product_id]
+     SET stock = COALESCE($1, stock),
+         x = COALESCE($2, x),
+         y = COALESCE($3, y),
+         z = COALESCE($4, z),
+         category_id = COALESCE($5, category_id),
+         category_name = COALESCE($6, category_name)
+     WHERE product_id=$7`,
+    [stock, x, y, z, nextCategoryId, nextCategoryName, product_id]
   );
 
   res.json({ ok: true });
